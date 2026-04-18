@@ -89,7 +89,7 @@ Click the green **Code** button at the top of this page, then click **Download Z
 
 ---
 
-### Step 2 — Run the Setup Wizard | 第二步 — 运行「天」安装向导
+### Step 2 (GUI) — Run the Setup Wizard | 第二步（图形界面）— 运行「天」安装向导
 
 Inside the folder, double-click `setup.bat`. A simple window will open and guide you through:
 
@@ -106,6 +106,57 @@ Inside the folder, double-click `setup.bat`. A simple window will open and guide
 2. **连接您的账号** — 向导会自动打开浏览器，引导您注册并获取API密钥。API密钥就像一个密码，让「天」代表您与AI通信。向导会一步步告诉您如何获取，您只需复制粘贴即可。
 3. **选择工具和技能包** — 勾选您希望AI能够执行的功能
 4. **等待安装完成** — 「天」全自动处理，无需任何操作
+
+---
+
+### Step 2 (CLI) — Install via Terminal | 第二步（命令行）— 通过终端安装
+
+> For users comfortable with PowerShell or Command Prompt.
+> 适合熟悉 PowerShell 或命令提示符的用户。
+
+**1. Open a terminal in the TIAN folder**
+
+In File Explorer, navigate to the unzipped TIAN folder. Click the address bar at the top, type `cmd`, and press Enter. A terminal window will open in the right place.
+
+在文件资源管理器中进入解压后的 TIAN 文件夹，点击顶部地址栏，输入 `cmd`，回车即可在当前目录打开终端窗口。
+
+**2. Run the interactive CLI setup**
+
+```bat
+tian-cli setup
+```
+
+Follow the prompts to choose your backend, paste your API key, and select tools.
+
+按照提示选择AI引擎、粘贴API密钥并选择工具。
+
+**Or install in one line (no prompts)**
+
+```bat
+tian-cli install --backend claude-code --key YOUR_API_KEY_HERE --mcp filesystem,web-search --yes
+```
+
+Replace `YOUR_API_KEY_HERE` with your actual key. Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys) for Claude, or [platform.openai.com](https://platform.openai.com/api-keys) for Codex.
+
+将 `YOUR_API_KEY_HERE` 替换为您的真实密钥。Claude 密钥在 [console.anthropic.com](https://console.anthropic.com/settings/keys) 获取，Codex 密钥在 [platform.openai.com](https://platform.openai.com/api-keys) 获取。
+
+**3. Verify the install**
+
+```bat
+tian-cli status
+```
+
+**4. Add more tools any time**
+
+```bat
+tian-cli list mcp          :: see all available tools
+tian-cli add mcp github    :: add a specific tool
+tian-cli add skill data-analyst
+```
+
+Run `tian-cli help` for the full command reference.
+
+运行 `tian-cli help` 查看完整命令说明。
 
 ---
 
