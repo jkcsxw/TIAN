@@ -1,14 +1,14 @@
-# Tian — Talking Is All You Need
+# TIAN — Talking Is All You Need
 
 > Set up AI on your computer in minutes. No coding. No technical background. Just follow the steps.
 
 ---
 
-## What is Tian?
+## What is TIAN?
 
-Tian is a simple setup tool that helps **anyone** — even with zero knowledge of AI or software — get powerful AI assistants running on their Windows computer. Whether you want help with daily tasks or want to automate parts of your business, Tian makes it easy.
+TIAN is a simple setup tool that helps **anyone** — even with zero knowledge of AI or software — get powerful AI assistants running on their Windows computer. Whether you want help with daily tasks or want to automate parts of your business, TIAN makes it easy.
 
-You don't need to know what "terminal", "Python", or "API" means. If you can install an app on Windows, you can use Tian.
+You don't need to know what "terminal", "Python", or "API" means. If you can install an app on Windows, you can use TIAN.
 
 ---
 
@@ -40,7 +40,7 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ## Getting Started
 
-### Step 1 — Download Tian
+### Step 1 — Download TIAN
 
 Click the green **Code** button at the top of this page, then click **Download ZIP**. Unzip the folder somewhere easy to find, like your Desktop.
 
@@ -91,9 +91,9 @@ More skills can be added from the community or built for your specific business.
 
 ---
 
-## Extending Tian
+## Extending TIAN
 
-Tian is designed to be extensible. Developers and technically inclined users can:
+TIAN is designed to be extensible. Developers and technically inclined users can:
 
 - Add new AI backends by dropping in a connector module
 - Create and share custom skills as simple configuration files
@@ -119,4 +119,4 @@ MIT — free to use, modify, and share.
 
 ---
 
-*Tian (天) means "sky" — because the only limit is your imagination.*
+*TIAN (天) means "sky" — because the only limit is your imagination.*
