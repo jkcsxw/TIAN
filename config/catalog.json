@@ -1,0 +1,242 @@
+{
+  "backends": [
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code (Anthropic)",
+      "description": "Anthropic's powerful AI assistant for everyday tasks, writing, research, and automation. Recommended for most users.",
+      "npmPackage": "@anthropic-ai/claude-code",
+      "cliCommand": "claude",
+      "apiKeyEnvVar": "ANTHROPIC_API_KEY",
+      "apiKeyLabel": "Anthropic API Key",
+      "apiKeyHint": "Starts with sk-ant-...",
+      "apiKeyUrl": "https://console.anthropic.com/settings/keys",
+      "mcpConfigTarget": "claude_code",
+      "defaultMcpServers": ["filesystem", "web-search"],
+      "defaultSkills": []
+    },
+    {
+      "id": "openai-codex",
+      "displayName": "OpenAI Codex CLI",
+      "description": "OpenAI's coding-focused AI assistant. Great for developers and technical tasks.",
+      "npmPackage": "@openai/codex",
+      "cliCommand": "codex",
+      "apiKeyEnvVar": "OPENAI_API_KEY",
+      "apiKeyLabel": "OpenAI API Key",
+      "apiKeyHint": "Starts with sk-...",
+      "apiKeyUrl": "https://platform.openai.com/api-keys",
+      "mcpConfigTarget": "openai",
+      "mcpConfigPath": "%APPDATA%\\OpenAI\\mcp_config.json",
+      "defaultMcpServers": ["filesystem"],
+      "defaultSkills": []
+    },
+    {
+      "id": "claude-desktop",
+      "displayName": "Claude Desktop (Anthropic)",
+      "description": "The Claude desktop app — a user-friendly window for chatting with Claude. No terminal ever needed.",
+      "downloadUrl": "https://claude.ai/download",
+      "installType": "desktop-app",
+      "cliCommand": null,
+      "apiKeyEnvVar": "ANTHROPIC_API_KEY",
+      "apiKeyLabel": "Anthropic API Key",
+      "apiKeyHint": "Starts with sk-ant-... (optional if you log in with your Anthropic account)",
+      "apiKeyUrl": "https://console.anthropic.com/settings/keys",
+      "mcpConfigTarget": "claude_desktop",
+      "defaultMcpServers": ["filesystem", "web-search"],
+      "defaultSkills": []
+    }
+  ],
+  "mcpServers": [
+    {
+      "id": "filesystem",
+      "displayName": "File System Access",
+      "description": "Let your AI read, write, and organize files on your computer.",
+      "category": "Productivity",
+      "npmPackage": "@modelcontextprotocol/server-filesystem",
+      "configKey": "filesystem",
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "%USERPROFILE%\\Documents"]
+      }
+    },
+    {
+      "id": "web-search",
+      "displayName": "Web Search",
+      "description": "Let your AI search the internet for up-to-date information.",
+      "category": "Productivity",
+      "npmPackage": "@modelcontextprotocol/server-brave-search",
+      "configKey": "brave-search",
+      "requiredEnvVars": [
+        {
+          "name": "BRAVE_API_KEY",
+          "label": "Brave Search API Key",
+          "hint": "Free tier available",
+          "url": "https://api.search.brave.com/register"
+        }
+      ],
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+        "env": {
+          "BRAVE_API_KEY": "%BRAVE_API_KEY%"
+        }
+      }
+    },
+    {
+      "id": "memory",
+      "displayName": "Persistent Memory",
+      "description": "Give your AI a memory that persists across conversations.",
+      "category": "Productivity",
+      "npmPackage": "@modelcontextprotocol/server-memory",
+      "configKey": "memory",
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"]
+      }
+    },
+    {
+      "id": "github",
+      "displayName": "GitHub Integration",
+      "description": "Let your AI read and manage GitHub repositories, issues, and pull requests.",
+      "category": "Developer",
+      "npmPackage": "@modelcontextprotocol/server-github",
+      "configKey": "github",
+      "requiredEnvVars": [
+        {
+          "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
+          "label": "GitHub Personal Access Token",
+          "hint": "Create one at github.com/settings/tokens",
+          "url": "https://github.com/settings/tokens"
+        }
+      ],
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_PERSONAL_ACCESS_TOKEN": "%GITHUB_PERSONAL_ACCESS_TOKEN%"
+        }
+      }
+    },
+    {
+      "id": "google-drive",
+      "displayName": "Google Drive",
+      "description": "Let your AI access and manage your Google Drive files and documents.",
+      "category": "Business",
+      "npmPackage": "@modelcontextprotocol/server-gdrive",
+      "configKey": "gdrive",
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-gdrive"]
+      }
+    },
+    {
+      "id": "slack",
+      "displayName": "Slack",
+      "description": "Let your AI read and send Slack messages on your behalf.",
+      "category": "Business",
+      "npmPackage": "@modelcontextprotocol/server-slack",
+      "configKey": "slack",
+      "requiredEnvVars": [
+        {
+          "name": "SLACK_BOT_TOKEN",
+          "label": "Slack Bot Token",
+          "hint": "Create a Slack app at api.slack.com",
+          "url": "https://api.slack.com/apps"
+        },
+        {
+          "name": "SLACK_TEAM_ID",
+          "label": "Slack Team ID",
+          "hint": "Found in your Slack workspace URL"
+        }
+      ],
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-slack"],
+        "env": {
+          "SLACK_BOT_TOKEN": "%SLACK_BOT_TOKEN%",
+          "SLACK_TEAM_ID": "%SLACK_TEAM_ID%"
+        }
+      }
+    },
+    {
+      "id": "postgres",
+      "displayName": "PostgreSQL Database",
+      "description": "Let your AI query and analyze your PostgreSQL database.",
+      "category": "Business",
+      "npmPackage": "@modelcontextprotocol/server-postgres",
+      "configKey": "postgres",
+      "requiredEnvVars": [
+        {
+          "name": "POSTGRES_CONNECTION_STRING",
+          "label": "PostgreSQL Connection String",
+          "hint": "e.g. postgresql://user:pass@localhost/mydb"
+        }
+      ],
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-postgres", "%POSTGRES_CONNECTION_STRING%"]
+      }
+    },
+    {
+      "id": "puppeteer",
+      "displayName": "Web Browser Control",
+      "description": "Let your AI control a web browser to fill forms, scrape data, and automate web tasks.",
+      "category": "Automation",
+      "npmPackage": "@modelcontextprotocol/server-puppeteer",
+      "configKey": "puppeteer",
+      "configSchema": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+      }
+    }
+  ],
+  "skills": [
+    {
+      "id": "email-assistant",
+      "displayName": "Email Assistant",
+      "description": "Draft, summarize, and manage emails with AI help.",
+      "category": "Daily Use",
+      "source": "builtin",
+      "promptFile": "skills/email-assistant.md"
+    },
+    {
+      "id": "meeting-notes",
+      "displayName": "Meeting Notes",
+      "description": "Turn raw notes or transcripts into structured action items.",
+      "category": "Daily Use",
+      "source": "builtin",
+      "promptFile": "skills/meeting-notes.md"
+    },
+    {
+      "id": "document-summarizer",
+      "displayName": "Document Summarizer",
+      "description": "Summarize long documents, PDFs, and reports instantly.",
+      "category": "Daily Use",
+      "source": "builtin",
+      "promptFile": "skills/document-summarizer.md"
+    },
+    {
+      "id": "customer-support",
+      "displayName": "Customer Support Templates",
+      "description": "Generate professional customer support responses and templates.",
+      "category": "Business",
+      "source": "builtin",
+      "promptFile": "skills/customer-support.md"
+    },
+    {
+      "id": "data-analyst",
+      "displayName": "Data Analyst",
+      "description": "Analyze spreadsheets and data, generate insights and summaries.",
+      "category": "Business",
+      "source": "builtin",
+      "promptFile": "skills/data-analyst.md"
+    },
+    {
+      "id": "social-media",
+      "displayName": "Social Media Content",
+      "description": "Create posts, captions, and content for LinkedIn, Twitter, and more.",
+      "category": "Marketing",
+      "source": "builtin",
+      "promptFile": "skills/social-media.md"
+    }
+  ]
+}
