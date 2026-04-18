@@ -320,25 +320,113 @@ You can switch backends at any time by re-running `setup.bat`.
 
 ---
 
-## Available Skills & MCP Tools | 可用技能与MCP工具
+## MCP Tools — Give Your AI Hands | MCP工具 — 给AI装上"手"
 
-Skills extend what your AI can do. Install only what you need.
-技能包扩展AI能力，按需安装即可。
+### What is an MCP tool? | 什么是MCP工具？
 
-**Daily Use | 日常使用**
-- Email drafting and summarization | 邮件起草与摘要
-- Web search and research | 网络搜索与调研
-- Document and PDF summarizer | 文档与PDF摘要
-- Meeting notes and action items | 会议记录与待办事项
+By default, your AI can only read and write text in the chat window. An **MCP tool** is a plugin that gives your AI the ability to actually *do things* — read files on your computer, search the web, check your calendar, send a message, query a database, and more.
 
-**Business | 商业用途**
-- Customer support templates | 客户服务模板
-- Invoice and spreadsheet automation | 发票与表格自动化
-- CRM and data entry helpers | CRM与数据录入辅助
-- Social media content creation | 社交媒体内容创作
+Think of it like this: the AI is the brain, and MCP tools are the hands. Without them, it can think and talk. With them, it can act.
 
-More skills can be added from the community or built for your specific business.
-更多技能包可由社区添加，也可针对您的业务为「天」定制开发。
+**You do not need to know what MCP stands for.** Just pick the tools that match what you want your AI to do. TIAN installs and connects them automatically.
+
+默认情况下，AI只能在对话窗口中读写文字。**MCP工具**是一种插件，让AI能够真正"做事"——读取您电脑上的文件、搜索网页、查看日历、发送消息、查询数据库等。
+
+可以这样理解：AI是大脑，MCP工具是双手。没有工具，它只能思考和说话；有了工具，它就能付诸行动。
+
+**您不需要了解MCP是什么缩写。** 只需根据您希望AI能做的事情，勾选对应工具，「天」会自动完成安装和配置。
+
+---
+
+### Which MCP tools should I pick? | 我应该选哪些MCP工具？
+
+| If you want your AI to… | Install this tool | 如果您希望AI能… | 安装此工具 |
+|---|---|---|---|
+| Read and save files on your computer | File System Access | 读写电脑上的文件 | 文件系统访问 |
+| Search the internet for up-to-date info | Web Search | 搜索最新网络信息 | 网络搜索 |
+| Remember things between conversations | Persistent Memory | 在多次对话间记住信息 | 持久记忆 |
+| Read and manage GitHub projects | GitHub Integration | 读写GitHub项目 | GitHub集成 |
+| Access Google Drive documents | Google Drive | 访问Google云端文档 | Google云端硬盘 |
+| Read and send Slack messages | Slack | 读写Slack消息 | Slack集成 |
+| Query your database | PostgreSQL Database | 查询数据库 | PostgreSQL数据库 |
+| Automate web browser actions | Web Browser Control | 自动化浏览器操作 | 网页浏览器控制 |
+
+> **Not sure? Start with just "File System Access" and "Web Search".** These two cover most everyday needs and you can always add more later.
+>
+> **不确定选哪个？从"文件系统访问"和"网络搜索"开始即可。** 这两个工具能满足大多数日常需求，之后可以随时添加更多。
+
+---
+
+## Skills — Teach Your AI Your Way of Working | 技能包 — 教AI按您的方式工作
+
+### What is a skill? | 什么是技能包？
+
+A **skill** is a set of instructions that tells your AI how to behave for a specific type of task. Without a skill, your AI is a generalist — it can do many things but doesn't know your preferred style, format, or workflow. With a skill, it knows exactly how you like things done.
+
+For example, the **Email Assistant** skill tells your AI to always write emails in a clear, professional tone and ask for the recipient and purpose if you haven't specified them. The **Meeting Notes** skill tells it to always output a summary, decisions, and action items table — so you get a consistent format every time.
+
+**You do not need to write or edit any code to use skills.** They are installed automatically. Just tell your AI what you want to do, and it will apply the right approach.
+
+**技能包**是一组指令，告诉AI如何处理特定类型的任务。没有技能包，AI是通才——什么都能做，但不了解您的偏好风格和工作流程。有了技能包，它就能完全按照您习惯的方式工作。
+
+例如，**邮件助手**技能包会让AI始终以清晰、专业的语气撰写邮件，并在您未指定收件人或目的时主动询问。**会议记录**技能包会让AI始终输出摘要、决策事项和行动清单表格，让您每次都获得一致的格式。
+
+**使用技能包无需编写或修改任何代码。** 技能包会自动安装，您只需告诉AI您想做什么，它会自动应用正确的处理方式。
+
+---
+
+### Which skills should I pick? | 我应该选哪些技能包？
+
+| If you regularly need to… | Install this skill | 如果您经常需要… | 安装此技能包 |
+|---|---|---|---|
+| Write or reply to emails | Email Assistant | 撰写或回复邮件 | 邮件助手 |
+| Turn meeting notes into action items | Meeting Notes | 将会议记录转化为行动清单 | 会议记录 |
+| Summarise long documents or reports | Document Summarizer | 总结长文档或报告 | 文档摘要 |
+| Write customer service replies | Customer Support Templates | 撰写客户服务回复 | 客服模板 |
+| Analyse data from spreadsheets | Data Analyst | 分析表格数据 | 数据分析师 |
+| Create social media posts | Social Media Content | 创作社交媒体内容 | 社交媒体内容 |
+
+> **Not sure? Pick "Email Assistant" and "Document Summarizer" to start.** These are the two most universally useful skills for both personal and business use.
+>
+> **不确定选哪个？从"邮件助手"和"文档摘要"开始。** 这两个技能包对个人和商业用途都最为实用。
+
+---
+
+### How do I use a skill after installing it? | 安装技能包后如何使用？
+
+You don't need to do anything special — just chat naturally. Here are some examples of what to say:
+
+安装后无需任何特殊操作，直接自然对话即可。以下是一些示例：
+
+**Email Assistant | 邮件助手**
+> "Write an email to my supplier asking why our order is delayed."
+> "帮我写一封邮件给供应商，询问订单为何延误。"
+
+**Meeting Notes | 会议记录**
+> "Here are my notes from today's meeting: [paste notes]. Please format them."
+> "这是今天会议的记录：[粘贴记录]。请帮我整理格式。"
+
+**Document Summarizer | 文档摘要**
+> "Summarise this report in 5 bullet points: [paste text]"
+> "把这份报告总结成5条要点：[粘贴文字]"
+
+**Data Analyst | 数据分析师**
+> "Here is my sales data for Q1: [paste table]. What are the key trends?"
+> "这是我Q1的销售数据：[粘贴表格]。有哪些关键趋势？"
+
+---
+
+### Can I add or remove tools and skills later? | 之后可以添加或删除工具和技能包吗？
+
+Yes — at any time.
+
+可以，随时都行。
+
+- **GUI:** Re-run `setup.bat` and your previous choices will be pre-selected. Change whatever you like.
+- **CLI:** Use `tian-cli add mcp <id>`, `tian-cli add skill <id>`, or `tian-cli remove mcp <id>`.
+
+- **图形界面：** 重新运行 `setup.bat`，您之前的选择会自动预选，按需修改即可。
+- **命令行：** 使用 `tian-cli add mcp <id>`、`tian-cli add skill <id>` 或 `tian-cli remove mcp <id>`。
 
 ---
 
