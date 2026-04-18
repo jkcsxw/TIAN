@@ -4,6 +4,8 @@
 > Set up AI on your computer in minutes. No coding. No technical background. Just follow the steps.
 > 几分钟内在您的电脑上安装好AI助手。无需编程，无需技术背景，按步骤操作即可。
 
+**[README](README.md)** · [Contributing](CONTRIBUTING.md) · [Testing](TESTING.md)
+
 ---
 
 ## What is TIAN? | 什么是「天」？
@@ -559,7 +561,7 @@ TIAN is designed to be extensible. Developers and technically inclined users can
 - Create and share custom skills as simple Markdown files
 - Package new MCP servers for community use
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details. For running and writing tests, see [`TESTING.md`](TESTING.md).
 
 ---
 
@@ -569,7 +571,27 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
 - 创建并分享自定义技能包（Markdown文件格式）
 - 为社区打包新的MCP服务器
 
-详情请参阅 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+详情请参阅 [`CONTRIBUTING.md`](CONTRIBUTING.md)。如需了解测试说明，请参阅 [`TESTING.md`](TESTING.md)。
+
+---
+
+## Test Status | 测试状态
+
+[![CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg)](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml)
+
+All tests run automatically on every push and pull request via GitHub Actions.
+
+每次推送和 Pull Request 都会通过 GitHub Actions 自动运行全部测试。
+
+| Suite | Platform | Status |
+|-------|----------|--------|
+| Pester (PowerShell) | Windows | ![Windows](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+| Bash | Linux (Ubuntu) | ![Linux](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+| Bash + Pester | macOS | ![macOS](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+
+Full run history: [Actions → CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml) · See [`TESTING.md`](TESTING.md) for how to run tests locally.
+
+完整运行记录：[Actions → CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml) · 本地运行测试说明详见 [`TESTING.md`](TESTING.md)。
 
 ---
 
