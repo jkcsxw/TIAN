@@ -575,26 +575,6 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details. For running and writing te
 
 ---
 
-## Test Status | 测试状态
-
-[![CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg)](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml)
-
-All tests run automatically on every push and pull request via GitHub Actions.
-
-每次推送和 Pull Request 都会通过 GitHub Actions 自动运行全部测试。
-
-| Suite | Platform | Status |
-|-------|----------|--------|
-| Pester (PowerShell) | Windows | ![Windows](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
-| Bash | Linux (Ubuntu) | ![Linux](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
-| Bash + Pester | macOS | ![macOS](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
-
-Full run history: [Actions → CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml) · See [`TESTING.md`](TESTING.md) for how to run tests locally.
-
-完整运行记录：[Actions → CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml) · 本地运行测试说明详见 [`TESTING.md`](TESTING.md)。
-
----
-
 ## Roadmap | 开发计划
 
 - [x] One-click Windows installer (.exe) | 一键Windows安装程序（.exe）

@@ -110,6 +110,22 @@ The wizard is split into pages under `wizard/pages/`. Each page is a self-contai
 
 ---
 
+## Test Status
+
+[![CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg)](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml)
+
+All tests run automatically on every push and pull request via GitHub Actions.
+
+| Suite | Platform | Status |
+|-------|----------|--------|
+| Pester (PowerShell) | Windows | ![Windows](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+| Bash | Linux (Ubuntu) | ![Linux](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+| Bash + Pester | macOS | ![macOS](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml/badge.svg) |
+
+Full run history: [Actions → CI](https://github.com/jkcsxw/TIAN/actions/workflows/ci.yml) · See [`TESTING.md`](TESTING.md) for full test layout and how to write new tests.
+
+---
+
 ## Testing
 
 ### Running Tests
