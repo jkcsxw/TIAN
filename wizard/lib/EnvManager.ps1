@@ -11,12 +11,21 @@ function Set-ApiKey {
     }
 
     $varName = $Backend.apiKeyEnvVar
+    $isMac   = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
+
     Append-Log $LogBox "Setting $varName environment variable..." "info"
 
-    [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "User")
-    $env:($varName) = $ApiKey.Trim()
+    if ($isMac) {
+        $profile = if (Test-Path "$env:HOME/.zshrc") { "$env:HOME/.zshrc" } else { "$env:HOME/.bash_profile" }
+        $existing = Get-Content $profile -ErrorAction SilentlyContinue | Where-Object { $_ -notmatch "^export $varName=" }
+        ($existing + "export $varName=`"$($ApiKey.Trim())`"") | Set-Content $profile -Encoding UTF8
+        [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "Process")
+    } else {
+        [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "User")
+        $env:($varName) = $ApiKey.Trim()
+    }
 
-    Append-Log $LogBox "$varName saved to your user environment." "success"
+    Append-Log $LogBox "$varName saved." "success"
 }
 
 function Set-ExtraEnvVar {
