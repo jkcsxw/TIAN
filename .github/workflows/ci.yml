@@ -51,20 +51,7 @@ jobs:
         run: chmod +x tests/run-tests.sh tests/bash/*.sh
 
       - name: Run bash tests
-        run: |
-          PASS=0; FAIL=0
-          for f in tests/bash/test-*.sh; do
-            echo ""
-            echo "── $(basename "$f") ────────────────────────────"
-            if bash "$f"; then
-              ((PASS++))
-            else
-              ((FAIL++))
-            fi
-          done
-          echo ""
-          echo "Results: $PASS suite(s) passed, $FAIL suite(s) failed"
-          [[ $FAIL -eq 0 ]]
+        run: bash tests/run-tests.sh
 
   # ── Bash tests (macOS) ───────────────────────────────────────────────────────
   test-macos:
@@ -75,9 +62,6 @@ jobs:
 
       - name: Make test scripts executable
         run: chmod +x tests/run-tests.sh tests/bash/*.sh
-
-      - name: Install PowerShell Core
-        run: brew install --cask powershell
 
       - name: Run all tests (bash + Pester)
         run: bash tests/run-tests.sh

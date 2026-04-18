@@ -200,12 +200,13 @@ Describe "Invoke-Build — error path (no iscc)" {
         $script = "$(Get-TianRoot)/installer/build-installer.ps1"
 
         # Intercept iscc lookup by prepending a function override on the command line
-        $result = & $pwsh -NoProfile -Command "
+        & $pwsh -NoProfile -Command "
             function Get-Command { param([string]\$Name,[string]\$ErrorAction) `$null }
             function Test-Path   { param(\$Path) `$false }
             & '$script' 2>&1
             exit `$LASTEXITCODE
         "
-        $LASTEXITCODE | Should -Be 1
+        $exitCode = $LASTEXITCODE
+        $exitCode | Should -Be 1
     }
 }
