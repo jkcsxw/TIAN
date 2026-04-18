@@ -1,28 +1,39 @@
 # Scheduler — wraps Windows Task Scheduler (schtasks) to run TIAN tasks on a timed basis
 # Schedule definitions stored in ~/.tian/schedules.json
 
-$TIAN_SCHEDULES_FILE = "$env:USERPROFILE\.tian\schedules.json"
+$_tianHome           = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+$global:TIAN_SCHEDULES_FILE = Join-Path $_tianHome ".tian" "schedules.json"
 $TIAN_DIR_ENV        = $TianDir  # inherited from tian.ps1 scope
 
 function Ensure-ScheduleFile {
-    $dir = Split-Path $TIAN_SCHEDULES_FILE -Parent
+    $dir = Split-Path $global:TIAN_SCHEDULES_FILE -Parent
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    if (-not (Test-Path $TIAN_SCHEDULES_FILE)) { '[]' | Set-Content $TIAN_SCHEDULES_FILE -Encoding UTF8 }
+    if (-not (Test-Path $global:TIAN_SCHEDULES_FILE)) { '[]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8 }
 }
 
 function Read-Schedules {
     Ensure-ScheduleFile
-    $raw = Get-Content $TIAN_SCHEDULES_FILE -Raw -ErrorAction SilentlyContinue
-    if (-not $raw -or $raw.Trim() -eq '') { return @() }
+    $raw = Get-Content $global:TIAN_SCHEDULES_FILE -Raw -ErrorAction SilentlyContinue
+    if (-not $raw -or $raw.Trim() -eq '' -or $raw.Trim() -eq '[]') { return [array]@() }
     $parsed = $raw | ConvertFrom-Json
-    if ($parsed -isnot [array]) { return @($parsed) }
-    return $parsed
+    if ($null -eq $parsed)         { return [array]@() }
+    if ($parsed -isnot [array])    { return [array]@($parsed) }
+    return [array]$parsed
 }
 
 function Save-Schedules {
     param([array]$Schedules)
     Ensure-ScheduleFile
-    $Schedules | ConvertTo-Json -Depth 5 | Set-Content $TIAN_SCHEDULES_FILE -Encoding UTF8
+    if ($null -eq $Schedules -or $Schedules.Count -eq 0) {
+        '[]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+    } else {
+        ConvertTo-Json $Schedules -Depth 5 | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+    }
+}
+
+function Invoke-Launchctl {
+    param([string]$Action, [string]$PlistFile)
+    & launchctl $Action $PlistFile 2>&1
 }
 
 function Get-TaskName {
@@ -94,7 +105,7 @@ function Add-Schedule {
 </plist>
 "@
         Set-Content -Path $plistFile -Value $plistContent -Encoding UTF8
-        & launchctl load $plistFile 2>/dev/null
+        Invoke-Launchctl -Action 'load' -PlistFile $plistFile
         Write-Ok "Schedule '$Name' registered with launchd."
 
         $entry = [PSCustomObject]@{
@@ -149,7 +160,7 @@ function Remove-Schedule {
 
     if ($isMac) {
         if ($entry.plistFile -and (Test-Path $entry.plistFile)) {
-            & launchctl unload $entry.plistFile 2>/dev/null
+            Invoke-Launchctl -Action 'unload' -PlistFile $entry.plistFile
             Remove-Item $entry.plistFile -ErrorAction SilentlyContinue
         }
     } else {

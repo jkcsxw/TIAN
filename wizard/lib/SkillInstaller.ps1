@@ -2,8 +2,8 @@ function Install-Skills {
     param(
         [array]$SelectedSkills,
         [string]$TianDir,
-        [System.Windows.Forms.RichTextBox]$LogBox,
-        [System.Windows.Forms.ProgressBar]$ProgressBar
+        $LogBox,
+        $ProgressBar
     )
 
     if (-not $SelectedSkills -or $SelectedSkills.Count -eq 0) {

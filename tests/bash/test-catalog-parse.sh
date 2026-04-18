@@ -88,17 +88,17 @@ print(len(missing))
 }
 it "every MCP server has an id" _test_mcp_has_id
 
-_test_mcp_has_command() {
+_test_mcp_has_configSchema() {
     local bad
     bad=$(py3 "
 import json
 c=json.load(open('$CATALOG'))
-missing=[s for s in c['mcpServers'] if 'command' not in s]
+missing=[s for s in c['mcpServers'] if 'configSchema' not in s or 'command' not in s.get('configSchema',{})]
 print(len(missing))
 ")
     assert_eq "$bad" "0"
 }
-it "every MCP server has a command" _test_mcp_has_command
+it "every MCP server has a configSchema with command" _test_mcp_has_configSchema
 
 suite "Skills fields"
 

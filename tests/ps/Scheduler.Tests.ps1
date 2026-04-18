@@ -4,19 +4,19 @@ BeforeAll {
     . "$(Get-TianRoot)/wizard/lib/McpConfigurator.ps1"
 
     $script:TempSchedDir = New-TestTempDir
-    $TIAN_SCHEDULES_FILE = Join-Path $script:TempSchedDir "schedules.json"
+    $_tmpSchedFile = Join-Path $script:TempSchedDir "schedules.json"
 
-    # Stub Append-Log and Write-* so scheduler doesn't need full CLI context
+    # Stub Write-* so scheduler doesn't need full CLI context
     function global:Write-Ok   { param($t) }
     function global:Write-Info { param($t) }
     function global:Write-Warn { param($t) }
-    function global:Write-Fail { param($t) Write-Error $t }
+    function global:Write-Fail { param($t) throw $t }
 
     . "$(Get-TianRoot)/cli/scheduler.ps1"
-    Set-Variable -Name TIAN_SCHEDULES_FILE -Value $TIAN_SCHEDULES_FILE -Scope Global
+    # Restore to temp path (scheduler.ps1 overwrote the local var when dot-sourced)
+    $global:TIAN_SCHEDULES_FILE = $_tmpSchedFile
 }
 AfterAll { Remove-Item $script:TempSchedDir -Recurse -Force -ErrorAction SilentlyContinue }
-BeforeEach { Remove-Item $TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue }
 
 Describe "Get-TaskName" {
     It "prefixes with TIAN_" {
@@ -31,17 +31,17 @@ Describe "Get-TaskName" {
 }
 
 Describe "Read-Schedules / Save-Schedules round-trip" {
+    BeforeEach { Remove-Item $global:TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue }
+
     It "returns empty array when file does not exist" {
-        $result = Read-Schedules
-        $result | Should -BeOfType [array]
-        $result.Count | Should -Be 0
+        $items = @(Read-Schedules)
+        $items.Count | Should -Be 0
     }
     It "normalises single-item array" {
         Ensure-ScheduleFile
-        '[{"name":"s1","prompt":"p"}]' | Set-Content $TIAN_SCHEDULES_FILE -Encoding UTF8
-        $result = Read-Schedules
-        $result | Should -BeOfType [array]
-        $result.Count | Should -Be 1
+        '[{"name":"s1","prompt":"p"}]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+        $items = @(Read-Schedules)
+        $items.Count | Should -Be 1
     }
     It "round-trips multi-item array" {
         $entries = @(
@@ -58,10 +58,10 @@ Describe "Read-Schedules / Save-Schedules round-trip" {
 
 Describe "Add-Schedule" {
     BeforeEach {
-        Remove-Item $TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
+        Remove-Item $global:TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
         # Mock Start-Process so schtasks/launchctl never runs
-        Mock Start-Process { [PSCustomObject]@{ ExitCode = 0 } }
-        Mock launchctl { }
+        Mock Start-Process     { [PSCustomObject]@{ ExitCode = 0 } }
+        Mock Invoke-Launchctl  { }
     }
 
     It "fails when Name is missing" {
@@ -99,22 +99,22 @@ Describe "Add-Schedule" {
         }
 
         It "uses ONCE for once repeat" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             Add-Schedule -Name "once-test" -Prompt "p" -Time "08:00" -Repeat "once" -TianDir (Get-TianRoot)
             $script:CapturedArgs | Should -Contain "ONCE"
         }
         It "uses HOURLY for hourly repeat" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             Add-Schedule -Name "hourly-test" -Prompt "p" -Time "08:00" -Repeat "hourly" -TianDir (Get-TianRoot)
             $script:CapturedArgs | Should -Contain "HOURLY"
         }
         It "uses DAILY for daily repeat" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             Add-Schedule -Name "daily-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
             $script:CapturedArgs | Should -Contain "DAILY"
         }
         It "uses WEEKLY and includes /D for weekly repeat with day" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             Add-Schedule -Name "weekly-test" -Prompt "p" -Time "09:00" -Repeat "weekly" -DayOfWeek "MON" -TianDir (Get-TianRoot)
             $script:CapturedArgs | Should -Contain "WEEKLY"
             $script:CapturedArgs | Should -Contain "/D"
@@ -125,9 +125,9 @@ Describe "Add-Schedule" {
 
 Describe "Remove-Schedule" {
     BeforeEach {
-        Remove-Item $TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
-        Mock Start-Process { [PSCustomObject]@{ ExitCode = 0 } }
-        Mock launchctl { }
+        Remove-Item $global:TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
+        Mock Start-Process     { [PSCustomObject]@{ ExitCode = 0 } }
+        Mock Invoke-Launchctl  { }
         # Pre-populate two schedules
         Save-Schedules @(
             [PSCustomObject]@{ name = "keep";   taskName = "TIAN_keep";   prompt = "p1"; time = "08:00"; repeat = "daily" },

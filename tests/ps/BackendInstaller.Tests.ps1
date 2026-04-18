@@ -15,20 +15,20 @@ Describe "Write-Launcher" {
         BeforeAll { if ($IsMacOS) { return } }
 
         It "creates launcher.bat on Windows" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             $backend = [PSCustomObject]@{ installType = "cli"; cliCommand = "claude"; displayName = "Claude" }
             Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
             Test-Path (Join-Path $script:TempDir "launcher.bat") | Should -BeTrue
         }
         It "launcher.bat contains the cliCommand" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             $backend = [PSCustomObject]@{ installType = "cli"; cliCommand = "claude"; displayName = "Claude" }
             Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
             $content = Get-Content (Join-Path $script:TempDir "launcher.bat") -Raw
             $content | Should -Match "claude"
         }
         It "desktop-app launcher references Claude.exe on Windows" {
-            if ($IsMacOS) { Set-ItResult -Skipped -Because "Windows only" }
+            if (-not $IsWindows) { Set-ItResult -Skipped -Because "Windows only" }
             $backend = [PSCustomObject]@{ installType = "desktop-app"; cliCommand = $null; displayName = "Claude Desktop"; downloadUrl = "https://example.com" }
             Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
             $content = Get-Content (Join-Path $script:TempDir "launcher.bat") -Raw

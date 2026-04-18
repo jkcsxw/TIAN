@@ -2,24 +2,24 @@ function Get-McpConfigPath {
     param($Backend)
 
     $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix' -and (uname) -eq 'Darwin')
-    $home  = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+    $homeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 
     switch ($Backend.mcpConfigTarget) {
         "claude_desktop" {
-            if ($isMac) { return "$home/Library/Application Support/Claude/claude_desktop_config.json" }
+            if ($isMac) { return "$homeDir/Library/Application Support/Claude/claude_desktop_config.json" }
             return "$env:APPDATA\Claude\claude_desktop_config.json"
         }
         "claude_code" {
-            return "$home/.claude/settings.json"
+            return "$homeDir/.claude/settings.json"
         }
         default {
             if ($Backend.mcpConfigPath) {
                 $path = $Backend.mcpConfigPath
-                if ($isMac) { $path = $path -replace '%APPDATA%', "$home/Library/Application Support" -replace '%USERPROFILE%', $home -replace '\\', '/' }
+                if ($isMac) { $path = $path -replace '%APPDATA%', "$homeDir/Library/Application Support" -replace '%USERPROFILE%', $homeDir -replace '\\', '/' }
                 else         { $path = [System.Environment]::ExpandEnvironmentVariables($path) }
                 return $path
             }
-            return "$home/.tian/mcp_config.json"
+            return "$homeDir/.tian/mcp_config.json"
         }
     }
 }
@@ -28,8 +28,8 @@ function Set-McpServers {
     param(
         $Backend,
         [array]$SelectedServers,
-        [System.Windows.Forms.RichTextBox]$LogBox,
-        [System.Windows.Forms.ProgressBar]$ProgressBar
+        $LogBox,
+        $ProgressBar
     )
 
     if (-not $SelectedServers -or $SelectedServers.Count -eq 0) {
