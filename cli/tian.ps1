@@ -121,7 +121,7 @@ function Cmd-Help {
      ██║   ██║██║  ██║██║ ╚████║
      ╚═╝   ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝  CLI
 
-  Talking Is All you Need
+  Talk Is All you Need
 "@ Cyan
 
     Write-Rule

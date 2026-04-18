@@ -58,7 +58,7 @@ $currentPage = 0
 
 # Build main form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Tian Setup — Talking Is All you Need"
+$form.Text = "Tian Setup — Talk Is All you Need"
 $form.Size = New-Object System.Drawing.Size(580, 500)
 $form.MinimumSize = New-Object System.Drawing.Size(580, 500)
 $form.MaximumSize = New-Object System.Drawing.Size(580, 500)
