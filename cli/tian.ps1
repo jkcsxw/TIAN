@@ -2,11 +2,19 @@ param(
     [string]$TianDir = (Split-Path $PSScriptRoot -Parent),
     [Parameter(Position = 0)][string]$Command = "help",
     [Parameter(Position = 1)][string]$Subcommand = "",
-    [string]$Backend  = "",
-    [string]$Key      = "",
-    [string]$Mcp      = "",
-    [string]$Skills   = "",
+    [string]$Backend   = "",
+    [string]$Key       = "",
+    [string]$Mcp       = "",
+    [string]$Skills    = "",
+    # run / schedule flags
+    [string]$Task      = "",
+    [string]$Name      = "",
+    [string]$Time      = "",
+    [string]$Repeat    = "daily",
+    [string]$Day       = "",
+    [switch]$Background,
     [switch]$Yes,
+    [switch]$All,
     [switch]$List
 )
 
@@ -28,6 +36,8 @@ function Write-Rule    { Write-Color ("─" * 60) DarkGray }
 # ── Load shared libs ──────────────────────────────────────────────────────────
 $libDir = Join-Path $TianDir "wizard\lib"
 . "$libDir\Catalog.ps1"
+. (Join-Path $PSScriptRoot "runner.ps1")
+. (Join-Path $PSScriptRoot "scheduler.ps1")
 
 # Minimal stubs so lib functions that expect a RichTextBox / ProgressBar still work
 function Append-Log {
@@ -130,6 +140,18 @@ function Cmd-Help {
     add skill <id>      Install a skill
     remove mcp  <id>    Remove an MCP server from your config
     repair              Re-run install for the current config
+
+    run  "prompt"       Run a task now (foreground)
+    run  "prompt" --background   Run a task in the background
+    jobs                List background jobs
+    jobs result <id>    Show output of a completed job
+    jobs clear          Clear completed jobs  (--all to clear everything)
+
+    schedule add        Create a recurring scheduled task
+    schedule list       List all scheduled tasks
+    schedule run <n>    Run a scheduled task immediately
+    schedule remove <n> Delete a scheduled task
+
     help                Show this help
 
   INSTALL FLAGS
@@ -139,13 +161,30 @@ function Cmd-Help {
     --skills  <ids>     Comma-separated skill IDs
     --yes               Skip all confirmation prompts
 
+  SCHEDULE FLAGS
+    --name    <name>    Schedule name (required)
+    --task    "prompt"  The prompt to run (required)
+    --time    HH:MM     Time of day to run  (default: 08:00)
+    --repeat  <freq>    once | hourly | daily | weekly  (default: daily)
+    --day     <days>    Days for weekly repeat  e.g. MON,WED,FRI
+
   EXAMPLES
     tian-cli setup
-    tian-cli install --backend claude-code --key sk-ant-xxx
     tian-cli install --backend claude-code --key sk-ant-xxx --mcp filesystem,web-search --yes
     tian-cli list mcp
     tian-cli add mcp github
     tian-cli status
+
+    tian-cli run "Summarise the latest news about AI"
+    tian-cli run "Draft my daily standup update" --background
+    tian-cli jobs
+    tian-cli jobs result 20240417-083012-ab12cd
+
+    tian-cli schedule add --name morning-brief --task "Give me a short morning briefing" --time 08:00 --repeat daily
+    tian-cli schedule add --name weekly-report --task "Summarise this week's key themes" --time 09:00 --repeat weekly --day MON
+    tian-cli schedule list
+    tian-cli schedule run morning-brief
+    tian-cli schedule remove morning-brief
 
 "@ White
     Write-Rule
@@ -534,6 +573,50 @@ switch ($Command.ToLower()) {
         } else { Write-Fail "Usage: tian-cli remove mcp <id>" }
     }
     "repair"  { Cmd-Repair }
+
+    "run" {
+        # tian-cli run "prompt"  or  tian-cli run "prompt" --background
+        $prompt = if ($Subcommand) { $Subcommand } elseif ($Task) { $Task } else { "" }
+        if (-not $prompt) {
+            Write-Fail "Usage: tian-cli run `"your task prompt`" [--background]"
+            exit 1
+        }
+        Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$Background
+    }
+
+    "jobs" {
+        switch ($Subcommand.ToLower()) {
+            "result" {
+                $id = $args[0]
+                if (-not $id) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
+                Show-JobResult -JobId $id
+            }
+            "clear"  { Clear-Jobs -All:$All }
+            ""       { Show-Jobs }
+            default  { Show-Jobs }
+        }
+    }
+
+    "schedule" {
+        switch ($Subcommand.ToLower()) {
+            "add" {
+                Add-Schedule -Name $Name -Prompt $Task -Time $Time -Repeat $Repeat -DayOfWeek $Day -TianDir $TianDir
+            }
+            "list"   { Show-Schedules }
+            "run"    {
+                $n = $args[0]
+                if (-not $n) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
+                Invoke-ScheduleNow -Name $n -TianDir $TianDir
+            }
+            "remove" {
+                $n = $args[0]
+                if (-not $n) { Write-Fail "Usage: tian-cli schedule remove <name>"; exit 1 }
+                Remove-Schedule -Name $n -TianDir $TianDir
+            }
+            default  { Write-Fail "Usage: tian-cli schedule add|list|run|remove" }
+        }
+    }
+
     { $_ -in "help","--help","-h","" } { Cmd-Help }
     default   { Write-Fail "Unknown command '$Command'. Run 'tian-cli help'."; exit 1 }
 }
