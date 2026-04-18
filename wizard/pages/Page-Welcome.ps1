@@ -5,7 +5,7 @@ function Show-Page-Welcome {
     $title = New-Label -Text "Welcome to Tian" -X 50 -Y 60 -Width 460 -Height 45 -Font $UI_FONT_TITLE -ForeColor $UI_COLOR_ACCENT
     $Panel.Controls.Add($title)
 
-    $tagline = New-Label -Text "Talking Is All You Need" -X 50 -Y 108 -Width 460 -Height 28 -Font $UI_FONT_SUBTITLE -ForeColor $UI_COLOR_MUTED
+    $tagline = New-Label -Text "Talking Is All you Need" -X 50 -Y 108 -Width 460 -Height 28 -Font $UI_FONT_SUBTITLE -ForeColor $UI_COLOR_MUTED
     $Panel.Controls.Add($tagline)
 
     $sep = New-Separator -X 50 -Y 148 -Width 460
