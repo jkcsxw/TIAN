@@ -68,25 +68,26 @@ function Write-Launcher {
         [System.Windows.Forms.RichTextBox]$LogBox
     )
 
-    $launcherPath = Join-Path $TianDir "launcher.bat"
+    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
 
-    if ($Backend.installType -eq "desktop-app") {
-        $content = @"
-@echo off
-echo Opening Claude Desktop...
-start "" "%LOCALAPPDATA%\AnthropicClaude\Claude.exe"
-"@
+    if ($isMac) {
+        $launcherPath = Join-Path $TianDir "launcher.sh"
+        if ($Backend.installType -eq "desktop-app") {
+            $content = "#!/usr/bin/env bash`necho 'Opening Claude...'`nopen -a Claude 2>/dev/null || open '$($Backend.downloadUrl)'`n"
+        } else {
+            $content = "#!/usr/bin/env bash`nsource `"`$HOME/.zshrc`" 2>/dev/null || source `"`$HOME/.bash_profile`" 2>/dev/null || true`necho 'Starting $($Backend.displayName)...'`n$($Backend.cliCommand)`n"
+        }
+        Set-Content -Path $launcherPath -Value $content -Encoding UTF8
+        & chmod +x $launcherPath
+        Append-Log $LogBox "Launcher created: launcher.sh" "success"
     } else {
-        $content = @"
-@echo off
-title Tian - $($Backend.displayName)
-echo Starting $($Backend.displayName)...
-echo Type your message and press Enter. Type 'exit' to quit.
-echo.
-$($Backend.cliCommand)
-"@
+        $launcherPath = Join-Path $TianDir "launcher.bat"
+        if ($Backend.installType -eq "desktop-app") {
+            $content = "@echo off`r`necho Opening Claude Desktop...`r`nstart `"`" `"%LOCALAPPDATA%\AnthropicClaude\Claude.exe`"`r`n"
+        } else {
+            $content = "@echo off`r`ntitle TIAN - $($Backend.displayName)`r`necho Starting $($Backend.displayName)...`r`necho.`r`n$($Backend.cliCommand)`r`n"
+        }
+        Set-Content -Path $launcherPath -Value $content -Encoding ASCII
+        Append-Log $LogBox "Launcher created: launcher.bat" "success"
     }
-
-    Set-Content -Path $launcherPath -Value $content -Encoding ASCII
-    Append-Log $LogBox "Launcher created: launcher.bat" "success"
 }

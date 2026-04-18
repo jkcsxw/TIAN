@@ -54,30 +54,39 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ## Requirements | 系统要求
 
-- A Windows computer (Windows 10 or later) | Windows 电脑（Windows 10 或更高版本）
-- Basic ability to click, type, and follow instructions | 能够点击、输入并按说明操作
-- An internet connection | 网络连接
-- An API key from your chosen AI provider (step-by-step instructions included) | 所选AI服务商的API密钥（向导内含获取说明）
+| | Windows | macOS |
+|---|---|---|
+| OS version | Windows 10 or later | macOS 10.15 (Catalina) or later |
+| Software needed | Nothing — TIAN installs everything | Nothing — TIAN installs everything (including Homebrew if missing) |
+| Terminal needed | No (GUI wizard available) | Yes (open Terminal from Applications → Utilities) |
+| API key needed | Yes (wizard walks you through it) | Yes (setup script walks you through it) |
+
+| | Windows | macOS |
+|---|---|---|
+| 系统版本 | Windows 10 或更高 | macOS 10.15（Catalina）或更高 |
+| 需要预装软件 | 无，「天」自动安装所有依赖 | 无，「天」自动安装所有依赖（包括Homebrew） |
+| 需要终端 | 否（有图形向导） | 是（从"应用程序→实用工具"打开终端） |
+| 需要API密钥 | 是（向导引导获取） | 是（安装脚本引导获取） |
 
 ---
 
 ## Getting Started | 快速开始
 
-TIAN offers two ways to set up — choose whichever fits you:
+TIAN supports both **Windows** and **macOS**. Choose your platform below.
 
-| | GUI Wizard | CLI |
-|---|---|---|
-| Who it's for | Anyone, no terminal needed | Users comfortable with a terminal |
-| How to start | Double-click `setup.bat` | Run `tian-cli help` |
-| Supports scripting / automation | No | Yes |
+「天」同时支持 **Windows** 和 **macOS**，请根据您的系统选择对应说明。
 
-「天」提供两种安装方式：
+| | Windows GUI | Windows CLI | macOS |
+|---|---|---|---|
+| Who it's for | Anyone, no terminal | Terminal users | All Mac users |
+| How to start | Double-click `setup.bat` | `tian-cli help` | `bash setup.sh` |
+| Scripting / automation | No | Yes | Yes |
 
-| | 图形向导 | 命令行 |
-|---|---|---|
-| 适合人群 | 任何人，无需终端 | 熟悉命令行的用户 |
-| 启动方式 | 双击 `setup.bat` | 运行 `tian-cli help` |
-| 支持脚本/自动化 | 否 | 是 |
+| | Windows图形界面 | Windows命令行 | macOS |
+|---|---|---|---|
+| 适合人群 | 任何人，无需终端 | 熟悉命令行的用户 | 所有Mac用户 |
+| 启动方式 | 双击 `setup.bat` | `tian-cli help` | `bash setup.sh` |
+| 支持自动化 | 否 | 是 | 是 |
 
 ---
 
@@ -160,9 +169,68 @@ Run `tian-cli help` for the full command reference.
 
 ---
 
+---
+
+## macOS Setup | macOS 安装
+
+### Mac Step 1 — Download TIAN | Mac第一步 — 下载「天」
+
+Click the green **Code** button at the top of this page, then **Download ZIP**. Unzip the folder to somewhere easy to find, like your Desktop.
+
+点击本页顶部绿色 **Code** 按钮，选择 **Download ZIP**，将压缩包解压到桌面等易找到的位置。
+
+### Mac Step 2 — Open Terminal | Mac第二步 — 打开终端
+
+Open **Terminal** (press `⌘ Space`, type `Terminal`, press Enter). Then type:
+
+打开**终端**（按 `⌘ 空格`，输入 `Terminal`，回车）。然后输入：
+
+```bash
+cd ~/Desktop/TIAN-main
+bash setup.sh
+```
+
+The script will:
+1. Install **Homebrew** (the Mac package manager) if you don't have it — you may be asked for your Mac password
+2. Install **Node.js** automatically
+3. Open your browser to get an API key — just follow the prompts
+4. Let you pick your MCP tools and skills
+5. Create `launcher.sh` to start chatting
+
+安装脚本将自动完成：
+1. 安装 **Homebrew**（Mac包管理器），如未安装会提示输入Mac密码
+2. 自动安装 **Node.js**
+3. 打开浏览器引导获取API密钥，按提示操作即可
+4. 让您选择MCP工具和技能包
+5. 创建 `launcher.sh` 启动文件
+
+### Mac Step 3 — Start Talking | Mac第三步 — 开始对话
+
+Open a **new** Terminal window (important — so your API key is loaded), then:
+
+打开一个**新的**终端窗口（重要——确保API密钥已加载），然后输入：
+
+```bash
+bash launcher.sh
+```
+
+For the CLI on Mac: | Mac命令行：
+
+```bash
+bash tian-cli.sh help
+bash tian-cli.sh run "Summarise the latest news about AI"
+bash tian-cli.sh schedule add --name morning-brief --task "Give me a morning briefing" --time 08:00 --repeat daily
+```
+
+> **Note:** The Mac version uses your Terminal instead of a GUI window. Everything else — MCP tools, skills, background tasks, scheduling — works exactly the same as Windows.
+>
+> **注意：** Mac版本使用终端而非图形界面。其他功能——MCP工具、技能包、后台任务、定时任务——与Windows版本完全一致。
+
+---
+
 ### Step 3 — Start Talking | 第三步 — 开始对话
 
-Once setup is complete, double-click `launcher.bat` and start chatting. TIAN is not just a Q&A tool — it can actively work for you. Here are some things you can say:
+Once setup is complete, double-click `launcher.bat` (Windows) or run `bash launcher.sh` (Mac) and start chatting. TIAN is not just a Q&A tool — it can actively work for you. Here are some things you can say:
 
 **Daily life | 日常生活**
 - "Write a professional email to my landlord asking to fix the heating"
@@ -457,7 +525,8 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
 - [ ] One-click Windows installer (.exe) | 一键Windows安装程序（.exe）
 - [ ] GUI skill browser and installer | 图形化技能浏览与安装界面
 - [ ] Business workflow templates | 商业工作流模板
-- [ ] Mac and Linux support | Mac 和 Linux 支持
+- [x] Mac support | Mac 支持
+- [ ] Linux support | Linux 支持
 - [ ] Community skill marketplace | 社区技能市场
 
 ---

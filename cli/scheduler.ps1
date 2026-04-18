@@ -34,9 +34,9 @@ function Add-Schedule {
     param(
         [string]$Name,
         [string]$Prompt,
-        [string]$Time,        # e.g. "08:00"
-        [string]$Repeat,      # once | daily | weekly | hourly
-        [string]$DayOfWeek,   # MON,TUE,... (weekly only)
+        [string]$Time,
+        [string]$Repeat,
+        [string]$DayOfWeek,
         [string]$TianDir
     )
 
@@ -51,51 +51,89 @@ function Add-Schedule {
         return
     }
 
-    $taskName  = Get-TaskName $Name
-    $cliPath   = Join-Path $TianDir "tian-cli.bat"
-    $action    = "`"$cliPath`" run `"$($Prompt -replace '"','\"')`" --background --yes"
+    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
 
-    # Build schtasks arguments
-    $schArgs = @(
-        "/Create", "/F",
-        "/TN", $taskName,
-        "/TR", $action,
-        "/ST", $Time
-    )
+    if ($isMac) {
+        # ── launchd (macOS) ──────────────────────────────────────────────────
+        $plistDir   = "$env:HOME/Library/LaunchAgents"
+        $plistLabel = "com.tian.$Name"
+        $plistFile  = "$plistDir/$plistLabel.plist"
+        $cliPath    = Join-Path $TianDir "tian-cli.sh"
+        New-Item -ItemType Directory -Path $plistDir -Force | Out-Null
 
-    switch ($Repeat.ToLower()) {
-        "once"    { $schArgs += @("/SC", "ONCE") }
-        "hourly"  { $schArgs += @("/SC", "HOURLY") }
-        "daily"   { $schArgs += @("/SC", "DAILY") }
-        "weekly"  {
-            $schArgs += @("/SC", "WEEKLY")
-            if ($DayOfWeek) { $schArgs += @("/D", $DayOfWeek) }
+        $hour   = [int]($Time -split ':')[0]
+        $minute = [int]($Time -split ':')[1]
+
+        $intervalXml = switch ($Repeat.ToLower()) {
+            "hourly" { "<key>StartInterval</key>`n    <integer>3600</integer>" }
+            "weekly" { "<key>StartCalendarInterval</key>`n    <dict>`n        <key>Weekday</key><integer>1</integer>`n        <key>Hour</key><integer>$hour</integer>`n        <key>Minute</key><integer>$minute</integer>`n    </dict>" }
+            default  { "<key>StartCalendarInterval</key>`n    <dict>`n        <key>Hour</key><integer>$hour</integer>`n        <key>Minute</key><integer>$minute</integer>`n    </dict>" }
         }
-        default   { $schArgs += @("/SC", "DAILY") }
+
+        $plistContent = @"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>$plistLabel</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>$cliPath</string>
+        <string>run</string>
+        <string>$($Prompt -replace '"','&quot;')</string>
+        <string>--background</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>$env:HOME/.tian/tasks/schedule-$Name.log</string>
+    <key>StandardErrorPath</key>
+    <string>$env:HOME/.tian/tasks/schedule-$Name.err</string>
+    $intervalXml
+</dict>
+</plist>
+"@
+        Set-Content -Path $plistFile -Value $plistContent -Encoding UTF8
+        & launchctl load $plistFile 2>/dev/null
+        Write-Ok "Schedule '$Name' registered with launchd."
+
+        $entry = [PSCustomObject]@{
+            name      = $Name; prompt = $Prompt; time = $Time
+            repeat    = $Repeat; plistFile = $plistFile
+            createdAt = [System.DateTime]::Now.ToString("o")
+        }
+    } else {
+        # ── Windows Task Scheduler ────────────────────────────────────────────
+        $taskName = Get-TaskName $Name
+        $cliPath  = Join-Path $TianDir "tian-cli.bat"
+        $action   = "`"$cliPath`" run `"$($Prompt -replace '"','\"')`" --background --yes"
+
+        $schArgs = @("/Create", "/F", "/TN", $taskName, "/TR", $action, "/ST", $Time)
+        switch ($Repeat.ToLower()) {
+            "once"   { $schArgs += @("/SC", "ONCE") }
+            "hourly" { $schArgs += @("/SC", "HOURLY") }
+            "daily"  { $schArgs += @("/SC", "DAILY") }
+            "weekly" { $schArgs += @("/SC", "WEEKLY"); if ($DayOfWeek) { $schArgs += @("/D", $DayOfWeek) } }
+            default  { $schArgs += @("/SC", "DAILY") }
+        }
+
+        $result = Start-Process schtasks -ArgumentList $schArgs -Wait -PassThru -NoNewWindow
+        if ($result.ExitCode -ne 0) {
+            Write-Fail "Failed to create Windows scheduled task (exit $($result.ExitCode))."
+            Write-Warn "Try running tian-cli as Administrator."
+            return
+        }
+
+        $entry = [PSCustomObject]@{
+            name      = $Name; taskName = $taskName; prompt = $Prompt
+            time      = $Time; repeat = $Repeat; dayOfWeek = $DayOfWeek
+            createdAt = [System.DateTime]::Now.ToString("o")
+        }
     }
 
-    $result = Start-Process schtasks -ArgumentList $schArgs -Wait -PassThru -NoNewWindow
-    if ($result.ExitCode -ne 0) {
-        Write-Fail "Failed to create Windows scheduled task (exit $($result.ExitCode))."
-        Write-Warn "Try running tian-cli as Administrator."
-        return
-    }
-
-    $entry = [PSCustomObject]@{
-        name      = $Name
-        taskName  = $taskName
-        prompt    = $Prompt
-        time      = $Time
-        repeat    = $Repeat
-        dayOfWeek = $DayOfWeek
-        createdAt = [System.DateTime]::Now.ToString("o")
-    }
     $schedules += $entry
     Save-Schedules $schedules
-
-    Write-Ok "Schedule '$Name' created."
-    Write-Info "Task    : $Prompt"
-    Write-Info "Runs    : $Repeat at $Time"
+    Write-Ok "Schedule '$Name' created — $Repeat at $Time."
     Write-Info "Results : tian-cli jobs  (after first run)"
 }
 
@@ -107,9 +145,16 @@ function Remove-Schedule {
     $entry = $schedules | Where-Object { $_.name -eq $Name } | Select-Object -First 1
     if (-not $entry) { Write-Fail "No schedule named '$Name'."; return }
 
-    $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
-    if ($result.ExitCode -ne 0) {
-        Write-Warn "Could not remove Windows task (may have already been deleted)."
+    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
+
+    if ($isMac) {
+        if ($entry.plistFile -and (Test-Path $entry.plistFile)) {
+            & launchctl unload $entry.plistFile 2>/dev/null
+            Remove-Item $entry.plistFile -ErrorAction SilentlyContinue
+        }
+    } else {
+        $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
+        if ($result.ExitCode -ne 0) { Write-Warn "Could not remove Windows task (may have already been deleted)." }
     }
 
     $keep = @($schedules | Where-Object { $_.name -ne $Name })
