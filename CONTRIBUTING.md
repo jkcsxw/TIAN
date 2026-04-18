@@ -4,6 +4,35 @@ Tian is designed to be extended by the community. You don't need to write PowerS
 
 ---
 
+## Bug Reports
+
+Found something broken? [Open a bug report](https://github.com/jkcsxw/TIAN/issues/new?template=bug_report.md) on GitHub Issues.
+
+Please include:
+
+- **What you did** — the exact steps to reproduce the problem
+- **What you expected** — what should have happened
+- **What actually happened** — error messages, unexpected output, or nothing at all
+- **Your setup** — OS (Windows 10/11, macOS version), how you installed TIAN (installer / ZIP / script), and which AI backend you are using
+
+The more detail you provide, the faster we can fix it.
+
+---
+
+## Feature Requests
+
+Have an idea? [Open a feature request](https://github.com/jkcsxw/TIAN/issues/new?template=feature_request.md) on GitHub Issues.
+
+Please include:
+
+- **The problem you have** — what are you trying to do that is currently hard or impossible?
+- **Your proposed solution** — how would you like it to work?
+- **Alternatives you have considered** — any workarounds you already tried
+
+If you want to build the feature yourself, open the issue first so we can discuss the approach before you invest time in a PR.
+
+---
+
 ## Adding a New AI Backend
 
 Edit `config/catalog.json` and add an entry to the `backends` array:

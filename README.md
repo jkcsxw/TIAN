@@ -584,6 +584,26 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details. For running and writing te
 
 ---
 
+## Bug Reports & Feature Requests | 问题反馈与功能建议
+
+Found a bug or have an idea? Open an issue on GitHub:
+
+- [Report a bug](https://github.com/jkcsxw/TIAN/issues/new?template=bug_report.md) — include your OS, install method, and steps to reproduce
+- [Request a feature](https://github.com/jkcsxw/TIAN/issues/new?template=feature_request.md) — describe the problem you want solved and your proposed solution
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for full guidance.
+
+---
+
+发现问题或有新想法？在 GitHub 上提交：
+
+- [报告问题](https://github.com/jkcsxw/TIAN/issues/new?template=bug_report.md) — 请注明您的操作系统、安装方式和复现步骤
+- [提交功能建议](https://github.com/jkcsxw/TIAN/issues/new?template=feature_request.md) — 描述您想解决的问题及建议方案
+
+详细指引请参阅 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+
+---
+
 ## License | 开源协议
 
 MIT — free to use, modify, and share.
