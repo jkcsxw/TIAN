@@ -1,8 +1,8 @@
 function Install-Backend {
     param(
         $Backend,
-        [System.Windows.Forms.RichTextBox]$LogBox,
-        [System.Windows.Forms.ProgressBar]$ProgressBar
+        $LogBox,
+        $ProgressBar
     )
 
     if ($Backend.installType -eq "desktop-app") {
@@ -65,7 +65,7 @@ function Write-Launcher {
     param(
         $Backend,
         [string]$TianDir,
-        [System.Windows.Forms.RichTextBox]$LogBox
+        $LogBox
     )
 
     $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')

@@ -105,7 +105,8 @@ function Confirm-Action {
 }
 
 # Fake progress bar object so lib functions don't crash
-$fakeProgress = [PSCustomObject]@{ Value = 0 }
+$script:_fakeProgress = 0
+$fakeProgress = [PSCustomObject]@{}
 Add-Member -InputObject $fakeProgress -MemberType ScriptProperty -Name Value -Value { $script:_fakeProgress } -SecondValue { param($v) $script:_fakeProgress = $v }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
@@ -587,9 +588,8 @@ switch ($Command.ToLower()) {
     "jobs" {
         switch ($Subcommand.ToLower()) {
             "result" {
-                $id = $args[0]
-                if (-not $id) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
-                Show-JobResult -JobId $id
+                if (-not $Name) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
+                Show-JobResult -JobId $Name
             }
             "clear"  { Clear-Jobs -All:$All }
             ""       { Show-Jobs }
@@ -604,14 +604,12 @@ switch ($Command.ToLower()) {
             }
             "list"   { Show-Schedules }
             "run"    {
-                $n = $args[0]
-                if (-not $n) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
-                Invoke-ScheduleNow -Name $n -TianDir $TianDir
+                if (-not $Name) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
+                Invoke-ScheduleNow -Name $Name -TianDir $TianDir
             }
             "remove" {
-                $n = $args[0]
-                if (-not $n) { Write-Fail "Usage: tian-cli schedule remove <name>"; exit 1 }
-                Remove-Schedule -Name $n -TianDir $TianDir
+                if (-not $Name) { Write-Fail "Usage: tian-cli schedule remove --name <name>"; exit 1 }
+                Remove-Schedule -Name $Name -TianDir $TianDir
             }
             default  { Write-Fail "Usage: tian-cli schedule add|list|run|remove" }
         }

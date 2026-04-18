@@ -15,15 +15,7 @@ Describe "Install-Skills" {
         New-Item -ItemType Directory -Path (Join-Path $script:TianDir "skills") -Force | Out-Null
         "# Email Skill" | Set-Content (Join-Path $script:TianDir "skills/email-assistant.md")
 
-        # Redirect skills output to temp
-        Mock -CommandName "Install-Skills" -MockWith {
-            param($SelectedSkills, $TianDir, $LogBox, $ProgressBar)
-        } -Verifiable
-
-        # Undo mock so we test the real function
-        Remove-Mock Install-Skills -ErrorAction SilentlyContinue
-
-        # Override skills dir via $env:USERPROFILE so real function writes to our temp
+        # Override skills dir so real function writes to our temp
         $env:USERPROFILE = $script:TempDir
         $env:HOME        = $script:TempDir
     }

@@ -28,8 +28,8 @@ Describe "Get-McpConfigPath" {
         $result | Should -Match "\.tian[/\\]mcp_config\.json"
     }
     It "uses mcpConfigPath when provided for custom target" {
-        $home = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
-        $backend = [PSCustomObject]@{ mcpConfigTarget = "custom"; mcpConfigPath = "$home/.myapp/config.json" }
+        $homeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
+        $backend = [PSCustomObject]@{ mcpConfigTarget = "custom"; mcpConfigPath = "$homeDir/.myapp/config.json" }
         $result = Get-McpConfigPath $backend
         $result | Should -Match "\.myapp[/\\]config\.json"
     }

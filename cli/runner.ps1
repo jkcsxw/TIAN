@@ -1,12 +1,13 @@
 # Task runner — executes a prompt against the configured backend
 # Stores results in ~/.tian/tasks/
 
-$TIAN_TASKS_DIR  = "$env:USERPROFILE\.tian\tasks"
-$TIAN_JOBS_FILE  = "$env:USERPROFILE\.tian\jobs.json"
+$_tianHome       = if ($env:USERPROFILE) { $env:USERPROFILE } else { $env:HOME }
+$global:TIAN_TASKS_DIR  = Join-Path $_tianHome ".tian" "tasks"
+$global:TIAN_JOBS_FILE  = Join-Path $_tianHome ".tian" "jobs.json"
 
 function Ensure-TaskDirs {
-    if (-not (Test-Path $TIAN_TASKS_DIR))  { New-Item -ItemType Directory -Path $TIAN_TASKS_DIR  -Force | Out-Null }
-    if (-not (Test-Path $TIAN_JOBS_FILE))  { '[]' | Set-Content $TIAN_JOBS_FILE -Encoding UTF8 }
+    if (-not (Test-Path $global:TIAN_TASKS_DIR)) { New-Item -ItemType Directory -Path $global:TIAN_TASKS_DIR -Force | Out-Null }
+    if (-not (Test-Path $global:TIAN_JOBS_FILE))  { '[]' | Set-Content $global:TIAN_JOBS_FILE -Encoding UTF8 }
 }
 
 function Get-ActiveBackend {
@@ -27,18 +28,23 @@ function New-JobId {
 
 function Read-Jobs {
     Ensure-TaskDirs
-    $raw = Get-Content $TIAN_JOBS_FILE -Raw -ErrorAction SilentlyContinue
-    if (-not $raw) { return @() }
+    $raw = Get-Content $global:TIAN_JOBS_FILE -Raw -ErrorAction SilentlyContinue
+    if (-not $raw -or $raw.Trim() -eq '' -or $raw.Trim() -eq '[]') { return [array]@() }
     $parsed = $raw | ConvertFrom-Json
     # ConvertFrom-Json returns a single object when array has one item — normalise
-    if ($parsed -isnot [array]) { return @($parsed) }
-    return $parsed
+    if ($null -eq $parsed)      { return [array]@() }
+    if ($parsed -isnot [array]) { return [array]@($parsed) }
+    return [array]$parsed
 }
 
 function Save-Jobs {
     param([array]$Jobs)
     Ensure-TaskDirs
-    $Jobs | ConvertTo-Json -Depth 5 | Set-Content $TIAN_JOBS_FILE -Encoding UTF8
+    if ($null -eq $Jobs -or $Jobs.Count -eq 0) {
+        '[]' | Set-Content $global:TIAN_JOBS_FILE -Encoding UTF8
+    } else {
+        ConvertTo-Json $Jobs -Depth 5 | Set-Content $global:TIAN_JOBS_FILE -Encoding UTF8
+    }
 }
 
 function Invoke-Task {
@@ -61,8 +67,8 @@ function Invoke-Task {
     }
 
     $jobId      = New-JobId
-    $outputFile = Join-Path $TIAN_TASKS_DIR "$jobId.txt"
-    $metaFile   = Join-Path $TIAN_TASKS_DIR "$jobId.meta.json"
+    $outputFile = Join-Path $global:TIAN_TASKS_DIR "$jobId.txt"
+    $metaFile   = Join-Path $global:TIAN_TASKS_DIR "$jobId.meta.json"
 
     $meta = @{
         id        = $jobId
@@ -128,7 +134,7 @@ function Invoke-Task {
 
 function Get-JobStatus {
     param([string]$JobId)
-    $metaFile = Join-Path $TIAN_TASKS_DIR "$JobId.meta.json"
+    $metaFile = Join-Path $global:TIAN_TASKS_DIR "$JobId.meta.json"
     if (-not (Test-Path $metaFile)) { return $null }
     return Get-Content $metaFile -Raw | ConvertFrom-Json
 }
@@ -139,9 +145,9 @@ function Sync-JobStatuses {
     $changed = $false
     foreach ($job in $jobs) {
         if ($job.status -eq "running") {
-            $outputFile = Join-Path $TIAN_TASKS_DIR "$($job.id).txt"
+            $outputFile = Join-Path $global:TIAN_TASKS_DIR "$($job.id).txt"
             if (Test-Path $outputFile) {
-                $metaFile = Join-Path $TIAN_TASKS_DIR "$($job.id).meta.json"
+                $metaFile = Join-Path $global:TIAN_TASKS_DIR "$($job.id).meta.json"
                 if (Test-Path $metaFile) {
                     $meta = Get-Content $metaFile -Raw | ConvertFrom-Json
                     if ($meta.status -eq "running") {
@@ -151,11 +157,16 @@ function Sync-JobStatuses {
                             $alive = Get-Process -Id $meta.pid -ErrorAction SilentlyContinue
                         }
                         if (-not $alive) {
-                            $meta.status    = "done"
-                            $meta.finishedAt = [System.DateTime]::Now.ToString("o")
+                            $meta.status = "done"
+                            $finishedAt  = [System.DateTime]::Now.ToString("o")
+                            if (-not ($meta.PSObject.Properties['finishedAt'])) {
+                                $meta | Add-Member -NotePropertyName 'finishedAt' -NotePropertyValue $finishedAt
+                            } else { $meta.finishedAt = $finishedAt }
                             $meta | ConvertTo-Json | Set-Content $metaFile -Encoding UTF8
-                            $job.status    = "done"
-                            $job.finishedAt = $meta.finishedAt
+                            $job.status = "done"
+                            if (-not ($job.PSObject.Properties['finishedAt'])) {
+                                $job | Add-Member -NotePropertyName 'finishedAt' -NotePropertyValue $finishedAt
+                            } else { $job.finishedAt = $finishedAt }
                             $changed = $true
                         }
                     }
@@ -206,7 +217,7 @@ function Show-JobResult {
     Write-Info "Prompt  : $($meta.prompt)"
     Write-Rule
 
-    $outputFile = Join-Path $TIAN_TASKS_DIR "$JobId.txt"
+    $outputFile = Join-Path $global:TIAN_TASKS_DIR "$JobId.txt"
     if (Test-Path $outputFile) {
         Get-Content $outputFile | ForEach-Object { Write-Host $_ }
     } elseif ($meta.status -eq "running") {
@@ -222,7 +233,7 @@ function Clear-Jobs {
     $jobs = Read-Jobs
     if ($All) {
         foreach ($job in $jobs) {
-            $base = Join-Path $TIAN_TASKS_DIR $job.id
+            $base = Join-Path $global:TIAN_TASKS_DIR $job.id
             Remove-Item "$base.txt"  -ErrorAction SilentlyContinue
             Remove-Item "$base.meta.json" -ErrorAction SilentlyContinue
         }
@@ -232,7 +243,7 @@ function Clear-Jobs {
         $keep = @($jobs | Where-Object { $_.status -eq "running" })
         $remove = @($jobs | Where-Object { $_.status -ne "running" })
         foreach ($job in $remove) {
-            $base = Join-Path $TIAN_TASKS_DIR $job.id
+            $base = Join-Path $global:TIAN_TASKS_DIR $job.id
             Remove-Item "$base.txt"  -ErrorAction SilentlyContinue
             Remove-Item "$base.meta.json" -ErrorAction SilentlyContinue
         }

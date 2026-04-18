@@ -2,7 +2,7 @@ function Set-ApiKey {
     param(
         $Backend,
         [string]$ApiKey,
-        [System.Windows.Forms.RichTextBox]$LogBox
+        $LogBox
     )
 
     if (-not $ApiKey -or $ApiKey.Trim() -eq "") {
@@ -22,7 +22,7 @@ function Set-ApiKey {
         [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "Process")
     } else {
         [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "User")
-        $env:($varName) = $ApiKey.Trim()
+        [System.Environment]::SetEnvironmentVariable($varName, $ApiKey.Trim(), "Process")
     }
 
     Append-Log $LogBox "$varName saved." "success"
@@ -32,7 +32,7 @@ function Set-ExtraEnvVar {
     param(
         [string]$Name,
         [string]$Value,
-        [System.Windows.Forms.RichTextBox]$LogBox
+        $LogBox
     )
 
     if (-not $Value -or $Value.Trim() -eq "") { return }
