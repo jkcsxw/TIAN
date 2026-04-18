@@ -72,25 +72,78 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ## Getting Started | 快速开始
 
+### Windows — Quickest way | Windows — 最快方式
+
+> No command line needed. Just double-click and go.
+> 无需命令行，双击即可开始。
+
+**Option A — Download installer directly (recommended)**
+
+Download [`tian-setup.exe`](../../releases/latest) from the Releases page and double-click it.
+
+**Option B — Already have the ZIP? Run `get-installer.bat`**
+
+If you downloaded the ZIP from the Code button, double-click **`get-installer.bat`** inside the folder.  
+It will download and launch the installer for you automatically — no typing required.
+
+---
+
+**方式A — 直接下载安装程序（推荐）**
+
+从 Releases 页面下载 [`tian-setup.exe`](../../releases/latest)，双击运行即可。
+
+**方式B — 已下载ZIP？运行 `get-installer.bat`**
+
+如果您通过 Code 按钮下载了 ZIP，在解压后的文件夹中双击 **`get-installer.bat`**。  
+它会自动下载并启动安装程序，无需任何输入。
+
+---
+
 TIAN supports both **Windows** and **macOS**. Choose your platform below.
 
 「天」同时支持 **Windows** 和 **macOS**，请根据您的系统选择对应说明。
 
-| | Windows GUI | Windows CLI | macOS |
+| | Windows Installer | Windows ZIP | macOS |
 |---|---|---|---|
-| Who it's for | Anyone, no terminal | Terminal users | All Mac users |
-| How to start | Double-click `setup.bat` | `tian-cli help` | `bash setup.sh` |
-| Scripting / automation | No | Yes | Yes |
+| Who it's for | Anyone — easiest | Terminal users / developers | All Mac users |
+| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` |
+| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes |
+| Includes uninstaller | Yes | No | No |
+| Scripting / automation | Yes | Yes | Yes |
 
-| | Windows图形界面 | Windows命令行 | macOS |
+| | Windows安装程序 | Windows ZIP | macOS |
 |---|---|---|---|
-| 适合人群 | 任何人，无需终端 | 熟悉命令行的用户 | 所有Mac用户 |
-| 启动方式 | 双击 `setup.bat` | `tian-cli help` | `bash setup.sh` |
-| 支持自动化 | 否 | 是 | 是 |
+| 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 |
+| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` |
+| 自动加入PATH | 是（可选） | 否（需手动） | 是 |
+| 包含卸载程序 | 是 | 否 | 否 |
+| 支持自动化 | 是 | 是 | 是 |
 
 ---
 
-### Step 1 — Download TIAN | 第一步 — 下载「天」
+### Step 1 (Installer) — Download and Run | 第一步（安装程序）— 下载并运行
+
+> **Recommended for most Windows users | 大多数Windows用户推荐此方式**
+
+Download the latest `tian-setup-*.exe` from the [Releases page](../../releases/latest).  
+Double-click the downloaded file and follow the installer wizard. It will:
+
+1. Install TIAN to `C:\Program Files\TIAN` (or your chosen folder)
+2. Optionally add `tian-cli` to your system PATH
+3. Create a Start Menu shortcut for the Setup Wizard
+4. Offer to launch the TIAN Setup Wizard immediately after installation
+
+从 [Releases 页面](../../releases/latest) 下载最新的 `tian-setup-*.exe`。  
+双击下载的文件，按照安装向导操作。安装程序将：
+
+1. 将 TIAN 安装到 `C:\Program Files\TIAN`（或您选择的目录）
+2. 可选：将 `tian-cli` 加入系统 PATH
+3. 在开始菜单创建安装向导快捷方式
+4. 安装完成后可立即启动 TIAN 安装向导
+
+---
+
+### Step 1 (ZIP) — Download TIAN | 第一步（ZIP）— 下载「天」
 
 Click the green **Code** button at the top of this page, then click **Download ZIP**. Unzip the folder somewhere easy to find, like your Desktop.
 
@@ -98,9 +151,9 @@ Click the green **Code** button at the top of this page, then click **Download Z
 
 ---
 
-### Step 2 (GUI) — Run the Setup Wizard | 第二步（图形界面）— 运行「天」安装向导
+### Step 2 (ZIP / GUI) — Run the Setup Wizard | 第二步（ZIP / 图形界面）— 运行「天」安装向导
 
-Inside the folder, double-click `setup.bat`. A simple window will open and guide you through:
+Inside the unzipped folder, double-click `setup.bat`. A simple window will open and guide you through:
 
 1. **Choose your AI** — pick Claude, Codex, or another assistant
 2. **Connect your account** — the wizard will open a website in your browser where you can sign up and get a free API key. An API key is like a password that lets TIAN talk to the AI on your behalf. The wizard walks you through getting it step by step — you just copy and paste.
@@ -522,7 +575,7 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
 
 ## Roadmap | 开发计划
 
-- [ ] One-click Windows installer (.exe) | 一键Windows安装程序（.exe）
+- [x] One-click Windows installer (.exe) | 一键Windows安装程序（.exe）
 - [ ] GUI skill browser and installer | 图形化技能浏览与安装界面
 - [ ] Business workflow templates | 商业工作流模板
 - [x] Mac support | Mac 支持
