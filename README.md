@@ -63,6 +63,24 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ## Getting Started | 快速开始
 
+TIAN offers two ways to set up — choose whichever fits you:
+
+| | GUI Wizard | CLI |
+|---|---|---|
+| Who it's for | Anyone, no terminal needed | Users comfortable with a terminal |
+| How to start | Double-click `setup.bat` | Run `tian-cli help` |
+| Supports scripting / automation | No | Yes |
+
+「天」提供两种安装方式：
+
+| | 图形向导 | 命令行 |
+|---|---|---|
+| 适合人群 | 任何人，无需终端 | 熟悉命令行的用户 |
+| 启动方式 | 双击 `setup.bat` | 运行 `tian-cli help` |
+| 支持脚本/自动化 | 否 | 是 |
+
+---
+
 ### Step 1 — Download TIAN | 第一步 — 下载「天」
 
 Click the green **Code** button at the top of this page, then click **Download ZIP**. Unzip the folder somewhere easy to find, like your Desktop.
@@ -142,6 +160,60 @@ You are always in control — TIAN only does what you ask, one conversation at a
 - "把我的待办事项保存到文件中"
 
 您始终掌握主动权——「天」只执行您明确要求的操作。
+
+---
+
+## CLI Reference | 命令行参考
+
+For users comfortable with a terminal, `tian-cli.bat` gives full control without the GUI.
+
+适合熟悉命令行的用户，`tian-cli.bat` 提供完整的命令行控制，无需图形界面。
+
+```
+tian-cli <command> [subcommand] [options]
+```
+
+| Command | Description | 说明 |
+|---|---|---|
+| `tian-cli setup` | Interactive guided setup in the terminal | 终端交互式安装向导 |
+| `tian-cli install --backend <id> --key <key>` | Non-interactive install with flags | 使用参数直接安装，无需交互 |
+| `tian-cli status` | Show what is installed and configured | 显示已安装和已配置的内容 |
+| `tian-cli list backends` | List all available AI backends | 列出所有可用的AI引擎 |
+| `tian-cli list mcp` | List all available MCP servers | 列出所有可用的MCP工具 |
+| `tian-cli list skills` | List all available skills | 列出所有可用的技能包 |
+| `tian-cli add mcp <id>` | Add an MCP server to your config | 向配置中添加MCP工具 |
+| `tian-cli add skill <id>` | Install a skill | 安装技能包 |
+| `tian-cli remove mcp <id>` | Remove an MCP server | 移除MCP工具 |
+| `tian-cli repair` | Re-run setup for current config | 重新执行当前配置的安装 |
+
+**Install flags | 安装参数**
+
+| Flag | Description |
+|---|---|
+| `--backend <id>` | AI backend to install (e.g. `claude-code`, `openai-codex`) |
+| `--key <apikey>` | API key for the chosen backend |
+| `--mcp <ids>` | Comma-separated MCP server IDs (e.g. `filesystem,web-search`) |
+| `--skills <ids>` | Comma-separated skill IDs |
+| `--yes` | Skip all confirmation prompts (for scripting) |
+
+**Examples | 示例**
+
+```bat
+:: Interactive setup
+tian-cli setup
+
+:: Fully automated install
+tian-cli install --backend claude-code --key sk-ant-xxx --mcp filesystem,web-search --yes
+
+:: Check what's installed
+tian-cli status
+
+:: Add a new MCP server after initial setup
+tian-cli add mcp github
+
+:: List everything available
+tian-cli list mcp
+```
 
 ---
 
