@@ -1,4 +1,4 @@
-# TIAN — Talking Is All You Need
+# TIAN — Talking Is All you Need
 # TIAN — 会说话，就会用AI
 
 > Set up AI on your computer in minutes. No coding. No technical background. Just follow the steps.
