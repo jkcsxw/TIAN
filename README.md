@@ -73,17 +73,19 @@ Click the green **Code** button at the top of this page, then click **Download Z
 
 Inside the folder, double-click `setup.bat`. A simple window will open and guide you through:
 
-- Choosing your AI backend (Claude, Codex, or others)
-- Entering your API key
-- Selecting which skills and MCP tools to install
+1. **Choose your AI** — pick Claude, Codex, or another assistant
+2. **Connect your account** — the wizard will open a website in your browser where you can sign up and get a free API key. An API key is like a password that lets TIAN talk to the AI on your behalf. The wizard walks you through getting it step by step — you just copy and paste.
+3. **Pick your tools and skills** — choose what you want the AI to be able to do
+4. **Wait for install** — TIAN handles everything automatically
 
 ---
 
 在解压后的文件夹中，双击 `setup.bat`。一个简单的窗口将会弹出，引导您完成以下步骤：
 
-- 选择AI引擎（Claude、Codex 或其他）
-- 输入您的API密钥
-- 选择要安装的技能包和MCP工具
+1. **选择AI引擎** — 选择 Claude、Codex 或其他AI助手
+2. **连接您的账号** — 向导会自动打开浏览器，引导您注册并获取API密钥。API密钥就像一个密码，让 TIAN 代表您与AI通信。向导会一步步告诉您如何获取，您只需复制粘贴即可。
+3. **选择工具和技能包** — 勾选您希望AI能够执行的功能
+4. **等待安装完成** — TIAN 全自动处理，无需任何操作
 
 ---
 
