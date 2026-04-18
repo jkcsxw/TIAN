@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # ── PowerShell / Pester tests (Windows) ─────────────────────────────────────
+  test-windows:
+    name: Pester tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pester v5
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable -Name Pester | Where-Object Version -ge '5.0')) {
+            Install-Module Pester -MinimumVersion 5.0 -Force -Scope CurrentUser
+          }
+
+      - name: Run Pester tests
+        shell: pwsh
+        run: |
+          Import-Module Pester -MinimumVersion 5.0
+          $config = New-PesterConfiguration
+          $config.Run.Path = 'tests/ps'
+          $config.Output.Verbosity = 'Detailed'
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = 'tests/results-windows.xml'
+          $result = Invoke-Pester -Configuration $config
+          exit $result.FailedCount
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-results
+          path: tests/results-windows.xml
+
+  # ── Bash tests (Linux / macOS-compatible) ────────────────────────────────────
+  test-bash:
+    name: Bash tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make test scripts executable
+        run: chmod +x tests/run-tests.sh tests/bash/*.sh
+
+      - name: Run bash tests
+        run: |
+          PASS=0; FAIL=0
+          for f in tests/bash/test-*.sh; do
+            echo ""
+            echo "── $(basename "$f") ────────────────────────────"
+            if bash "$f"; then
+              ((PASS++))
+            else
+              ((FAIL++))
+            fi
+          done
+          echo ""
+          echo "Results: $PASS suite(s) passed, $FAIL suite(s) failed"
+          [[ $FAIL -eq 0 ]]
+
+  # ── Bash tests (macOS) ───────────────────────────────────────────────────────
+  test-macos:
+    name: Bash + Pester tests (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make test scripts executable
+        run: chmod +x tests/run-tests.sh tests/bash/*.sh
+
+      - name: Install PowerShell Core
+        run: brew install --cask powershell
+
+      - name: Run all tests (bash + Pester)
+        run: bash tests/run-tests.sh
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-results-mac
+          path: tests/results-mac.xml
