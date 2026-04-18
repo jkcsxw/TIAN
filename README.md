@@ -91,9 +91,55 @@ Inside the folder, double-click `setup.bat`. A simple window will open and guide
 
 ### Step 3 — Start Talking | 第三步 — 开始对话
 
-Once setup is complete, launch the app and start chatting. Ask it anything.
+Once setup is complete, double-click `launcher.bat` and start chatting. TIAN is not just a Q&A tool — it can actively work for you. Here are some things you can say:
 
-安装完成后，启动应用即可开始对话。有问题尽管问！
+**Daily life | 日常生活**
+- "Write a professional email to my landlord asking to fix the heating"
+- "Summarize this article for me" *(paste any text)*
+- "Help me plan a 5-day trip to Japan on a $2,000 budget"
+- "Translate this paragraph into Chinese / English"
+- "Proofread my CV and suggest improvements"
+
+**Business | 商业用途**
+- "Draft a reply to this customer complaint" *(paste the email)*
+- "Turn these messy meeting notes into a clean action item list" *(paste notes)*
+- "Write 5 LinkedIn post ideas about our new product launch"
+- "Analyse this sales data and tell me what's working" *(paste a table)*
+- "Create a professional invoice template for my freelance business"
+- "Write a job description for a customer service role"
+
+**Automation & files | 自动化与文件**
+- "Read the file on my Desktop called report.pdf and summarise it" *(requires File System MCP)*
+- "Search the web for the latest news about AI in healthcare" *(requires Web Search MCP)*
+- "Save my to-do list to a file and remind me of it tomorrow"
+
+You are always in control — TIAN only does what you ask, one conversation at a time.
+
+---
+
+安装完成后，双击 `launcher.bat` 即可开始对话。TIAN 不只是问答工具——它可以主动为您完成各种任务。以下是一些示例：
+
+**日常生活**
+- "帮我写一封给房东的邮件，要求修复暖气"
+- "帮我总结这篇文章"（粘贴任意文字）
+- "帮我规划一个2000美元预算的日本5日游"
+- "把这段话翻译成中文/英文"
+- "帮我修改简历并提出改进建议"
+
+**商业用途**
+- "帮我回复这封客户投诉邮件"（粘贴邮件内容）
+- "把这些凌乱的会议记录整理成清晰的行动清单"（粘贴记录）
+- "为我们的新产品发布写5条LinkedIn帖子"
+- "分析这份销售数据，告诉我哪些方面表现良好"（粘贴表格）
+- "为我的自由职业创建一个专业发票模板"
+- "写一份客服岗位的招聘描述"
+
+**自动化与文件**
+- "读取我桌面上的 report.pdf 并帮我总结"（需要文件系统MCP）
+- "搜索最新的医疗AI新闻"（需要网络搜索MCP）
+- "把我的待办事项保存到文件中"
+
+您始终掌握主动权——TIAN 只执行您明确要求的操作。
 
 ---
 
