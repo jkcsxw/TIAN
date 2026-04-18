@@ -45,7 +45,7 @@ cmd_help() {
 cat <<EOF
 
   TIAN CLI  (macOS bash mode)
-  Talking Is All you Need
+  Talk Is All you Need
 
 $(rule)
 

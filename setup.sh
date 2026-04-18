@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TIAN — Talking Is All you Need
+# TIAN — Talk Is All you Need
 # Mac setup entry point — double-click in Finder or run: bash setup.sh
 
 set -euo pipefail
@@ -19,7 +19,7 @@ echo "     ██║   ██║██╔══██║██║╚██╗█
 echo "     ██║   ██║██║  ██║██║ ╚████║"
 echo "     ╚═╝   ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝"
 echo ""
-echo "  Talking Is All you Need — macOS Setup"
+echo "  Talk Is All you Need — macOS Setup"
 echo ""
 
 bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
