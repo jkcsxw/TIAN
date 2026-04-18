@@ -236,6 +236,15 @@ tian-cli <command> [subcommand] [options]
 | `tian-cli add skill <id>` | Install a skill | 安装技能包 |
 | `tian-cli remove mcp <id>` | Remove an MCP server | 移除MCP工具 |
 | `tian-cli repair` | Re-run setup for current config | 重新执行当前配置的安装 |
+| `tian-cli run "prompt"` | Run a task now and print the result | 立即执行任务并输出结果 |
+| `tian-cli run "prompt" --background` | Run a task in the background | 在后台执行任务 |
+| `tian-cli jobs` | List all background jobs and their status | 列出所有后台任务及状态 |
+| `tian-cli jobs result <id>` | Read the output of a completed job | 查看已完成任务的输出 |
+| `tian-cli jobs clear` | Clear completed jobs (`--all` clears everything) | 清除已完成任务记录 |
+| `tian-cli schedule add` | Create a recurring scheduled task | 创建定时/定期任务 |
+| `tian-cli schedule list` | List all scheduled tasks | 列出所有定时任务 |
+| `tian-cli schedule run <name>` | Run a scheduled task immediately | 立即执行某个定时任务 |
+| `tian-cli schedule remove <name>` | Delete a scheduled task | 删除定时任务 |
 
 **Install flags | 安装参数**
 
@@ -246,6 +255,16 @@ tian-cli <command> [subcommand] [options]
 | `--mcp <ids>` | Comma-separated MCP server IDs (e.g. `filesystem,web-search`) |
 | `--skills <ids>` | Comma-separated skill IDs |
 | `--yes` | Skip all confirmation prompts (for scripting) |
+
+**Schedule flags | 定时任务参数**
+
+| Flag | Description | 说明 |
+|---|---|---|
+| `--name <name>` | Schedule name (required) | 任务名称（必填） |
+| `--task "prompt"` | The AI prompt to run (required) | 要执行的提示词（必填） |
+| `--time HH:MM` | Time of day to run (default: `08:00`) | 每天执行时间（默认08:00） |
+| `--repeat <freq>` | `once` / `hourly` / `daily` / `weekly` (default: `daily`) | 重复频率 |
+| `--day <days>` | Days for weekly repeat e.g. `MON,WED,FRI` | 每周执行日（weekly模式） |
 
 **Examples | 示例**
 
@@ -264,6 +283,25 @@ tian-cli add mcp github
 
 :: List everything available
 tian-cli list mcp
+
+:: Run a task now (output printed to terminal)
+tian-cli run "Summarise the latest AI news in 5 bullet points"
+
+:: Run a task in the background and check it later
+tian-cli run "Draft my weekly team update email" --background
+tian-cli jobs
+tian-cli jobs result 20240417-083012-ab12cd
+
+:: Schedule a daily morning briefing at 8am
+tian-cli schedule add --name morning-brief --task "Give me a short morning briefing with 3 key things to focus on today" --time 08:00 --repeat daily
+
+:: Schedule a Monday weekly report at 9am
+tian-cli schedule add --name weekly-report --task "Summarise this week's priorities and suggest a plan" --time 09:00 --repeat weekly --day MON
+
+:: List and manage schedules
+tian-cli schedule list
+tian-cli schedule run morning-brief
+tian-cli schedule remove morning-brief
 ```
 
 ---
