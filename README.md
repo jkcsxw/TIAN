@@ -79,7 +79,7 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 **Option A — Download installer directly (recommended)**
 
-Download [`tian-setup.exe`](../../releases/latest) from the Releases page and double-click it.
+Download [`tian-setup.exe`](https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe) and double-click it.
 
 **Option B — Already have the ZIP? Run `get-installer.bat`**
 
@@ -90,7 +90,7 @@ It will download and launch the installer for you automatically — no typing re
 
 **方式A — 直接下载安装程序（推荐）**
 
-从 Releases 页面下载 [`tian-setup.exe`](../../releases/latest)，双击运行即可。
+下载 [`tian-setup.exe`](https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe)，双击运行即可。
 
 **方式B — 已下载ZIP？运行 `get-installer.bat`**
 
@@ -125,7 +125,7 @@ TIAN supports both **Windows** and **macOS**. Choose your platform below.
 
 > **Recommended for most Windows users | 大多数Windows用户推荐此方式**
 
-Download the latest `tian-setup-*.exe` from the [Releases page](../../releases/latest).  
+Download the latest installer from [Releases](https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe).  
 Double-click the downloaded file and follow the installer wizard. It will:
 
 1. Install TIAN to `C:\Program Files\TIAN` (or your chosen folder)
@@ -133,7 +133,7 @@ Double-click the downloaded file and follow the installer wizard. It will:
 3. Create a Start Menu shortcut for the Setup Wizard
 4. Offer to launch the TIAN Setup Wizard immediately after installation
 
-从 [Releases 页面](../../releases/latest) 下载最新的 `tian-setup-*.exe`。  
+从 [Releases 页面](https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe) 下载安装程序。  
 双击下载的文件，按照安装向导操作。安装程序将：
 
 1. 将 TIAN 安装到 `C:\Program Files\TIAN`（或您选择的目录）
