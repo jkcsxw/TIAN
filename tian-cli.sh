@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# TIAN CLI — Mac entry point
+# TIAN CLI — macOS/Linux entry point
 # Usage: bash tian-cli.sh <command> [options]
 
 TIAN_DIR="$(cd "$(dirname "$0")" && pwd)"
+OS_NAME="$(uname -s 2>/dev/null || echo unknown)"
 
-if [[ "$OSTYPE" != "darwin"* && "$OSTYPE" != "linux"* ]]; then
+if [[ "$OS_NAME" != "Darwin" && "$OS_NAME" != "Linux" ]]; then
     echo "This script is for macOS/Linux. On Windows please use tian-cli.bat instead."
     exit 1
 fi
