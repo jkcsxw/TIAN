@@ -7,6 +7,19 @@ on:
     branches: ["**"]
 
 jobs:
+  # ── Package security test ───────────────────────────────────────────────────
+  test-package-security:
+    name: Package security (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make security test executable
+        run: chmod +x tests/bash/test-package-security.sh
+
+      - name: Run package security test
+        run: bash tests/bash/test-package-security.sh
+
   # ── PowerShell / Pester tests (Windows) ─────────────────────────────────────
   test-windows:
     name: Pester tests (Windows)
@@ -76,7 +89,7 @@ jobs:
   # ── Release (main branch, push only, all tests green) ───────────────────────
   release:
     name: Queue release tag
-    needs: [test-windows, test-bash, test-macos]
+    needs: [test-package-security, test-windows, test-bash, test-macos]
     if: >
       success() &&
       github.event_name == 'push' &&
@@ -109,7 +122,7 @@ jobs:
   # ── Auto-revert on test failure (main branch only) ───────────────────────────
   auto-revert:
     name: Auto-revert on failure
-    needs: [test-windows, test-bash, test-macos]
+    needs: [test-package-security, test-windows, test-bash, test-macos]
     if: |
       failure() &&
       github.event_name == 'push' &&

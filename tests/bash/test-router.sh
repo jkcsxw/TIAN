@@ -5,9 +5,28 @@ source "$(dirname "$0")/bash-helpers.sh"
 
 TIAN_ROOT=$(get_tian_root)
 CLI="$TIAN_ROOT/mac/tian-cli-bash.sh"
+TEST_HOME=$(make_temp_dir)
+trap 'rm -rf "$TEST_HOME"' EXIT
+
+mkdir -p "$TEST_HOME/.tian/tasks" "$TEST_HOME/Library/Application Support/Claude"
+cat > "$TEST_HOME/.tian/jobs.json" <<'EOF'
+[
+  {
+    "id": "20260417-231812-13d702",
+    "status": "running",
+    "prompt": "run"
+  },
+  {
+    "id": "20260417-231813-abcdef",
+    "status": "done",
+    "prompt": "done"
+  }
+]
+EOF
+echo '[]' > "$TEST_HOME/.tian/schedules.json"
 
 # All invocations pass TIAN_ROOT as first arg (the script's $1 = TIAN_DIR)
-run_cli() { bash "$CLI" "$TIAN_ROOT" "$@" 2>&1; }
+run_cli() { HOME="$TEST_HOME" bash "$CLI" "$TIAN_ROOT" "$@" 2>&1; }
 
 # ─────────────────────────────────────────────────────────────────────────────
 
