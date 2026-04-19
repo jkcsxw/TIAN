@@ -94,6 +94,47 @@ a {
   color: var(--muted);
 }
 
+.lang-switch {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.lang-option {
+  min-width: 58px;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lang-option.is-active {
+  background: var(--accent);
+  color: #fff;
+}
+
+body [data-lang] {
+  display: none;
+}
+
+html[data-lang="en"] [data-lang="en"],
+html[data-lang="zh"] [data-lang="zh"] {
+  display: inline;
+}
+
+html[data-lang="en"] p[data-lang="en"],
+html[data-lang="zh"] p[data-lang="zh"],
+html[data-lang="en"] li[data-lang="en"],
+html[data-lang="zh"] li[data-lang="zh"] {
+  display: block;
+}
+
 .eyebrow,
 .section-kicker,
 .stat-label {
@@ -106,7 +147,7 @@ a {
 }
 
 .hero-copy h1,
-.bilingual h2 {
+.intro-panel h2 {
   margin: 0 0 16px;
   line-height: 0.98;
 }
@@ -122,7 +163,7 @@ a {
 .platform p,
 .faq p,
 .summary-card p,
-.bilingual p,
+.intro-panel p,
 .footer p {
   color: var(--muted);
   line-height: 1.65;
@@ -192,10 +233,9 @@ a {
   border-radius: 24px;
 }
 
-.bilingual {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px;
+.intro-panel h2 {
+  font-size: clamp(2rem, 4vw, 3.3rem);
+  max-width: 20ch;
 }
 
 .feature-grid,
@@ -257,7 +297,6 @@ a {
 
 @media (max-width: 920px) {
   .hero,
-  .bilingual,
   .feature-grid,
   .platform-grid {
     grid-template-columns: 1fr;

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -96,149 +96,179 @@
       <nav class="topbar" aria-label="Primary">
         <a class="brand" href="#top">TIAN</a>
         <div class="nav-links">
-          <a href="#why">Why TIAN</a>
-          <a href="#platforms">Platforms</a>
-          <a href="#seo-faq">FAQ</a>
+          <a href="#why"><span data-lang="en">Why TIAN</span><span data-lang="zh">为什么选择「天」</span></a>
+          <a href="#platforms"><span data-lang="en">Platforms</span><span data-lang="zh">支持平台</span></a>
+          <a href="#seo-faq"><span data-lang="en">FAQ</span><span data-lang="zh">常见问题</span></a>
           <a href="https://github.com/jkcsxw/TIAN">GitHub</a>
+        </div>
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button type="button" class="lang-option is-active" data-set-lang="en" aria-pressed="true">EN</button>
+          <button type="button" class="lang-option" data-set-lang="zh" aria-pressed="false">中文</button>
         </div>
       </nav>
 
       <div class="hero-copy" id="top">
-        <p class="eyebrow">Talk Is All You Need</p>
-        <h1>Set up AI on your computer without the usual setup mess.</h1>
+        <p class="eyebrow"><span data-lang="en">Talk Is All You Need</span><span data-lang="zh">会说话，就会用 AI</span></p>
+        <h1>
+          <span data-lang="en">Set up AI on your computer without the usual setup mess.</span>
+          <span data-lang="zh">不用折腾复杂配置，也能把 AI 装到自己的电脑上。</span>
+        </h1>
         <p class="lede">
-          TIAN is a guided installer and command-line toolkit for Windows, macOS, and Linux.
-          It helps people get AI assistants running, connect MCP tools, and install workflow skills
-          without needing deep technical knowledge.
+          <span data-lang="en">TIAN is a guided installer and command-line toolkit for Windows, macOS, and Linux. It helps people get AI assistants running, connect MCP tools, and install workflow skills without needing deep technical knowledge.</span>
+          <span data-lang="zh">「天」是面向 Windows、macOS 和 Linux 的引导式安装工具与命令行工具集，帮助用户快速运行 AI 助手、连接 MCP 工具并安装工作流技能包，不需要深厚的技术背景。</span>
         </p>
         <div class="cta-row">
-          <a class="button primary" href="https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe">Download for Windows</a>
-          <a class="button secondary" href="https://github.com/jkcsxw/TIAN">View on GitHub</a>
+          <a class="button primary" href="https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe"><span data-lang="en">Download for Windows</span><span data-lang="zh">下载 Windows 安装包</span></a>
+          <a class="button secondary" href="https://github.com/jkcsxw/TIAN"><span data-lang="en">View on GitHub</span><span data-lang="zh">在 GitHub 查看</span></a>
         </div>
         <ul class="signal-list" aria-label="Highlights">
-          <li>No-code setup path for Windows users</li>
-          <li>MCP server support for files, web search, GitHub, Slack, and more</li>
-          <li>Backend choices including Claude Code, OpenAI Codex CLI, and local Ollama</li>
+          <li><span data-lang="en">No-code setup path for Windows users</span><span data-lang="zh">Windows 用户可通过图形向导完成免代码安装</span></li>
+          <li><span data-lang="en">MCP server support for files, web search, GitHub, Slack, and more</span><span data-lang="zh">支持文件、网络搜索、GitHub、Slack 等 MCP 服务</span></li>
+          <li><span data-lang="en">Backend choices including Claude Code, OpenAI Codex CLI, and local Ollama</span><span data-lang="zh">可选 Claude Code、OpenAI Codex CLI 和本地 Ollama 等后端</span></li>
         </ul>
       </div>
 
       <div class="hero-card" aria-label="Project summary">
         <div class="stat">
-          <span class="stat-label">Best for</span>
-          <strong>Non-technical users, operators, and small teams</strong>
+          <span class="stat-label"><span data-lang="en">Best for</span><span data-lang="zh">适合人群</span></span>
+          <strong><span data-lang="en">Non-technical users, operators, and small teams</span><span data-lang="zh">非技术用户、运营人员和小团队</span></strong>
         </div>
         <div class="stat">
-          <span class="stat-label">What it installs</span>
-          <strong>AI backends, MCP servers, workflow skills, and helpers</strong>
+          <span class="stat-label"><span data-lang="en">What it installs</span><span data-lang="zh">安装内容</span></span>
+          <strong><span data-lang="en">AI backends, MCP servers, workflow skills, and helpers</span><span data-lang="zh">AI 后端、MCP 服务、工作流技能包和辅助组件</span></strong>
         </div>
         <div class="stat">
-          <span class="stat-label">Languages</span>
-          <strong>English + Chinese</strong>
+          <span class="stat-label"><span data-lang="en">Languages</span><span data-lang="zh">语言</span></span>
+          <strong><span data-lang="en">English + Chinese</span><span data-lang="zh">英文 + 中文</span></strong>
         </div>
       </div>
     </header>
 
     <main>
-      <section class="section bilingual">
-        <div>
-          <p class="section-kicker">English</p>
-          <h2>AI setup for people who want outcomes, not terminal archaeology.</h2>
-          <p>
-            TIAN turns a complicated stack of installers, environment variables, MCP configuration,
-            and skill setup into a guided flow. It is aimed at business owners, professionals,
-            and curious users who want practical AI help on their own machines.
-          </p>
-        </div>
-        <div>
-          <p class="section-kicker">中文</p>
-          <h2>让普通用户也能快速把 AI 安装到自己的电脑上。</h2>
-          <p>
-            「天」把原本复杂的安装流程简化成可引导的步骤，帮助用户配置 AI 助手、MCP 工具和技能包。
-            即使不了解终端、Node.js 或配置文件，也能开始使用。
-          </p>
-        </div>
+      <section class="section intro-panel">
+        <p class="section-kicker"><span data-lang="en">Overview</span><span data-lang="zh">简介</span></p>
+        <h2>
+          <span data-lang="en">AI setup for people who want outcomes, not terminal archaeology.</span>
+          <span data-lang="zh">为重视结果的人准备的 AI 安装体验，而不是一堆难懂的终端命令。</span>
+        </h2>
+        <p>
+          <span data-lang="en">TIAN turns a complicated stack of installers, environment variables, MCP configuration, and skill setup into a guided flow. It is aimed at business owners, professionals, and curious users who want practical AI help on their own machines.</span>
+          <span data-lang="zh">「天」把原本复杂的安装器、环境变量、MCP 配置和技能包设置，整理成清晰的引导流程。它面向企业主、专业人士，以及想在自己电脑上真正用起来 AI 的普通用户。</span>
+        </p>
       </section>
 
       <section class="section" id="why">
-        <p class="section-kicker">Why TIAN</p>
+        <p class="section-kicker"><span data-lang="en">Why TIAN</span><span data-lang="zh">为什么选择「天」</span></p>
         <div class="feature-grid">
           <article class="feature">
-            <h3>Guided install</h3>
-            <p>Windows users can use a GUI wizard. Mac and Linux users get straightforward script and CLI flows.</p>
+            <h3><span data-lang="en">Guided install</span><span data-lang="zh">引导式安装</span></h3>
+            <p><span data-lang="en">Windows users can use a GUI wizard. Mac and Linux users get straightforward script and CLI flows.</span><span data-lang="zh">Windows 用户可以直接使用图形向导，Mac 和 Linux 用户也有清晰直接的脚本和命令行流程。</span></p>
           </article>
           <article class="feature">
-            <h3>MCP ready</h3>
-            <p>Connect AI to local files, web search, GitHub, Slack, Google Drive, databases, and other tools.</p>
+            <h3><span data-lang="en">MCP ready</span><span data-lang="zh">原生支持 MCP</span></h3>
+            <p><span data-lang="en">Connect AI to local files, web search, GitHub, Slack, Google Drive, databases, and other tools.</span><span data-lang="zh">可把 AI 连接到本地文件、网络搜索、GitHub、Slack、Google Drive、数据库等工具。</span></p>
           </article>
           <article class="feature">
-            <h3>Backend choice</h3>
-            <p>Pick the assistant that matches the job, including Claude Code, OpenAI Codex CLI, Claude Desktop, or local Ollama.</p>
+            <h3><span data-lang="en">Backend choice</span><span data-lang="zh">自由选择后端</span></h3>
+            <p><span data-lang="en">Pick the assistant that matches the job, including Claude Code, OpenAI Codex CLI, Claude Desktop, or local Ollama.</span><span data-lang="zh">可根据任务选择 Claude Code、OpenAI Codex CLI、Claude Desktop 或本地 Ollama 等助手。</span></p>
           </article>
           <article class="feature">
-            <h3>Skills included</h3>
-            <p>Add reusable prompt skills for analysis, customer support, document work, meetings, and social media tasks.</p>
+            <h3><span data-lang="en">Skills included</span><span data-lang="zh">内置技能包</span></h3>
+            <p><span data-lang="en">Add reusable prompt skills for analysis, customer support, document work, meetings, and social media tasks.</span><span data-lang="zh">可安装适用于分析、客服、文档处理、会议记录和社交媒体工作的复用型技能包。</span></p>
           </article>
         </div>
       </section>
 
       <section class="section" id="platforms">
-        <p class="section-kicker">Platforms</p>
+        <p class="section-kicker"><span data-lang="en">Platforms</span><span data-lang="zh">支持平台</span></p>
         <div class="platform-grid">
           <article class="platform">
             <h3>Windows</h3>
-            <p>The simplest path. Download the installer and follow the wizard.</p>
-            <a href="https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe">Get tian-setup.exe</a>
+            <p><span data-lang="en">The simplest path. Download the installer and follow the wizard.</span><span data-lang="zh">最简单的方式。下载安装程序后按向导操作即可。</span></p>
+            <a href="https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe"><span data-lang="en">Get tian-setup.exe</span><span data-lang="zh">下载 tian-setup.exe</span></a>
           </article>
           <article class="platform">
             <h3>macOS</h3>
-            <p>Run the setup script to install dependencies and configure your assistant.</p>
+            <p><span data-lang="en">Run the setup script to install dependencies and configure your assistant.</span><span data-lang="zh">运行安装脚本即可安装依赖并完成助手配置。</span></p>
             <code>bash setup.sh</code>
           </article>
           <article class="platform">
             <h3>Linux</h3>
-            <p>Use the CLI from the repository and manage installs from the terminal.</p>
+            <p><span data-lang="en">Use the CLI from the repository and manage installs from the terminal.</span><span data-lang="zh">使用仓库里的命令行工具，在终端中完成安装和管理。</span></p>
             <code>bash tian-cli.sh help</code>
           </article>
         </div>
       </section>
 
       <section class="section">
-        <p class="section-kicker">Search-Friendly Summary</p>
+        <p class="section-kicker"><span data-lang="en">Search-Friendly Summary</span><span data-lang="zh">搜索友好说明</span></p>
         <div class="summary-card">
           <p>
-            TIAN is an open-source AI installer and setup tool. People searching for terms like
-            <strong>AI setup tool for Windows</strong>, <strong>MCP installer</strong>,
-            <strong>Claude Code setup</strong>, <strong>OpenAI Codex CLI setup</strong>,
-            <strong>AI assistant installer</strong>, or <strong>天 AI 安装工具</strong>
-            should be able to understand what the project does from this page alone.
+            <span data-lang="en">TIAN is an open-source AI installer and setup tool. People searching for terms like <strong>AI setup tool for Windows</strong>, <strong>MCP installer</strong>, <strong>Claude Code setup</strong>, <strong>OpenAI Codex CLI setup</strong>, <strong>AI assistant installer</strong>, or <strong>天 AI 安装工具</strong> should be able to understand what the project does from this page alone.</span>
+            <span data-lang="zh">TIAN 是一个开源的 AI 安装与配置工具。无论用户搜索的是 <strong>Windows AI 安装工具</strong>、<strong>MCP 安装器</strong>、<strong>Claude Code 配置</strong>、<strong>OpenAI Codex CLI 配置</strong>、<strong>AI 助手安装器</strong>，还是 <strong>天 AI 安装工具</strong>，都应该能从这个页面快速理解项目用途。</span>
           </p>
         </div>
       </section>
 
       <section class="section faq" id="seo-faq">
-        <p class="section-kicker">FAQ</p>
+        <p class="section-kicker"><span data-lang="en">FAQ</span><span data-lang="zh">常见问题</span></p>
         <article>
-          <h3>What is TIAN?</h3>
-          <p>TIAN is a project that helps users install and configure AI assistants, MCP integrations, and skills on their own computers.</p>
+          <h3><span data-lang="en">What is TIAN?</span><span data-lang="zh">TIAN 是什么？</span></h3>
+          <p><span data-lang="en">TIAN is a project that helps users install and configure AI assistants, MCP integrations, and skills on their own computers.</span><span data-lang="zh">TIAN 是一个帮助用户在自己电脑上安装和配置 AI 助手、MCP 集成和技能包的项目。</span></p>
         </article>
         <article>
-          <h3>Who is TIAN for?</h3>
-          <p>It is designed for non-technical users, business operators, professionals, and developers who want a faster setup path.</p>
+          <h3><span data-lang="en">Who is TIAN for?</span><span data-lang="zh">TIAN 适合谁？</span></h3>
+          <p><span data-lang="en">It is designed for non-technical users, business operators, professionals, and developers who want a faster setup path.</span><span data-lang="zh">它适合希望更快完成 AI 配置的非技术用户、业务运营者、专业人士和开发者。</span></p>
         </article>
         <article>
-          <h3>Is TIAN only for Windows?</h3>
-          <p>No. Windows has the smoothest no-code experience, but the project also supports macOS and Linux.</p>
+          <h3><span data-lang="en">Is TIAN only for Windows?</span><span data-lang="zh">TIAN 只支持 Windows 吗？</span></h3>
+          <p><span data-lang="en">No. Windows has the smoothest no-code experience, but the project also supports macOS and Linux.</span><span data-lang="zh">不是。Windows 的免代码体验最完整，但项目同样支持 macOS 和 Linux。</span></p>
         </article>
         <article>
-          <h3>Where can I download TIAN?</h3>
-          <p>The main download is the Windows installer on the GitHub Releases page. Source and scripts are in the GitHub repository.</p>
+          <h3><span data-lang="en">Where can I download TIAN?</span><span data-lang="zh">在哪里下载 TIAN？</span></h3>
+          <p><span data-lang="en">The main download is the Windows installer on the GitHub Releases page. Source and scripts are in the GitHub repository.</span><span data-lang="zh">主要下载入口是 GitHub Releases 页面中的 Windows 安装程序，源码和脚本都在 GitHub 仓库中。</span></p>
         </article>
       </section>
     </main>
 
     <footer class="footer">
-      <p>TIAN is open source. Explore the code, releases, and setup instructions on <a href="https://github.com/jkcsxw/TIAN">GitHub</a>.</p>
+      <p><span data-lang="en">TIAN is open source. Explore the code, releases, and setup instructions on <a href="https://github.com/jkcsxw/TIAN">GitHub</a>.</span><span data-lang="zh">TIAN 是开源项目。你可以在 <a href="https://github.com/jkcsxw/TIAN">GitHub</a> 查看源码、发行版和安装说明。</span></p>
     </footer>
   </div>
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var buttons = document.querySelectorAll("[data-set-lang]");
+      var supported = ["en", "zh"];
+
+      function pickInitialLanguage() {
+        var stored = window.localStorage.getItem("tian-site-lang");
+        if (supported.indexOf(stored) !== -1) {
+          return stored;
+        }
+        var browserLang = (navigator.language || "en").toLowerCase();
+        return browserLang.indexOf("zh") === 0 ? "zh" : "en";
+      }
+
+      function setLanguage(lang) {
+        root.setAttribute("data-lang", lang);
+        root.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
+        window.localStorage.setItem("tian-site-lang", lang);
+        buttons.forEach(function (button) {
+          var active = button.getAttribute("data-set-lang") === lang;
+          button.classList.toggle("is-active", active);
+          button.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          setLanguage(button.getAttribute("data-set-lang"));
+        });
+      });
+
+      setLanguage(pickInitialLanguage());
+    }());
+  </script>
 </body>
 </html>
