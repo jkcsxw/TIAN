@@ -1,10 +1,6 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
   push:
     tags:
       - 'v*'
@@ -21,9 +17,7 @@ permissions:
 jobs:
   build-installer:
     runs-on: windows-latest
-    if: >
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -42,22 +36,6 @@ jobs:
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "ver=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
             echo "tag=v${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
-          else
-            # Push to main — auto-bump patch from latest release tag
-            latest=$(git tag --list 'v*' --sort=-version:refname | head -1)
-            if [ -z "$latest" ]; then
-              latest="v0.0.0"
-            fi
-            IFS='.' read -r major minor patch <<< "${latest#v}"
-            patch=$((patch + 1))
-            new_ver="${major}.${minor}.${patch}"
-            new_tag="v${new_ver}"
-            git config user.name  "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag "$new_tag"
-            git push origin "$new_tag"
-            echo "ver=${new_ver}" >> "$GITHUB_OUTPUT"
-            echo "tag=${new_tag}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install Inno Setup 6

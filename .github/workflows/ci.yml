@@ -73,6 +73,39 @@ jobs:
           name: pester-results-mac
           path: tests/results-mac.xml
 
+  # ── Release (main branch, push only, all tests green) ───────────────────────
+  release:
+    name: Queue release tag
+    needs: [test-windows, test-bash, test-macos]
+    if: >
+      success() &&
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create next release tag
+        shell: bash
+        run: |
+          latest=$(git tag --list 'v*' --sort=-version:refname | head -1)
+          if [ -z "$latest" ]; then
+            latest="v0.0.0"
+          fi
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+          patch=$((patch + 1))
+          new_ver="${major}.${minor}.${patch}"
+          new_tag="v${new_ver}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$new_tag"
+          git push origin "$new_tag"
+
   # ── Auto-revert on test failure (main branch only) ───────────────────────────
   auto-revert:
     name: Auto-revert on failure
