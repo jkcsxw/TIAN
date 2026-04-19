@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">TIAN social preview</title>
+  <desc id="desc">TIAN project preview card for GitHub Pages and social sharing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f8f2e3"/>
+      <stop offset="55%" stop-color="#edf3ef"/>
+      <stop offset="100%" stop-color="#d7ebe4"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="20%" cy="10%" r="45%">
+      <stop offset="0%" stop-color="#d7812f" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#d7812f" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="80%" cy="22%" r="42%">
+      <stop offset="0%" stop-color="#0f6b5d" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#0f6b5d" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glowA)"/>
+  <rect width="1200" height="630" fill="url(#glowB)"/>
+
+  <rect x="60" y="58" width="1080" height="514" rx="36" fill="#fffaf1" fill-opacity="0.84" stroke="#d7d8d1"/>
+
+  <text x="100" y="145" fill="#0f6b5d" font-family="Outfit, Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="5">TALK IS ALL YOU NEED</text>
+  <text x="100" y="255" fill="#18221f" font-family="Outfit, Arial, sans-serif" font-size="84" font-weight="800">TIAN</text>
+  <text x="100" y="332" fill="#18221f" font-family="Noto Sans SC, Arial, sans-serif" font-size="48" font-weight="700">天 · 会说话，就会用 AI</text>
+
+  <text x="100" y="410" fill="#53615b" font-family="Outfit, Arial, sans-serif" font-size="32">
+    <tspan x="100" dy="0">Guided AI setup for Windows, macOS, and Linux.</tspan>
+    <tspan x="100" dy="46">Install assistants, MCP tools, and workflow skills.</tspan>
+  </text>
+
+  <rect x="760" y="150" width="300" height="86" rx="20" fill="#edf4f1" stroke="#c6d6d1"/>
+  <text x="790" y="202" fill="#0f6b5d" font-family="Outfit, Arial, sans-serif" font-size="30" font-weight="700">No-code setup</text>
+
+  <rect x="810" y="264" width="250" height="86" rx="20" fill="#fff1dd" stroke="#ebcfad"/>
+  <text x="840" y="316" fill="#a55d18" font-family="Outfit, Arial, sans-serif" font-size="30" font-weight="700">MCP ready</text>
+
+  <rect x="730" y="378" width="330" height="86" rx="20" fill="#edf4f1" stroke="#c6d6d1"/>
+  <text x="760" y="430" fill="#0f6b5d" font-family="Outfit, Arial, sans-serif" font-size="30" font-weight="700">Open source on GitHub</text>
+</svg>
