@@ -62,7 +62,7 @@ Describe "Set-ApiKey" {
             $env:HOME = $script:TempHome
             Set-ApiKey -Backend $script:Backend -ApiKey "sk-first" -LogBox $null
             Set-ApiKey -Backend $script:Backend -ApiKey "sk-second" -LogBox $null
-            $lines = @(Get-Content $script:FakeProfile | Where-Object { $_ -match $script:Backend.apiKeyEnvVar })
+            $lines = Get-Content $script:FakeProfile | Where-Object { $_ -match $script:Backend.apiKeyEnvVar }
             $lines.Count | Should -Be 1
             $lines[0] | Should -Match "sk-second"
         }
