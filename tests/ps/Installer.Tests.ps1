@@ -201,8 +201,8 @@ Describe "Invoke-Build — error path (no iscc)" {
 
         # Intercept iscc lookup by prepending a function override on the command line
         & $pwsh -NoProfile -Command "
-            function Get-Command { param([string]`$Name,[string]`$ErrorAction) `$null }
-            function Test-Path   { param(`$Path) `$false }
+            function Get-Command { param([string]\$Name,[string]\$ErrorAction) `$null }
+            function Test-Path   { param(\$Path) `$false }
             & '$script' 2>&1
             exit `$LASTEXITCODE
         "
