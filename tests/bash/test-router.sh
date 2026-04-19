@@ -6,11 +6,9 @@ source "$(dirname "$0")/bash-helpers.sh"
 TIAN_ROOT=$(get_tian_root)
 CLI="$TIAN_ROOT/mac/tian-cli-bash.sh"
 TEST_HOME=$(make_temp_dir)
-OS_NAME="$(uname -s)"
 trap 'rm -rf "$TEST_HOME"' EXIT
 
 mkdir -p "$TEST_HOME/.tian/tasks" "$TEST_HOME/Library/Application Support/Claude"
-mkdir -p "$TEST_HOME/.config/Claude"
 cat > "$TEST_HOME/.tian/jobs.json" <<'EOF'
 [
   {
@@ -91,28 +89,10 @@ it "jobs clear exits 0" _test_jobs_clear
 suite "schedule subcommands"
 
 _test_sched_list() {
-    local out
-    out=$(run_cli schedule list 2>&1 || true)
-    if [[ "$OS_NAME" == "Darwin" ]]; then
-        [[ $? -eq 0 ]]
-    else
-        assert_contains "$out" "Scheduling in native bash mode is only available on macOS"
-    fi
+    run_cli schedule list
+    [[ $? -eq 0 ]]
 }
-it "schedule list matches platform support" _test_sched_list
-
-suite "setup command"
-
-_test_setup_platform_support() {
-    local out
-    out=$(run_cli setup 2>&1 || true)
-    if [[ "$OS_NAME" == "Darwin" ]]; then
-        assert_not_empty "$out"
-    else
-        assert_contains "$out" "Setup in native bash mode is only available on macOS"
-    fi
-}
-it "setup matches platform support" _test_setup_platform_support
+it "schedule list exits 0" _test_sched_list
 
 suite "unknown command"
 

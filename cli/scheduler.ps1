@@ -62,9 +62,7 @@ function Add-Schedule {
         return
     }
 
-    $platform = if ($PSVersionTable.Platform -eq 'Unix') { uname } else { "" }
-    $isMac = $IsMacOS -or ($platform -eq 'Darwin')
-    $isLinux = $IsLinux -or ($platform -eq 'Linux')
+    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
 
     if ($isMac) {
         # ── launchd (macOS) ──────────────────────────────────────────────────
@@ -115,9 +113,6 @@ function Add-Schedule {
             repeat    = $Repeat; plistFile = $plistFile
             createdAt = [System.DateTime]::Now.ToString("o")
         }
-    } elseif ($isLinux) {
-        Write-Fail "Linux scheduling is not available in the built-in CLI yet. Use 'tian-cli run' directly, or install PowerShell Core only after Linux scheduler support lands."
-        return
     } else {
         # ── Windows Task Scheduler ────────────────────────────────────────────
         $taskName = Get-TaskName $Name
@@ -161,17 +156,13 @@ function Remove-Schedule {
     $entry = $schedules | Where-Object { $_.name -eq $Name } | Select-Object -First 1
     if (-not $entry) { Write-Fail "未找到名为 '$Name' 的定时任务。/ No schedule named '$Name'."; return }
 
-    $platform = if ($PSVersionTable.Platform -eq 'Unix') { uname } else { "" }
-    $isMac = $IsMacOS -or ($platform -eq 'Darwin')
-    $isLinux = $IsLinux -or ($platform -eq 'Linux')
+    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
 
     if ($isMac) {
         if ($entry.plistFile -and (Test-Path $entry.plistFile)) {
             Invoke-Launchctl -Action 'unload' -PlistFile $entry.plistFile
             Remove-Item $entry.plistFile -ErrorAction SilentlyContinue
         }
-    } elseif ($isLinux) {
-        # Linux does not have a scheduler integration yet, but stale entries can still be cleaned up.
     } else {
         $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
         if ($result.ExitCode -ne 0) { Write-Warn "无法删除Windows定时任务（可能已被删除）。/ Could not remove Windows task (may have already been deleted)." }
