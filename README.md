@@ -106,16 +106,16 @@ TIAN supports **Windows**, **macOS**, and **Linux**. Choose your platform below.
 | | Windows Installer | Windows ZIP | macOS | Linux |
 |---|---|---|---|---|
 | Who it's for | Anyone — easiest | Terminal users / developers | All Mac users | Terminal users / developers |
-| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | Quick install with `curl`, then run `bash setup.sh` | Quick install with `curl`, then run `bash tian-cli.sh help` |
-| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes | No (run from repo or add your own symlink) |
+| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh \| bash` | `curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh \| bash` |
+| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes | Yes (`~/.local/bin`) |
 | Includes uninstaller | Yes | No | No | No |
 | Scripting / automation | Yes | Yes | Yes | Yes |
 
 | | Windows安装程序 | Windows ZIP | macOS | Linux |
 |---|---|---|---|---|
 | 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 | 命令行用户/开发者 |
-| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | 用 `curl` 快速获取后运行 `bash setup.sh` | 用 `curl` 快速获取后运行 `bash tian-cli.sh help` |
-| 自动加入PATH | 是（可选） | 否（需手动） | 是 | 否（可自行添加软链接） |
+| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh \| bash` | `curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh \| bash` |
+| 自动加入PATH | 是（可选） | 否（需手动） | 是 | 是（`~/.local/bin`） |
 | 包含卸载程序 | 是 | 否 | 否 | 否 |
 | 支持自动化 | 是 | 是 | 是 | 是 |
 
@@ -233,26 +233,24 @@ Open **Terminal** (press `⌘ Space`, type `Terminal`, press Enter). Then run:
 打开**终端**（按 `⌘ 空格`，输入 `Terminal`，回车）。然后运行：
 
 ```bash
-mkdir -p ~/tian-install
-cd ~/tian-install
-curl -fsSL https://github.com/jkcsxw/TIAN/archive/refs/heads/main.tar.gz | tar -xz
-cd TIAN-main
-bash setup.sh
+curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash
 ```
 
 The script will:
 1. Install **Homebrew** (the Mac package manager) if you don't have it — you may be asked for your Mac password
 2. Install **Node.js** automatically
-3. Open your browser to get an API key — just follow the prompts
-4. Let you pick your MCP tools and skills
-5. Create `launcher.sh` to start chatting
+3. Download TIAN to `~/.tian/repo` and install a `tian-cli` launcher in `~/.local/bin`
+4. Open your browser to get an API key — just follow the prompts
+5. Let you pick your MCP tools and skills
+6. Create `launcher.sh` to start chatting
 
 安装脚本将自动完成：
 1. 安装 **Homebrew**（Mac包管理器），如未安装会提示输入Mac密码
 2. 自动安装 **Node.js**
-3. 打开浏览器引导获取API密钥，按提示操作即可
-4. 让您选择MCP工具和技能包
-5. 创建 `launcher.sh` 启动文件
+3. 将 TIAN 下载到 `~/.tian/repo`，并在 `~/.local/bin` 安装 `tian-cli` 启动命令
+4. 打开浏览器引导获取API密钥，按提示操作即可
+5. 让您选择MCP工具和技能包
+6. 创建 `launcher.sh` 启动文件
 
 ### Mac Step 2 — Start Talking | Mac第二步 — 开始对话
 
@@ -285,13 +283,17 @@ Linux currently ships as a CLI-first experience. You can fetch it without downlo
 Linux 当前以命令行为主。您也可以不用下载 ZIP，直接这样获取：
 
 ```bash
-mkdir -p ~/tian-install
-cd ~/tian-install
-curl -fsSL https://github.com/jkcsxw/TIAN/archive/refs/heads/main.tar.gz | tar -xz
-cd TIAN-main
-bash tian-cli.sh help
-bash tian-cli.sh status
-bash tian-cli.sh run "Summarise the latest news about AI"
+curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash
+```
+
+Then open a new terminal and run:
+
+然后打开一个新的终端窗口，再运行：
+
+```bash
+tian-cli help
+tian-cli status
+tian-cli run "Summarise the latest news about AI"
 ```
 
 If `pwsh` is installed, `tian-cli.sh` uses the shared PowerShell CLI. Without `pwsh`, it falls back to the native bash CLI for `status`, `list`, `run`, and `jobs`.
