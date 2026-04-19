@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TIAN native bash CLI — used on macOS/Linux when PowerShell Core (pwsh) is not installed
+# TIAN native bash CLI — used on Mac when PowerShell Core (pwsh) is not installed
 set -euo pipefail
 TIAN_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 shift || true
@@ -7,17 +7,6 @@ CATALOG="$TIAN_DIR/config/catalog.json"
 TASKS_DIR="$HOME/.tian/tasks"
 SCHEDULES_FILE="$HOME/.tian/schedules.json"
 JOBS_FILE="$HOME/.tian/jobs.json"
-OS_NAME="$(uname -s 2>/dev/null || echo unknown)"
-IS_MAC=false
-IS_LINUX=false
-
-case "$OS_NAME" in
-    Darwin) IS_MAC=true ;;
-    Linux) IS_LINUX=true ;;
-    *) echo "This script only supports macOS and Linux."; exit 1 ;;
-esac
-
-CLI_ENTRY="bash tian-cli.sh"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
@@ -55,16 +44,16 @@ new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
 cmd_help() {
 cat <<EOF
 
-  TIAN CLI  (native bash mode)
+  TIAN CLI  (macOS bash mode)
   Talk Is All you Need
 
 $(rule)
 
   USAGE
-    $CLI_ENTRY <command> [options]
+    tian-cli.sh <command> [options]
 
   COMMANDS
-    setup               Re-run the setup flow (macOS only in native bash mode)
+    setup               Re-run the interactive setup wizard
     status              Show what is installed
     list mcp            List available MCP servers
     list skills         List available skills
@@ -73,22 +62,18 @@ $(rule)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs clear          Clear completed jobs
-    schedule add        Create a recurring task (macOS only in native bash mode)
+    schedule add        Create a recurring task (uses launchd)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
     help                Show this help
 
   EXAMPLES
-    $CLI_ENTRY run "Summarise today's AI news"
-    $CLI_ENTRY run "Draft my weekly report" -b
-    $CLI_ENTRY jobs
-    $CLI_ENTRY schedule add morning-brief "Morning briefing" 08:00 daily
-    $CLI_ENTRY schedule list
-
-  NOTES
-    Linux native bash mode supports status, list, run, and jobs.
-    For setup and schedule on Linux, install PowerShell Core and re-run tian-cli.sh.
+    bash tian-cli.sh run "Summarise today's AI news"
+    bash tian-cli.sh run "Draft my weekly report" -b
+    bash tian-cli.sh jobs
+    bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
+    bash tian-cli.sh schedule list
 
 EOF
 }
@@ -114,14 +99,9 @@ for b in c['backends']:
     status = '[ok]' if val else '[!!]'
     print(f'  {status}  {env}')
 "
-    local mcp_config
-    if $IS_MAC; then
-        mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    else
-        mcp_config="$HOME/.config/Claude/claude_desktop_config.json"
-    fi
+    MCP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
     echo ""
-    [[ -f "$mcp_config" ]] && ok "MCP config: $mcp_config" || warn "MCP config not found"
+    [[ -f "$MCP_CONFIG" ]] && ok "MCP config: $MCP_CONFIG" || warn "MCP config not found"
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh exists" || warn "launcher.sh not found — run setup.sh first"
     echo ""; rule
 }
@@ -154,7 +134,7 @@ jobs.append({"id": jid, "name": jid, "prompt": prompt, "backend": cmd,
 json.dump(jobs, open(jobs_file, 'w'), indent=2)
 PYEOF
         ok "Job started: $job_id"
-        info "Check result with: $CLI_ENTRY jobs result $job_id"
+        info "Check result with: bash tian-cli.sh jobs result $job_id"
     else
         rule
         eval "$cmd $flag \"$prompt\"" | tee "$out_file"
@@ -191,7 +171,7 @@ import json, sys
 from datetime import datetime
 jobs = json.load(open(sys.argv[1]))
 if not jobs:
-    print("  No jobs yet. Run: $CLI_ENTRY run \"your task\"")
+    print("  No jobs yet. Run: bash tian-cli.sh run \"your task\"")
 else:
     print(f"\n  {'ID':<30} {'STATUS':<10} PROMPT")
     print("  " + "─"*70)
@@ -206,18 +186,7 @@ PYEOF
     esac
 }
 
-cmd_setup() {
-    if ! $IS_MAC; then
-        fail "Setup in native bash mode is only available on macOS. Install PowerShell Core to use 'tian-cli.sh setup' on Linux."
-    fi
-    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
-}
-
 cmd_schedule() {
-    if ! $IS_MAC; then
-        fail "Scheduling in native bash mode is only available on macOS. Install PowerShell Core to use 'tian-cli.sh schedule' on Linux."
-    fi
-
     local sub="${1:-list}"; shift || true
     case "$sub" in
         add)
@@ -280,7 +249,7 @@ schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat
 json.dump(schedules, open(sf, 'w'), indent=2)
 PYEOF
             ok "Schedule '$name' created ($repeat at $time)."
-            info "Results will appear in: $CLI_ENTRY jobs"
+            info "Results will appear in: bash tian-cli.sh jobs"
             ;;
 
         list)
@@ -289,7 +258,7 @@ PYEOF
 import json, sys
 schedules = json.load(open(sys.argv[1]))
 if not schedules:
-    print("  No schedules. Create one with: $CLI_ENTRY schedule add <name> \"prompt\" HH:MM daily")
+    print("  No schedules. Create one with: bash tian-cli.sh schedule add <name> \"prompt\" HH:MM daily")
 else:
     print(f"\n  {'NAME':<22} {'REPEAT':<10} {'TIME':<8} PROMPT")
     print("  " + "─"*70)
@@ -368,7 +337,7 @@ for s in c['skills']:
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
-    setup)    cmd_setup ;;
+    setup)    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
     status)   cmd_status ;;
     run)      cmd_run "$@" ;;
     jobs)     cmd_jobs "$@" ;;

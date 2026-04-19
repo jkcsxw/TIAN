@@ -22,12 +22,6 @@ Describe "Get-McpConfigPath" {
         $result = Get-McpConfigPath $backend
         $result | Should -Match "Library/Application Support/Claude"
     }
-    It "returns ~/.config Claude path for claude_desktop on Linux" {
-        if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux-only path" }
-        $backend = [PSCustomObject]@{ mcpConfigTarget = "claude_desktop"; mcpConfigPath = "" }
-        $result = Get-McpConfigPath $backend
-        $result | Should -Match "\.config[/\\]Claude[/\\]claude_desktop_config\.json"
-    }
     It "falls back to ~/.tian/mcp_config.json for unknown target" {
         $backend = [PSCustomObject]@{ mcpConfigTarget = "unknown_xyz"; mcpConfigPath = "" }
         $result = Get-McpConfigPath $backend
