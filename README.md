@@ -4,6 +4,9 @@
 > Set up AI on your computer in minutes. No coding. No technical background. Just follow the steps.
 > 几分钟内在您的电脑上安装好AI助手。无需编程，无需技术背景，按步骤操作即可。
 
+Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
+网站入口：[jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
+
 ---
 
 ## What is TIAN? | 什么是「天」？
