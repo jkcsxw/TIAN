@@ -38,33 +38,61 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ## Feature Status | 功能状态
 
-| Feature | Status | Notes |
+| Area | Status | Notes |
 |---|---|---|
-| Windows installer | Available | `tian-setup.exe` installer with Start Menu integration and optional PATH setup |
-| Windows GUI setup wizard | Available | Guided setup flow for backend, API key, MCP tools, and skills |
-| Windows CLI | Available | `tian-cli` supports setup, install, status, run, jobs, and schedule commands |
-| macOS setup | Available | `setup.sh` installs prerequisites and walks through terminal-based setup |
-| MCP tool selection | Available | Catalog-driven MCP install/config flow is included on Windows and macOS |
-| Skill installation | Available | Built-in skills can be selected during setup or added later from CLI |
-| Background jobs | Available | `tian-cli run --background`, `jobs`, and result management are implemented |
-| Task scheduling | Available | Recurring tasks via `tian-cli schedule add/list/run/remove` |
-| Multiple AI backends | Available | Claude, Claude Code, and OpenAI Codex are supported today |
-| Linux support | Not yet listed | Current README and setup flows cover Windows and macOS only |
-| More backends | In progress | The catalog and README both indicate additional backends are planned |
+| Windows installer | Available | Inno Setup packaging, Start Menu shortcuts, optional PATH integration, and uninstall cleanup are implemented |
+| Windows GUI setup wizard | Available | WinForms flow covers backend choice, API key entry, MCP selection, skills, install, and launcher creation |
+| Windows CLI | Available | `tian-cli` supports `setup`, `install`, `status`, `list`, `add`, `remove`, `repair`, `run`, `jobs`, and `schedule` |
+| macOS setup flow | Available | `setup.sh` installs prerequisites, prompts for backend/API key, configures MCP, installs skills, and writes `launcher.sh` |
+| macOS/Linux CLI entry | Partial | `tian-cli.sh` supports macOS and Linux, using PowerShell Core when available and a native bash fallback otherwise |
+| AI backend catalog | Available | Catalog currently includes Claude Code, OpenAI Codex CLI, Ollama local Qwen2.5-Coder, and Claude Desktop |
+| Local-model path | Partial | Ollama local is selectable and documented in setup, but installation is user-guided rather than fully automated |
+| MCP configuration | Available | MCP server definitions are catalog-driven and written into backend-specific config files |
+| Skills | Available | Built-in markdown skills install today; the installer code also has hooks for future `npm` and `git` skill sources |
+| Background jobs | Available | Foreground and background task runs are implemented, with persisted job metadata and stored output |
+| Scheduling | Available | Recurring task scheduling exists on Windows (`schtasks`) and macOS (`launchd`) |
+| Localization | Available | English and Chinese strings are built into the setup and CLI flow |
+| Test coverage | Available | PowerShell and bash tests exist, with CI documented for Windows, macOS, and Linux |
 
-| 功能 | 状态 | 说明 |
+| 模块 | 状态 | 说明 |
 |---|---|---|
-| Windows 安装程序 | 已提供 | 提供 `tian-setup.exe`，支持开始菜单入口和可选 PATH 配置 |
-| Windows 图形安装向导 | 已提供 | 可视化引导完成引擎、API 密钥、MCP 工具和技能包配置 |
-| Windows 命令行 | 已提供 | `tian-cli` 支持 setup、install、status、run、jobs、schedule |
-| macOS 安装流程 | 已提供 | `setup.sh` 会安装依赖并通过终端引导完成配置 |
-| MCP 工具选择 | 已提供 | Windows 和 macOS 都包含基于目录的 MCP 安装与配置流程 |
-| 技能包安装 | 已提供 | 可在安装时选择，也可后续通过命令行追加 |
-| 后台任务 | 已提供 | 已实现 `tian-cli run --background`、`jobs` 与结果查看 |
-| 定时任务 | 已提供 | 支持 `tian-cli schedule add/list/run/remove` |
-| 多AI引擎支持 | 已提供 | 当前支持 Claude、Claude Code、OpenAI Codex |
-| Linux 支持 | 暂未列出 | 当前 README 与安装流程仅覆盖 Windows 和 macOS |
-| 更多AI引擎 | 开发中 | 目录结构与 README 都表明后续还会继续扩展 |
+| Windows 安装程序 | 已提供 | 已实现 Inno Setup 打包、开始菜单快捷方式、可选 PATH 集成与卸载清理 |
+| Windows 图形安装向导 | 已提供 | WinForms 向导已覆盖引擎选择、API 密钥、MCP、技能包、安装和启动器生成 |
+| Windows 命令行 | 已提供 | `tian-cli` 已支持 `setup`、`install`、`status`、`list`、`add`、`remove`、`repair`、`run`、`jobs`、`schedule` |
+| macOS 安装流程 | 已提供 | `setup.sh` 会安装前置依赖、引导配置引擎和密钥、安装 MCP 与技能包，并生成 `launcher.sh` |
+| macOS/Linux 命令行入口 | 部分提供 | `tian-cli.sh` 可在 macOS 和 Linux 运行，优先使用 `pwsh`，没有时回退到 bash 版本 |
+| AI 引擎目录 | 已提供 | 当前目录中已包含 Claude Code、OpenAI Codex CLI、Ollama 本地 Qwen2.5-Coder、Claude Desktop |
+| 本地模型路径 | 部分提供 | 可选择 Ollama 本地模型并给出安装说明，但安装过程仍以用户手动完成为主 |
+| MCP 配置 | 已提供 | MCP 定义来自目录，并写入不同后端对应的配置文件 |
+| 技能包 | 已提供 | 当前可直接安装内置 Markdown 技能包，安装器代码也预留了 `npm` 与 `git` 来源扩展点 |
+| 后台任务 | 已提供 | 已实现前台/后台任务执行、任务元数据持久化和输出保存 |
+| 定时任务 | 已提供 | Windows 通过 `schtasks`、macOS 通过 `launchd` 实现定时任务 |
+| 双语界面 | 已提供 | 安装向导和 CLI 已内置英文与中文文案 |
+| 测试覆盖 | 已提供 | 已有 PowerShell 与 bash 测试，并在文档中说明 Windows、macOS、Linux 的 CI 流程 |
+
+### Potential Future Expansion | 潜在扩展方向
+
+These are not promises or fixed roadmap items. They are the clearest next expansion paths suggested by the current code structure.
+
+以下内容不是承诺或固定路线图，而是从当前代码结构中最明显可继续扩展的方向。
+
+| Potential direction | Why it fits this codebase |
+|---|---|
+| More AI backends | Backends are catalog-driven, so adding another CLI or desktop backend mostly means adding catalog metadata plus installer rules |
+| More MCP connectors | MCP servers already live in `config/catalog.json`, with per-server package, env-var, and config schema support |
+| More skill sources | `SkillInstaller.ps1` already has branches for builtin, `npm`, and `git`, even though the current catalog only uses builtin skills |
+| Better local-model automation | The Ollama path already exists; the next step would be automating download, pull, and verification |
+| Broader Linux onboarding | Linux already has CLI entry and CI coverage, but not a first-class setup flow or installer UX |
+| Richer credential setup | MCP env-var prompting is implemented; a natural next step would be guided OAuth or provider-specific login helpers |
+
+| 潜在方向 | 为什么适合当前代码库 |
+|---|---|
+| 更多 AI 引擎 | 后端由目录驱动，新增 CLI 或桌面引擎主要是补充目录元数据与安装规则 |
+| 更多 MCP 连接器 | MCP 已集中定义在 `config/catalog.json`，并支持包名、环境变量和配置模板 |
+| 更多技能来源 | `SkillInstaller.ps1` 已预留 builtin、`npm`、`git` 三类安装分支，当前目录仅使用了 builtin |
+| 更完整的本地模型自动化 | Ollama 路径已经存在，下一步可继续自动化下载、拉取模型和校验过程 |
+| 更完整的 Linux 安装体验 | Linux 已有 CLI 入口和 CI 覆盖，但还没有面向终端外用户的一等安装流程 |
+| 更丰富的凭证引导 | 目前已支持 MCP 环境变量提示，后续可以继续扩展为 OAuth 或服务商专用登录引导 |
 
 ---
 
