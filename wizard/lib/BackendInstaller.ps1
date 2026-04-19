@@ -88,7 +88,7 @@ function Write-Launcher {
         $LogBox
     )
 
-    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
+    $isMac = [bool]$IsMacOS
     $launchCommand = if ($Backend.launchCommand) { $Backend.launchCommand } else { $Backend.cliCommand }
 
     if ($isMac) {
