@@ -1,12 +1,15 @@
 function Get-McpConfigPath {
     param($Backend)
 
-    $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix' -and (uname) -eq 'Darwin')
+    $platform = if ($PSVersionTable.Platform -eq 'Unix') { uname } else { "" }
+    $isMac = $IsMacOS -or ($platform -eq 'Darwin')
+    $isLinux = $IsLinux -or ($platform -eq 'Linux')
     $homeDir = if ($env:HOME) { $env:HOME } else { $env:USERPROFILE }
 
     switch ($Backend.mcpConfigTarget) {
         "claude_desktop" {
             if ($isMac) { return "$homeDir/Library/Application Support/Claude/claude_desktop_config.json" }
+            if ($isLinux) { return "$homeDir/.config/Claude/claude_desktop_config.json" }
             return "$env:APPDATA\Claude\claude_desktop_config.json"
         }
         "claude_code" {
@@ -16,6 +19,7 @@ function Get-McpConfigPath {
             if ($Backend.mcpConfigPath) {
                 $path = $Backend.mcpConfigPath
                 if ($isMac) { $path = $path -replace '%APPDATA%', "$homeDir/Library/Application Support" -replace '%USERPROFILE%', $homeDir -replace '\\', '/' }
+                elseif ($isLinux) { $path = $path -replace '%APPDATA%', "$homeDir/.config" -replace '%USERPROFILE%', $homeDir -replace '\\', '/' }
                 else         { $path = [System.Environment]::ExpandEnvironmentVariables($path) }
                 return $path
             }

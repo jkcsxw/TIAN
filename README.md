@@ -44,13 +44,13 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 | Windows GUI setup wizard | Available | WinForms flow covers backend choice, API key entry, MCP selection, skills, install, and launcher creation |
 | Windows CLI | Available | `tian-cli` supports `setup`, `install`, `status`, `list`, `add`, `remove`, `repair`, `run`, `jobs`, and `schedule` |
 | macOS setup flow | Available | `setup.sh` installs prerequisites, prompts for backend/API key, configures MCP, installs skills, and writes `launcher.sh` |
-| macOS/Linux CLI entry | Partial | `tian-cli.sh` supports macOS and Linux, using PowerShell Core when available and a native bash fallback otherwise |
+| macOS/Linux CLI entry | Available | `tian-cli.sh` supports macOS and Linux, using PowerShell Core when available and a native bash fallback for core commands otherwise |
 | AI backend catalog | Available | Catalog currently includes Claude Code, OpenAI Codex CLI, Ollama local Qwen2.5-Coder, and Claude Desktop |
 | Local-model path | Partial | Ollama local is selectable and documented in setup, but installation is user-guided rather than fully automated |
 | MCP configuration | Available | MCP server definitions are catalog-driven and written into backend-specific config files |
 | Skills | Available | Built-in markdown skills install today; the installer code also has hooks for future `npm` and `git` skill sources |
 | Background jobs | Available | Foreground and background task runs are implemented, with persisted job metadata and stored output |
-| Scheduling | Available | Recurring task scheduling exists on Windows (`schtasks`) and macOS (`launchd`) |
+| Scheduling | Partial | Recurring task scheduling exists on Windows (`schtasks`) and macOS (`launchd`); Linux scheduling is not implemented yet |
 | Localization | Available | English and Chinese strings are built into the setup and CLI flow |
 | Test coverage | Available | PowerShell and bash tests exist, with CI documented for Windows, macOS, and Linux |
 
@@ -60,13 +60,13 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 | Windows 图形安装向导 | 已提供 | WinForms 向导已覆盖引擎选择、API 密钥、MCP、技能包、安装和启动器生成 |
 | Windows 命令行 | 已提供 | `tian-cli` 已支持 `setup`、`install`、`status`、`list`、`add`、`remove`、`repair`、`run`、`jobs`、`schedule` |
 | macOS 安装流程 | 已提供 | `setup.sh` 会安装前置依赖、引导配置引擎和密钥、安装 MCP 与技能包，并生成 `launcher.sh` |
-| macOS/Linux 命令行入口 | 部分提供 | `tian-cli.sh` 可在 macOS 和 Linux 运行，优先使用 `pwsh`，没有时回退到 bash 版本 |
+| macOS/Linux 命令行入口 | 已提供 | `tian-cli.sh` 可在 macOS 和 Linux 运行，优先使用 `pwsh`，没有时回退到支持核心命令的 bash 版本 |
 | AI 引擎目录 | 已提供 | 当前目录中已包含 Claude Code、OpenAI Codex CLI、Ollama 本地 Qwen2.5-Coder、Claude Desktop |
 | 本地模型路径 | 部分提供 | 可选择 Ollama 本地模型并给出安装说明，但安装过程仍以用户手动完成为主 |
 | MCP 配置 | 已提供 | MCP 定义来自目录，并写入不同后端对应的配置文件 |
 | 技能包 | 已提供 | 当前可直接安装内置 Markdown 技能包，安装器代码也预留了 `npm` 与 `git` 来源扩展点 |
 | 后台任务 | 已提供 | 已实现前台/后台任务执行、任务元数据持久化和输出保存 |
-| 定时任务 | 已提供 | Windows 通过 `schtasks`、macOS 通过 `launchd` 实现定时任务 |
+| 定时任务 | 部分提供 | Windows 通过 `schtasks`、macOS 通过 `launchd` 实现定时任务；Linux 定时调度尚未实现 |
 | 双语界面 | 已提供 | 安装向导和 CLI 已内置英文与中文文案 |
 | 测试覆盖 | 已提供 | 已有 PowerShell 与 bash 测试，并在文档中说明 Windows、macOS、Linux 的 CI 流程 |
 
@@ -159,25 +159,25 @@ It will download and launch the installer for you automatically — no typing re
 
 ---
 
-TIAN supports both **Windows** and **macOS**. Choose your platform below.
+TIAN supports **Windows**, **macOS**, and **Linux**. Choose your platform below.
 
-「天」同时支持 **Windows** 和 **macOS**，请根据您的系统选择对应说明。
+「天」同时支持 **Windows**、**macOS** 和 **Linux**，请根据您的系统选择对应说明。
 
-| | Windows Installer | Windows ZIP | macOS |
-|---|---|---|---|
-| Who it's for | Anyone — easiest | Terminal users / developers | All Mac users |
-| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` |
-| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes |
-| Includes uninstaller | Yes | No | No |
-| Scripting / automation | Yes | Yes | Yes |
+| | Windows Installer | Windows ZIP | macOS | Linux |
+|---|---|---|---|---|
+| Who it's for | Anyone — easiest | Terminal users / developers | All Mac users | Terminal users / developers |
+| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes | No (run from repo or add your own symlink) |
+| Includes uninstaller | Yes | No | No | No |
+| Scripting / automation | Yes | Yes | Yes | Yes |
 
-| | Windows安装程序 | Windows ZIP | macOS |
-|---|---|---|---|
-| 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 |
-| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` |
-| 自动加入PATH | 是（可选） | 否（需手动） | 是 |
-| 包含卸载程序 | 是 | 否 | 否 |
-| 支持自动化 | 是 | 是 | 是 |
+| | Windows安装程序 | Windows ZIP | macOS | Linux |
+|---|---|---|---|---|
+| 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 | 命令行用户/开发者 |
+| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| 自动加入PATH | 是（可选） | 否（需手动） | 是 | 否（可自行添加软链接） |
+| 包含卸载程序 | 是 | 否 | 否 | 否 |
+| 支持自动化 | 是 | 是 | 是 | 是 |
 
 ---
 
@@ -338,6 +338,28 @@ bash tian-cli.sh schedule add --name morning-brief --task "Give me a morning bri
 > **Note:** The Mac version uses your Terminal instead of a GUI window. Everything else — MCP tools, skills, background tasks, scheduling — works exactly the same as Windows.
 >
 > **注意：** Mac版本使用终端而非图形界面。其他功能——MCP工具、技能包、后台任务、定时任务——与Windows版本完全一致。
+
+---
+
+## Linux CLI | Linux 命令行
+
+Linux currently ships as a CLI-first experience. From the repo root, run:
+
+Linux 当前以命令行为主。在项目根目录运行：
+
+```bash
+bash tian-cli.sh help
+bash tian-cli.sh status
+bash tian-cli.sh run "Summarise the latest news about AI"
+```
+
+If `pwsh` is installed, `tian-cli.sh` uses the shared PowerShell CLI. Without `pwsh`, it falls back to the native bash CLI for `status`, `list`, `run`, and `jobs`.
+
+如果系统已安装 `pwsh`，`tian-cli.sh` 会优先使用共享的 PowerShell CLI。若未安装 `pwsh`，则回退到原生 bash CLI，支持 `status`、`list`、`run` 和 `jobs`。
+
+`setup` and `schedule` are still macOS-only in native bash mode.
+
+原生 bash 模式下，`setup` 和 `schedule` 目前仍仅支持 macOS。
 
 ---
 
