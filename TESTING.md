@@ -38,6 +38,7 @@ tests/
 │   ├── bash-helpers.sh
 │   ├── test-catalog-parse.sh
 │   ├── test-jobs.sh
+│   ├── test-package-security.sh
 │   ├── test-router.sh
 │   └── test-schedule.sh
 ├── run-tests.bat              # Windows local runner
@@ -65,6 +66,8 @@ bash tests/run-tests.sh
 
 Runs all bash suites. If `pwsh` (PowerShell Core) is available it also runs the Pester suite.  
 Results saved to `tests/results-mac.xml`.
+
+The bash suite also includes a package security check that expands the installer manifest in `installer/tian-setup.iss` and fails if the shipped files contain common credential files or high-signal secret/token patterns.
 
 Install PowerShell Core on macOS to enable the Pester suite:
 
