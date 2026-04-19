@@ -106,7 +106,7 @@ TIAN supports **Windows**, **macOS**, and **Linux**. Choose your platform below.
 | | Windows Installer | Windows ZIP | macOS | Linux |
 |---|---|---|---|---|
 | Who it's for | Anyone — easiest | Terminal users / developers | All Mac users | Terminal users / developers |
-| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | Quick install with `curl`, then run `bash setup.sh` | Quick install with `curl`, then run `bash tian-cli.sh help` |
 | Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes | No (run from repo or add your own symlink) |
 | Includes uninstaller | Yes | No | No | No |
 | Scripting / automation | Yes | Yes | Yes | Yes |
@@ -114,7 +114,7 @@ TIAN supports **Windows**, **macOS**, and **Linux**. Choose your platform below.
 | | Windows安装程序 | Windows ZIP | macOS | Linux |
 |---|---|---|---|---|
 | 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 | 命令行用户/开发者 |
-| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | 用 `curl` 快速获取后运行 `bash setup.sh` | 用 `curl` 快速获取后运行 `bash tian-cli.sh help` |
 | 自动加入PATH | 是（可选） | 否（需手动） | 是 | 否（可自行添加软链接） |
 | 包含卸载程序 | 是 | 否 | 否 | 否 |
 | 支持自动化 | 是 | 是 | 是 | 是 |
@@ -226,20 +226,17 @@ Run `tian-cli help` for the full command reference.
 
 ## macOS Setup | macOS 安装
 
-### Mac Step 1 — Download TIAN | Mac第一步 — 下载「天」
+### Mac Step 1 — Quick Install with `curl` | Mac第一步 — 用 `curl` 快速安装
 
-Click the green **Code** button at the top of this page, then **Download ZIP**. Unzip the folder to somewhere easy to find, like your Desktop.
+Open **Terminal** (press `⌘ Space`, type `Terminal`, press Enter). Then run:
 
-点击本页顶部绿色 **Code** 按钮，选择 **Download ZIP**，将压缩包解压到桌面等易找到的位置。
-
-### Mac Step 2 — Open Terminal | Mac第二步 — 打开终端
-
-Open **Terminal** (press `⌘ Space`, type `Terminal`, press Enter). Then type:
-
-打开**终端**（按 `⌘ 空格`，输入 `Terminal`，回车）。然后输入：
+打开**终端**（按 `⌘ 空格`，输入 `Terminal`，回车）。然后运行：
 
 ```bash
-cd ~/Desktop/TIAN-main
+mkdir -p ~/tian-install
+cd ~/tian-install
+curl -fsSL https://github.com/jkcsxw/TIAN/archive/refs/heads/main.tar.gz | tar -xz
+cd TIAN-main
 bash setup.sh
 ```
 
@@ -257,7 +254,7 @@ The script will:
 4. 让您选择MCP工具和技能包
 5. 创建 `launcher.sh` 启动文件
 
-### Mac Step 3 — Start Talking | Mac第三步 — 开始对话
+### Mac Step 2 — Start Talking | Mac第二步 — 开始对话
 
 Open a **new** Terminal window (important — so your API key is loaded), then:
 
@@ -283,11 +280,15 @@ bash tian-cli.sh schedule add --name morning-brief --task "Give me a morning bri
 
 ## Linux CLI | Linux 命令行
 
-Linux currently ships as a CLI-first experience. From the repo root, run:
+Linux currently ships as a CLI-first experience. You can fetch it without downloading a ZIP:
 
-Linux 当前以命令行为主。在项目根目录运行：
+Linux 当前以命令行为主。您也可以不用下载 ZIP，直接这样获取：
 
 ```bash
+mkdir -p ~/tian-install
+cd ~/tian-install
+curl -fsSL https://github.com/jkcsxw/TIAN/archive/refs/heads/main.tar.gz | tar -xz
+cd TIAN-main
 bash tian-cli.sh help
 bash tian-cli.sh status
 bash tian-cli.sh run "Summarise the latest news about AI"
