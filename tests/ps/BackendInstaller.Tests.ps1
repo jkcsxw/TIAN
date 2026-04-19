@@ -73,7 +73,7 @@ Describe "Write-Launcher" {
             displayName   = "Ollama Local"
         }
         Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
-        $fileName = if ($IsWindows) { "launcher.bat" } else { "launcher.sh" }
+        $fileName = if ($IsMacOS) { "launcher.sh" } else { "launcher.bat" }
         $content = Get-Content (Join-Path $script:TempDir $fileName) -Raw
         $content | Should -Match "ollama run qwen2.5-coder:7b"
     }
