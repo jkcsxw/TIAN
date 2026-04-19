@@ -7,7 +7,9 @@
 ; Download Inno Setup 6: https://jrsoftware.org/isdl.php
 
 #define AppName      "TIAN"
-#define AppVersion   "1.0.0"
+#ifndef AppVersion
+  #define AppVersion "1.0.0"
+#endif
 #define AppPublisher "TIAN Project"
 #define AppURL       "https://github.com/your-org/tian"
 #define AppExeName   "tian-cli.bat"
