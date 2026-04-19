@@ -36,66 +36,6 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ---
 
-## Feature Status | 功能状态
-
-| Area | Status | Notes |
-|---|---|---|
-| Windows installer | Available | Inno Setup packaging, Start Menu shortcuts, optional PATH integration, and uninstall cleanup are implemented |
-| Windows GUI setup wizard | Available | WinForms flow covers backend choice, API key entry, MCP selection, skills, install, and launcher creation |
-| Windows CLI | Available | `tian-cli` supports `setup`, `install`, `status`, `list`, `add`, `remove`, `repair`, `run`, `jobs`, and `schedule` |
-| macOS setup flow | Available | `setup.sh` installs prerequisites, prompts for backend/API key, configures MCP, installs skills, and writes `launcher.sh` |
-| macOS/Linux CLI entry | Partial | `tian-cli.sh` supports macOS and Linux, using PowerShell Core when available and a native bash fallback otherwise |
-| AI backend catalog | Available | Catalog currently includes Claude Code, OpenAI Codex CLI, Ollama local Qwen2.5-Coder, and Claude Desktop |
-| Local-model path | Partial | Ollama local is selectable and documented in setup, but installation is user-guided rather than fully automated |
-| MCP configuration | Available | MCP server definitions are catalog-driven and written into backend-specific config files |
-| Skills | Available | Built-in markdown skills install today; the installer code also has hooks for future `npm` and `git` skill sources |
-| Background jobs | Available | Foreground and background task runs are implemented, with persisted job metadata and stored output |
-| Scheduling | Available | Recurring task scheduling exists on Windows (`schtasks`) and macOS (`launchd`) |
-| Localization | Available | English and Chinese strings are built into the setup and CLI flow |
-| Test coverage | Available | PowerShell and bash tests exist, with CI documented for Windows, macOS, and Linux |
-
-| 模块 | 状态 | 说明 |
-|---|---|---|
-| Windows 安装程序 | 已提供 | 已实现 Inno Setup 打包、开始菜单快捷方式、可选 PATH 集成与卸载清理 |
-| Windows 图形安装向导 | 已提供 | WinForms 向导已覆盖引擎选择、API 密钥、MCP、技能包、安装和启动器生成 |
-| Windows 命令行 | 已提供 | `tian-cli` 已支持 `setup`、`install`、`status`、`list`、`add`、`remove`、`repair`、`run`、`jobs`、`schedule` |
-| macOS 安装流程 | 已提供 | `setup.sh` 会安装前置依赖、引导配置引擎和密钥、安装 MCP 与技能包，并生成 `launcher.sh` |
-| macOS/Linux 命令行入口 | 部分提供 | `tian-cli.sh` 可在 macOS 和 Linux 运行，优先使用 `pwsh`，没有时回退到 bash 版本 |
-| AI 引擎目录 | 已提供 | 当前目录中已包含 Claude Code、OpenAI Codex CLI、Ollama 本地 Qwen2.5-Coder、Claude Desktop |
-| 本地模型路径 | 部分提供 | 可选择 Ollama 本地模型并给出安装说明，但安装过程仍以用户手动完成为主 |
-| MCP 配置 | 已提供 | MCP 定义来自目录，并写入不同后端对应的配置文件 |
-| 技能包 | 已提供 | 当前可直接安装内置 Markdown 技能包，安装器代码也预留了 `npm` 与 `git` 来源扩展点 |
-| 后台任务 | 已提供 | 已实现前台/后台任务执行、任务元数据持久化和输出保存 |
-| 定时任务 | 已提供 | Windows 通过 `schtasks`、macOS 通过 `launchd` 实现定时任务 |
-| 双语界面 | 已提供 | 安装向导和 CLI 已内置英文与中文文案 |
-| 测试覆盖 | 已提供 | 已有 PowerShell 与 bash 测试，并在文档中说明 Windows、macOS、Linux 的 CI 流程 |
-
-### Potential Future Expansion | 潜在扩展方向
-
-These are not promises or fixed roadmap items. They are the clearest next expansion paths suggested by the current code structure.
-
-以下内容不是承诺或固定路线图，而是从当前代码结构中最明显可继续扩展的方向。
-
-| Potential direction | Why it fits this codebase |
-|---|---|
-| More AI backends | Backends are catalog-driven, so adding another CLI or desktop backend mostly means adding catalog metadata plus installer rules |
-| More MCP connectors | MCP servers already live in `config/catalog.json`, with per-server package, env-var, and config schema support |
-| More skill sources | `SkillInstaller.ps1` already has branches for builtin, `npm`, and `git`, even though the current catalog only uses builtin skills |
-| Better local-model automation | The Ollama path already exists; the next step would be automating download, pull, and verification |
-| Broader Linux onboarding | Linux already has CLI entry and CI coverage, but not a first-class setup flow or installer UX |
-| Richer credential setup | MCP env-var prompting is implemented; a natural next step would be guided OAuth or provider-specific login helpers |
-
-| 潜在方向 | 为什么适合当前代码库 |
-|---|---|
-| 更多 AI 引擎 | 后端由目录驱动，新增 CLI 或桌面引擎主要是补充目录元数据与安装规则 |
-| 更多 MCP 连接器 | MCP 已集中定义在 `config/catalog.json`，并支持包名、环境变量和配置模板 |
-| 更多技能来源 | `SkillInstaller.ps1` 已预留 builtin、`npm`、`git` 三类安装分支，当前目录仅使用了 builtin |
-| 更完整的本地模型自动化 | Ollama 路径已经存在，下一步可继续自动化下载、拉取模型和校验过程 |
-| 更完整的 Linux 安装体验 | Linux 已有 CLI 入口和 CI 覆盖，但还没有面向终端外用户的一等安装流程 |
-| 更丰富的凭证引导 | 目前已支持 MCP 环境变量提示，后续可以继续扩展为 OAuth 或服务商专用登录引导 |
-
----
-
 ## Who is this for? | 适合哪些人？
 
 - Business owners who want AI to help with day-to-day operations
@@ -159,25 +99,25 @@ It will download and launch the installer for you automatically — no typing re
 
 ---
 
-TIAN supports both **Windows** and **macOS**. Choose your platform below.
+TIAN supports **Windows**, **macOS**, and **Linux**. Choose your platform below.
 
-「天」同时支持 **Windows** 和 **macOS**，请根据您的系统选择对应说明。
+「天」同时支持 **Windows**、**macOS** 和 **Linux**，请根据您的系统选择对应说明。
 
-| | Windows Installer | Windows ZIP | macOS |
-|---|---|---|---|
-| Who it's for | Anyone — easiest | Terminal users / developers | All Mac users |
-| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` |
-| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes |
-| Includes uninstaller | Yes | No | No |
-| Scripting / automation | Yes | Yes | Yes |
+| | Windows Installer | Windows ZIP | macOS | Linux |
+|---|---|---|---|---|
+| Who it's for | Anyone — easiest | Terminal users / developers | All Mac users | Terminal users / developers |
+| How to start | Download & double-click `.exe` | Extract ZIP, double-click `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| Adds tian-cli to PATH | Yes (optional) | No (manual) | Yes | No (run from repo or add your own symlink) |
+| Includes uninstaller | Yes | No | No | No |
+| Scripting / automation | Yes | Yes | Yes | Yes |
 
-| | Windows安装程序 | Windows ZIP | macOS |
-|---|---|---|---|
-| 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 |
-| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` |
-| 自动加入PATH | 是（可选） | 否（需手动） | 是 |
-| 包含卸载程序 | 是 | 否 | 否 |
-| 支持自动化 | 是 | 是 | 是 |
+| | Windows安装程序 | Windows ZIP | macOS | Linux |
+|---|---|---|---|---|
+| 适合人群 | 任何人，最简单 | 命令行用户/开发者 | 所有Mac用户 | 命令行用户/开发者 |
+| 启动方式 | 下载 `.exe` 双击安装 | 解压ZIP，双击 `setup.bat` | `bash setup.sh` | `bash tian-cli.sh help` |
+| 自动加入PATH | 是（可选） | 否（需手动） | 是 | 否（可自行添加软链接） |
+| 包含卸载程序 | 是 | 否 | 否 | 否 |
+| 支持自动化 | 是 | 是 | 是 | 是 |
 
 ---
 
@@ -341,6 +281,28 @@ bash tian-cli.sh schedule add --name morning-brief --task "Give me a morning bri
 
 ---
 
+## Linux CLI | Linux 命令行
+
+Linux currently ships as a CLI-first experience. From the repo root, run:
+
+Linux 当前以命令行为主。在项目根目录运行：
+
+```bash
+bash tian-cli.sh help
+bash tian-cli.sh status
+bash tian-cli.sh run "Summarise the latest news about AI"
+```
+
+If `pwsh` is installed, `tian-cli.sh` uses the shared PowerShell CLI. Without `pwsh`, it falls back to the native bash CLI for `status`, `list`, `run`, and `jobs`.
+
+如果系统已安装 `pwsh`，`tian-cli.sh` 会优先使用共享的 PowerShell CLI。若未安装 `pwsh`，则回退到原生 bash CLI，支持 `status`、`list`、`run` 和 `jobs`。
+
+`setup` and `schedule` are still macOS-only in native bash mode.
+
+原生 bash 模式下，`setup` 和 `schedule` 目前仍仅支持 macOS。
+
+---
+
 ### Step 3 — Start Talking | 第三步 — 开始对话
 
 Once setup is complete, double-click `launcher.bat` (Windows) or run `bash launcher.sh` (Mac) and start chatting. TIAN is not just a Q&A tool — it can actively work for you. Here are some things you can say:
@@ -392,6 +354,66 @@ You are always in control — TIAN only does what you ask, one conversation at a
 - "把我的待办事项保存到文件中"
 
 您始终掌握主动权——「天」只执行您明确要求的操作。
+
+---
+
+## Feature Status | 功能状态
+
+| Area | Status | Notes |
+|---|---|---|
+| Windows installer | Available | Inno Setup packaging, Start Menu shortcuts, optional PATH integration, and uninstall cleanup are implemented |
+| Windows GUI setup wizard | Available | WinForms flow covers backend choice, API key entry, MCP selection, skills, install, and launcher creation |
+| Windows CLI | Available | `tian-cli` supports `setup`, `install`, `status`, `list`, `add`, `remove`, `repair`, `run`, `jobs`, and `schedule` |
+| macOS setup flow | Available | `setup.sh` installs prerequisites, prompts for backend/API key, configures MCP, installs skills, and writes `launcher.sh` |
+| macOS/Linux CLI entry | Available | `tian-cli.sh` supports macOS and Linux, using PowerShell Core when available and a native bash fallback for core commands otherwise |
+| AI backend catalog | Available | Catalog currently includes Claude Code, OpenAI Codex CLI, Ollama local Qwen2.5-Coder, and Claude Desktop |
+| Local-model path | Partial | Ollama local is selectable and documented in setup, but installation is user-guided rather than fully automated |
+| MCP configuration | Available | MCP server definitions are catalog-driven and written into backend-specific config files |
+| Skills | Available | Built-in markdown skills install today; the installer code also has hooks for future `npm` and `git` skill sources |
+| Background jobs | Available | Foreground and background task runs are implemented, with persisted job metadata and stored output |
+| Scheduling | Partial | Recurring task scheduling exists on Windows (`schtasks`) and macOS (`launchd`); Linux scheduling is not implemented yet |
+| Localization | Available | English and Chinese strings are built into the setup and CLI flow |
+| Test coverage | Available | PowerShell and bash tests exist, with CI documented for Windows, macOS, and Linux |
+
+| 模块 | 状态 | 说明 |
+|---|---|---|
+| Windows 安装程序 | 已提供 | 已实现 Inno Setup 打包、开始菜单快捷方式、可选 PATH 集成与卸载清理 |
+| Windows 图形安装向导 | 已提供 | WinForms 向导已覆盖引擎选择、API 密钥、MCP、技能包、安装和启动器生成 |
+| Windows 命令行 | 已提供 | `tian-cli` 已支持 `setup`、`install`、`status`、`list`、`add`、`remove`、`repair`、`run`、`jobs`、`schedule` |
+| macOS 安装流程 | 已提供 | `setup.sh` 会安装前置依赖、引导配置引擎和密钥、安装 MCP 与技能包，并生成 `launcher.sh` |
+| macOS/Linux 命令行入口 | 已提供 | `tian-cli.sh` 可在 macOS 和 Linux 运行，优先使用 `pwsh`，没有时回退到支持核心命令的 bash 版本 |
+| AI 引擎目录 | 已提供 | 当前目录中已包含 Claude Code、OpenAI Codex CLI、Ollama 本地 Qwen2.5-Coder、Claude Desktop |
+| 本地模型路径 | 部分提供 | 可选择 Ollama 本地模型并给出安装说明，但安装过程仍以用户手动完成为主 |
+| MCP 配置 | 已提供 | MCP 定义来自目录，并写入不同后端对应的配置文件 |
+| 技能包 | 已提供 | 当前可直接安装内置 Markdown 技能包，安装器代码也预留了 `npm` 与 `git` 来源扩展点 |
+| 后台任务 | 已提供 | 已实现前台/后台任务执行、任务元数据持久化和输出保存 |
+| 定时任务 | 部分提供 | Windows 通过 `schtasks`、macOS 通过 `launchd` 实现定时任务；Linux 定时调度尚未实现 |
+| 双语界面 | 已提供 | 安装向导和 CLI 已内置英文与中文文案 |
+| 测试覆盖 | 已提供 | 已有 PowerShell 与 bash 测试，并在文档中说明 Windows、macOS、Linux 的 CI 流程 |
+
+### Potential Future Expansion | 潜在扩展方向
+
+These are not promises or fixed roadmap items. They are the clearest next expansion paths suggested by the current code structure.
+
+以下内容不是承诺或固定路线图，而是从当前代码结构中最明显可继续扩展的方向。
+
+| Potential direction | Why it fits this codebase |
+|---|---|
+| More AI backends | Backends are catalog-driven, so adding another CLI or desktop backend mostly means adding catalog metadata plus installer rules |
+| More MCP connectors | MCP servers already live in `config/catalog.json`, with per-server package, env-var, and config schema support |
+| More skill sources | `SkillInstaller.ps1` already has branches for builtin, `npm`, and `git`, even though the current catalog only uses builtin skills |
+| Better local-model automation | The Ollama path already exists; the next step would be automating download, pull, and verification |
+| Broader Linux onboarding | Linux already has CLI entry and CI coverage, but not a first-class setup flow or installer UX |
+| Richer credential setup | MCP env-var prompting is implemented; a natural next step would be guided OAuth or provider-specific login helpers |
+
+| 潜在方向 | 为什么适合当前代码库 |
+|---|---|
+| 更多 AI 引擎 | 后端由目录驱动，新增 CLI 或桌面引擎主要是补充目录元数据与安装规则 |
+| 更多 MCP 连接器 | MCP 已集中定义在 `config/catalog.json`，并支持包名、环境变量和配置模板 |
+| 更多技能来源 | `SkillInstaller.ps1` 已预留 builtin、`npm`、`git` 三类安装分支，当前目录仅使用了 builtin |
+| 更完整的本地模型自动化 | Ollama 路径已经存在，下一步可继续自动化下载、拉取模型和校验过程 |
+| 更完整的 Linux 安装体验 | Linux 已有 CLI 入口和 CI 覆盖，但还没有面向终端外用户的一等安装流程 |
+| 更丰富的凭证引导 | 目前已支持 MCP 环境变量提示，后续可以继续扩展为 OAuth 或服务商专用登录引导 |
 
 ---
 
