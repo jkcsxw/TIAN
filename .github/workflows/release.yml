@@ -1,9 +1,11 @@
 name: Release
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
   push:
-    branches:
-      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -19,6 +21,9 @@ permissions:
 jobs:
   build-installer:
     runs-on: windows-latest
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout
