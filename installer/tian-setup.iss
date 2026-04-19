@@ -48,7 +48,6 @@ WizardSizePercent=120
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "addtopath";   Description: "Add tian-cli to system PATH (recommended)"; \
