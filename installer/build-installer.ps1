@@ -1,5 +1,5 @@
 # Build the TIAN Windows installer (.exe)
-# Requires Inno Setup 6 — https://jrsoftware.org/isdl.php
+# Requires Inno Setup 6 - https://jrsoftware.org/isdl.php
 #
 # Usage (from repo root):
 #   powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1
@@ -16,7 +16,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-# ── Locate Inno Setup compiler ────────────────────────────────────────────────
+# Locate Inno Setup compiler
 
 function Find-Iscc {
     # 1. Already on PATH
@@ -35,7 +35,7 @@ function Find-Iscc {
     return $null
 }
 
-# ── Extract version from .iss file ───────────────────────────────────────────
+# Extract version from .iss file
 
 function Get-IssVersion {
     param([string]$IssFile)
@@ -44,7 +44,7 @@ function Get-IssVersion {
     return "1.0.0"
 }
 
-# ── Main build logic ──────────────────────────────────────────────────────────
+# Main build logic
 
 function Invoke-Build {
     param(
@@ -103,7 +103,7 @@ function Invoke-Build {
     if ($BuildSign) {
         $signtool = Get-Command signtool -ErrorAction SilentlyContinue
         if (-not $signtool) {
-            Write-Host "signtool not found — skipping signing." -ForegroundColor Yellow
+            Write-Host "signtool not found - skipping signing." -ForegroundColor Yellow
         } else {
             Write-Host "Signing $exePath ..." -ForegroundColor Cyan
             & signtool sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a $exePath
@@ -122,7 +122,7 @@ function Invoke-Build {
     Write-Host "To test: double-click the .exe, or run it from an elevated prompt."
 }
 
-# Only execute when run directly — not when dot-sourced for testing
+# Only execute when run directly - not when dot-sourced for testing
 if ($MyInvocation.InvocationName -ne '.') {
     Invoke-Build -BuildVersion $Version -BuildSign:$Sign -ScriptRoot $PSScriptRoot
 }
