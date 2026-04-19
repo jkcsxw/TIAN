@@ -38,7 +38,7 @@ ensure_dirs() {
     [[ -f "$SCHEDULES_FILE" ]] || echo '[]' > "$SCHEDULES_FILE"
 }
 
-new_job_id() { date '+%Y%m%d-%H%M%S'-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6); }
+new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 cmd_help() {

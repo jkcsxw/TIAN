@@ -14,7 +14,7 @@ mkdir -p "$TASKS_DIR"
 echo '[]' > "$JOBS_FILE"
 
 # Re-implement the subset of functions we're unit-testing
-new_job_id() { date '+%Y%m%d-%H%M%S'-$(LC_ALL=C tr -dc 'a-z0-9' </dev/urandom | head -c 6); }
+new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
 
 ensure_dirs() {
     mkdir -p "$TASKS_DIR" "$(dirname "$JOBS_FILE")"
