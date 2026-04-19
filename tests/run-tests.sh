@@ -42,11 +42,11 @@ if command -v pwsh &>/dev/null; then
         Set-Location '$SCRIPT_DIR/..'
         \$config = New-PesterConfiguration
         \$config.Run.Path = '$SCRIPT_DIR/ps'
+        \$config.Run.Exit = \$true
         \$config.Output.Verbosity = 'Detailed'
         \$config.TestResult.Enabled = \$true
         \$config.TestResult.OutputPath = '$SCRIPT_DIR/results-mac.xml'
-        \$result = Invoke-Pester -Configuration \$config
-        exit \$result.FailedCount
+        Invoke-Pester -Configuration \$config
     " && ((PASS_SUITES++)) || ((FAIL_SUITES++))
 else
     echo ""
