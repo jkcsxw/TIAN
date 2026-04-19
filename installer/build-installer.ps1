@@ -115,10 +115,9 @@ function Invoke-Build {
         }
     }
 
-    $size = [Math]::Round((Get-Item $exePath).Length / 1MB, 1)
     Write-Host ""
     Write-Host "Installer built successfully:" -ForegroundColor Green
-    Write-Host ("  {0}  ({1} MB)" -f $exePath, $size) -ForegroundColor White
+    Write-Host "  $exePath" -ForegroundColor White
     Write-Host ""
     Write-Host "To test: double-click the .exe, or run it from an elevated prompt."
 }
