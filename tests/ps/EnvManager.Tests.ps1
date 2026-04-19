@@ -25,6 +25,11 @@ Describe "Set-ApiKey" {
         Set-ApiKey -Backend $script:Backend -ApiKey "   " -LogBox $null
         $script:LogMessages | Should -Contain "No API key provided — skipping."
     }
+    It "skips backends that do not require an API key" {
+        $backend = [PSCustomObject]@{ apiKeyEnvVar = "" }
+        Set-ApiKey -Backend $backend -ApiKey "ignored" -LogBox $null
+        $script:LogMessages | Should -Contain "Backend does not require an API key — skipping."
+    }
     It "sets the process-level environment variable immediately" {
         Set-ApiKey -Backend $script:Backend -ApiKey "sk-test-abc123" -LogBox $null
         [System.Environment]::GetEnvironmentVariable($script:Backend.apiKeyEnvVar, "Process") | Should -Be "sk-test-abc123"

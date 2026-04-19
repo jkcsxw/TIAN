@@ -67,7 +67,8 @@ function Show-Page-Done {
             if (Test-Path $launcherPath) {
                 Start-Process cmd.exe -ArgumentList "/k `"$launcherPath`""
             } else {
-                Start-Process cmd.exe -ArgumentList "/k $($State.SelectedBackend.cliCommand)"
+                $launchCommand = if ($State.SelectedBackend.launchCommand) { $State.SelectedBackend.launchCommand } else { $State.SelectedBackend.cliCommand }
+                Start-Process cmd.exe -ArgumentList "/k $launchCommand"
             }
         })
         $Panel.Controls.Add($btnLaunch)

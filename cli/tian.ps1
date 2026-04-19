@@ -271,28 +271,38 @@ function Cmd-Setup {
     Write-Ok (TF "cli.selected" $selectedBackend.displayName)
 
     Write-Header (T "cli.step2_header")
-    $keyLabel = Get-ApiKeyLabel $selectedBackend
-    Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
-    Write-Info (TF "cli.get_at" $selectedBackend.apiKeyUrl)
-    $apiKey = Prompt-Secret $keyLabel
+    $apiKey = ""
+    if (Test-BackendRequiresApiKey $selectedBackend) {
+        $keyLabel = Get-ApiKeyLabel $selectedBackend
+        Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
+        Write-Info (TF "cli.get_at" $selectedBackend.apiKeyUrl)
+        $apiKey = Prompt-Secret $keyLabel
+    } elseif ($selectedBackend.setupNote) {
+        Write-Info $selectedBackend.setupNote
+    }
 
     Write-Header (T "cli.step3_header")
-    $mcpNames = $catalog.mcpServers | ForEach-Object { "$(Get-DisplayName $_)  —  $(Get-Description $_)" }
-    $defaultIdxs = @()
-    for ($i = 0; $i -lt $catalog.mcpServers.Count; $i++) {
-        if ($selectedBackend.defaultMcpServers -contains $catalog.mcpServers[$i].id) { $defaultIdxs += $i }
-    }
-    $mcpIdxs = Prompt-MultiChoice (T "cli.select_mcp") $mcpNames $defaultIdxs
-    $selectedMcp = @($mcpIdxs | ForEach-Object { $catalog.mcpServers[$_] })
-
+    $selectedMcp = @()
     $extraEnvVars = @{}
-    $requiredVars = $selectedMcp | Where-Object { $_.requiredEnvVars } | ForEach-Object { $_.requiredEnvVars }
-    foreach ($ev in $requiredVars) {
-        $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
-        Write-Info "$evLabel — $($ev.hint)"
-        if ($ev.url) { Write-Info (TF "cli.get_env_at" $ev.url) }
-        $val = Prompt-Secret $evLabel
-        if ($val) { $extraEnvVars[$ev.name] = $val }
+    if (Test-BackendSupportsMcp $selectedBackend) {
+        $mcpNames = $catalog.mcpServers | ForEach-Object { "$(Get-DisplayName $_)  —  $(Get-Description $_)" }
+        $defaultIdxs = @()
+        for ($i = 0; $i -lt $catalog.mcpServers.Count; $i++) {
+            if ($selectedBackend.defaultMcpServers -contains $catalog.mcpServers[$i].id) { $defaultIdxs += $i }
+        }
+        $mcpIdxs = Prompt-MultiChoice (T "cli.select_mcp") $mcpNames $defaultIdxs
+        $selectedMcp = @($mcpIdxs | ForEach-Object { $catalog.mcpServers[$_] })
+
+        $requiredVars = $selectedMcp | Where-Object { $_.requiredEnvVars } | ForEach-Object { $_.requiredEnvVars }
+        foreach ($ev in $requiredVars) {
+            $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
+            Write-Info "$evLabel — $($ev.hint)"
+            if ($ev.url) { Write-Info (TF "cli.get_env_at" $ev.url) }
+            $val = Prompt-Secret $evLabel
+            if ($val) { $extraEnvVars[$ev.name] = $val }
+        }
+    } else {
+        Write-Info "$($selectedBackend.displayName) does not support MCP server configuration."
     }
 
     Write-Header (T "cli.step4_header")
@@ -324,18 +334,22 @@ function Cmd-Install {
     }
 
     $apiKey = $Key
-    if (-not $apiKey) {
+    if ((-not $apiKey) -and (Test-BackendRequiresApiKey $selectedBackend)) {
         $keyLabel = Get-ApiKeyLabel $selectedBackend
         Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
         $apiKey = Prompt-Secret $keyLabel
+    } elseif (-not (Test-BackendRequiresApiKey $selectedBackend)) {
+        $apiKey = ""
     }
 
     $selectedMcp = @()
-    if ($Mcp) {
+    if ($Mcp -and (Test-BackendSupportsMcp $selectedBackend)) {
         $selectedMcp = @($Mcp -split ',' | ForEach-Object { $_.Trim() } | ForEach-Object {
             $s = Get-McpById $_
             if (-not $s) { Write-Warn (TF "cli.unknown_mcp" $_) } else { $s }
         } | Where-Object { $_ })
+    } elseif ($Mcp) {
+        Write-Warn "$($selectedBackend.displayName) does not support MCP server configuration. Ignoring --mcp."
     }
 
     $selectedSkills = @()
@@ -347,14 +361,16 @@ function Cmd-Install {
     }
 
     $extraEnvVars = @{}
-    $requiredVars = $selectedMcp | Where-Object { $_.requiredEnvVars } | ForEach-Object { $_.requiredEnvVars }
-    foreach ($ev in $requiredVars) {
-        $existing = [System.Environment]::GetEnvironmentVariable($ev.name, "User")
-        if (-not $existing) {
-            $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
-            Write-Info (TF "cli.required_for" $evLabel)
-            $val = Prompt-Secret $evLabel
-            if ($val) { $extraEnvVars[$ev.name] = $val }
+    if (Test-BackendSupportsMcp $selectedBackend) {
+        $requiredVars = $selectedMcp | Where-Object { $_.requiredEnvVars } | ForEach-Object { $_.requiredEnvVars }
+        foreach ($ev in $requiredVars) {
+            $existing = [System.Environment]::GetEnvironmentVariable($ev.name, "User")
+            if (-not $existing) {
+                $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
+                Write-Info (TF "cli.required_for" $evLabel)
+                $val = Prompt-Secret $evLabel
+                if ($val) { $extraEnvVars[$ev.name] = $val }
+            }
         }
     }
 
@@ -380,7 +396,11 @@ function Run-Install($selectedBackend, $apiKey, $extraEnvVars, $selectedMcp, $se
     }
 
     Write-Info (T "cli.install_step4")
-    Set-McpServers -Backend $selectedBackend -SelectedServers $selectedMcp -LogBox $null -ProgressBar $fakeProgress
+    if (Test-BackendSupportsMcp $selectedBackend) {
+        Set-McpServers -Backend $selectedBackend -SelectedServers $selectedMcp -LogBox $null -ProgressBar $fakeProgress
+    } else {
+        Write-Info "$($selectedBackend.displayName) does not support MCP server configuration. Skipping."
+    }
 
     Write-Info (T "cli.install_step5")
     Install-Skills -SelectedSkills $selectedSkills -TianDir $TianDir -LogBox $null -ProgressBar $fakeProgress
@@ -392,7 +412,7 @@ function Run-Install($selectedBackend, $apiKey, $extraEnvVars, $selectedMcp, $se
     Write-Host ""
     if ($selectedBackend.cliCommand) {
         Write-Color "  $(T 'cli.verify_tip')" White
-        Write-Color "    $($selectedBackend.cliCommand)" Cyan
+        Write-Color "    $(if ($selectedBackend.launchCommand) { $selectedBackend.launchCommand } else { $selectedBackend.cliCommand })" Cyan
     }
     Write-Host ""
 }
@@ -418,6 +438,7 @@ function Cmd-Status {
     Write-Host ""
     Write-Color (T "cli.apikeys_section") Gray
     foreach ($b in $catalog.backends) {
+        if (-not (Test-BackendRequiresApiKey $b)) { continue }
         $varName = $b.apiKeyEnvVar
         $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
         if ($val) { Write-Ok "$($varName.PadRight(30)) $(T 'cli.key_set')" }
@@ -426,7 +447,7 @@ function Cmd-Status {
 
     Write-Host ""
     Write-Color (T "cli.mcp_section") Gray
-    $targets = $catalog.backends | Select-Object -ExpandProperty mcpConfigTarget -Unique
+    $targets = $catalog.backends | Where-Object { (Test-BackendSupportsMcp $_) -and $_.mcpConfigTarget } | Select-Object -ExpandProperty mcpConfigTarget -Unique
     foreach ($t in $targets) {
         $fakeBackend = [PSCustomObject]@{ mcpConfigTarget = $t; mcpConfigPath = "" }
         $path = Get-McpConfigPath $fakeBackend
