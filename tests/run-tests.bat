@@ -18,11 +18,11 @@ powershell -NoProfile -STA -Command ^
    Import-Module Pester -MinimumVersion 5.0; ^
    $config = New-PesterConfiguration; ^
    $config.Run.Path = '%~dp0ps'; ^
+   $config.Run.Exit = $true; ^
    $config.Output.Verbosity = 'Detailed'; ^
    $config.TestResult.Enabled = $true; ^
    $config.TestResult.OutputPath = '%~dp0results-windows.xml'; ^
-   $result = Invoke-Pester -Configuration $config; ^
-   exit $result.FailedCount"
+   Invoke-Pester -Configuration $config"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

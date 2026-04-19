@@ -27,11 +27,11 @@ jobs:
           Import-Module Pester -MinimumVersion 5.0
           $config = New-PesterConfiguration
           $config.Run.Path = 'tests/ps'
+          $config.Run.Exit = $true
           $config.Output.Verbosity = 'Detailed'
           $config.TestResult.Enabled = $true
           $config.TestResult.OutputPath = 'tests/results-windows.xml'
-          $result = Invoke-Pester -Configuration $config
-          exit $result.FailedCount
+          Invoke-Pester -Configuration $config
 
       - name: Upload test results
         if: always()
