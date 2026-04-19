@@ -190,12 +190,24 @@
           <article class="platform">
             <h3>macOS</h3>
             <p><span data-copy-lang="en">Use a Homebrew-style one-line install command. It downloads TIAN, adds `tian-cli`, and starts the macOS setup flow.</span><span data-copy-lang="zh">使用类似 Homebrew 的一行安装命令。它会下载 TIAN、添加 `tian-cli`，并启动 macOS 安装流程。</span></p>
-            <code>curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash</code>
+            <div class="code-block">
+              <code>curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash</code>
+              <button class="copy-btn" aria-label="Copy install command" data-copy-target>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span class="copy-label"><span data-copy-lang="en">Copy</span><span data-copy-lang="zh">复制</span></span>
+              </button>
+            </div>
           </article>
           <article class="platform">
             <h3>Linux</h3>
             <p><span data-copy-lang="en">Use the same one-line install command to fetch TIAN and install the Linux CLI entrypoint.</span><span data-copy-lang="zh">使用同一条一行安装命令即可获取 TIAN 并安装 Linux 命令行入口。</span></p>
-            <code>curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash</code>
+            <div class="code-block">
+              <code>curl -fsSL https://raw.githubusercontent.com/jkcsxw/TIAN/main/install.sh | bash</code>
+              <button class="copy-btn" aria-label="Copy install command" data-copy-target>
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span class="copy-label"><span data-copy-lang="en">Copy</span><span data-copy-lang="zh">复制</span></span>
+              </button>
+            </div>
           </article>
         </div>
       </section>
@@ -272,6 +284,33 @@
       });
 
       setLanguage(pickInitialLanguage());
+    }());
+
+    (function () {
+      document.querySelectorAll(".copy-btn").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var code = btn.closest(".code-block").querySelector("code");
+          navigator.clipboard.writeText(code.textContent.trim()).then(function () {
+            btn.classList.add("is-copied");
+            var label = btn.querySelector(".copy-label");
+            var origHtml = label.innerHTML;
+            label.innerHTML = '<span data-copy-lang="en">Copied!</span><span data-copy-lang="zh">已复制！</span>';
+            setLanguageOnNode(label);
+            setTimeout(function () {
+              btn.classList.remove("is-copied");
+              label.innerHTML = origHtml;
+              setLanguageOnNode(label);
+            }, 2000);
+          });
+        });
+      });
+
+      function setLanguageOnNode(node) {
+        var lang = document.documentElement.getAttribute("data-page-lang") || "en";
+        node.querySelectorAll("[data-copy-lang]").forEach(function (el) {
+          el.hidden = el.getAttribute("data-copy-lang") !== lang;
+        });
+      }
     }());
   </script>
 </body>
