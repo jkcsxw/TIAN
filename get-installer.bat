@@ -16,7 +16,7 @@ set "DEST=%TEMP%\tian-setup.exe"
 :: Download the latest release installer using PowerShell (built into Windows 7+)
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { " ^
-  "  $url = 'https://github.com/your-org/tian/releases/latest/download/tian-setup.exe'; " ^
+  "  $url = 'https://github.com/jkcsxw/TIAN/releases/latest/download/tian-setup.exe'; " ^
   "  Write-Host '  Connecting to GitHub...'; " ^
   "  Invoke-WebRequest -Uri $url -OutFile '%DEST%' -UseBasicParsing; " ^
   "  Write-Host '  Download complete.'; " ^
@@ -29,13 +29,13 @@ if %ERRORLEVEL% neq 0 (
     echo.
     echo  Could not download the installer automatically.
     echo.
-    echo  Please visit the link below and download tian-setup.exe manually:
+    echo  Please visit the link below and download the installer manually:
     echo.
-    echo    https://github.com/your-org/tian/releases/latest
+    echo    https://github.com/jkcsxw/TIAN/releases/latest
     echo.
     pause
     :: Try to open the releases page in the browser as a fallback
-    start "" "https://github.com/your-org/tian/releases/latest"
+    start "" "https://github.com/jkcsxw/TIAN/releases/latest"
     exit /b 1
 )
 

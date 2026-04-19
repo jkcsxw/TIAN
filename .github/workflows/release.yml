@@ -52,12 +52,33 @@ jobs:
           $ver = '${{ steps.version.outputs.ver }}'
           powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version $ver
 
+      - name: Prepare release assets
+        id: assets
+        shell: pwsh
+        run: |
+          $ver = '${{ steps.version.outputs.ver }}'
+          $distDir = Join-Path $env:GITHUB_WORKSPACE 'installer\dist'
+          $versionedExe = Join-Path $distDir "tian-setup-$ver.exe"
+          $stableExe = Join-Path $distDir 'tian-setup.exe'
+
+          if (-not (Test-Path $versionedExe)) {
+            throw "Expected installer asset not found: $versionedExe"
+          }
+
+          Copy-Item $versionedExe $stableExe -Force
+
+          "versioned=$versionedExe" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "stable=$stableExe" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: TIAN ${{ steps.version.outputs.tag }}
-          files: installer/dist/tian-setup-${{ steps.version.outputs.ver }}.exe
+          files: |
+            ${{ steps.assets.outputs.versioned }}
+            ${{ steps.assets.outputs.stable }}
+          fail_on_unmatched_files: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
