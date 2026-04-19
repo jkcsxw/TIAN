@@ -36,6 +36,38 @@ You don't need to know what "terminal", "Python", or "API" means. If you can ins
 
 ---
 
+## Feature Status | 功能状态
+
+| Feature | Status | Notes |
+|---|---|---|
+| Windows installer | Available | `tian-setup.exe` installer with Start Menu integration and optional PATH setup |
+| Windows GUI setup wizard | Available | Guided setup flow for backend, API key, MCP tools, and skills |
+| Windows CLI | Available | `tian-cli` supports setup, install, status, run, jobs, and schedule commands |
+| macOS setup | Available | `setup.sh` installs prerequisites and walks through terminal-based setup |
+| MCP tool selection | Available | Catalog-driven MCP install/config flow is included on Windows and macOS |
+| Skill installation | Available | Built-in skills can be selected during setup or added later from CLI |
+| Background jobs | Available | `tian-cli run --background`, `jobs`, and result management are implemented |
+| Task scheduling | Available | Recurring tasks via `tian-cli schedule add/list/run/remove` |
+| Multiple AI backends | Available | Claude, Claude Code, and OpenAI Codex are supported today |
+| Linux support | Not yet listed | Current README and setup flows cover Windows and macOS only |
+| More backends | In progress | The catalog and README both indicate additional backends are planned |
+
+| 功能 | 状态 | 说明 |
+|---|---|---|
+| Windows 安装程序 | 已提供 | 提供 `tian-setup.exe`，支持开始菜单入口和可选 PATH 配置 |
+| Windows 图形安装向导 | 已提供 | 可视化引导完成引擎、API 密钥、MCP 工具和技能包配置 |
+| Windows 命令行 | 已提供 | `tian-cli` 支持 setup、install、status、run、jobs、schedule |
+| macOS 安装流程 | 已提供 | `setup.sh` 会安装依赖并通过终端引导完成配置 |
+| MCP 工具选择 | 已提供 | Windows 和 macOS 都包含基于目录的 MCP 安装与配置流程 |
+| 技能包安装 | 已提供 | 可在安装时选择，也可后续通过命令行追加 |
+| 后台任务 | 已提供 | 已实现 `tian-cli run --background`、`jobs` 与结果查看 |
+| 定时任务 | 已提供 | 支持 `tian-cli schedule add/list/run/remove` |
+| 多AI引擎支持 | 已提供 | 当前支持 Claude、Claude Code、OpenAI Codex |
+| Linux 支持 | 暂未列出 | 当前 README 与安装流程仅覆盖 Windows 和 macOS |
+| 更多AI引擎 | 开发中 | 目录结构与 README 都表明后续还会继续扩展 |
+
+---
+
 ## Who is this for? | 适合哪些人？
 
 - Business owners who want AI to help with day-to-day operations
