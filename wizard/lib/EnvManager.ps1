@@ -5,6 +5,11 @@ function Set-ApiKey {
         $LogBox
     )
 
+    if (-not $Backend.apiKeyEnvVar -or $Backend.apiKeyEnvVar.Trim() -eq "") {
+        Append-Log $LogBox "Backend does not require an API key — skipping." "info"
+        return
+    }
+
     if (-not $ApiKey -or $ApiKey.Trim() -eq "") {
         Append-Log $LogBox "No API key provided — skipping." "warn"
         return

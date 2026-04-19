@@ -455,3 +455,13 @@ function Get-ApiKeyLabel {
     if ($lang -eq "zh" -and $Backend.apiKeyLabelZh) { return $Backend.apiKeyLabelZh }
     return $Backend.apiKeyLabel
 }
+
+function Test-BackendRequiresApiKey {
+    param($Backend)
+    return -not [string]::IsNullOrWhiteSpace([string]$Backend.apiKeyEnvVar)
+}
+
+function Test-BackendSupportsMcp {
+    param($Backend)
+    return $Backend.supportsMcp -ne $false
+}

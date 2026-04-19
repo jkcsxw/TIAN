@@ -38,6 +38,23 @@
       "defaultSkills": []
     },
     {
+      "id": "ollama-qwen-local",
+      "displayName": "Ollama Local (Qwen2.5-Coder 7B)",
+      "displayNameZh": "Ollama 本地模型（Qwen2.5-Coder 7B）",
+      "description": "Run an open-source coding model locally with Ollama. No API key required.",
+      "descriptionZh": "通过 Ollama 在本地运行开源编程模型，无需 API 密钥。",
+      "installType": "local-cli",
+      "cliCommand": "ollama",
+      "launchCommand": "ollama run qwen2.5-coder:7b",
+      "nonInteractiveFlag": "run qwen2.5-coder:7b",
+      "downloadUrl": "https://ollama.com/download",
+      "setupNote": "Install Ollama, then load the model locally with: ollama pull qwen2.5-coder:7b",
+      "setupNoteZh": "先安装 Ollama，然后运行以下命令在本地加载模型：ollama pull qwen2.5-coder:7b",
+      "supportsMcp": false,
+      "defaultMcpServers": [],
+      "defaultSkills": []
+    },
+    {
       "id": "claude-desktop",
       "displayName": "Claude Desktop (Anthropic)",
       "displayNameZh": "Claude 桌面版（Anthropic）",

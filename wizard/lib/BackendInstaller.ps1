@@ -5,10 +5,30 @@ function Install-Backend {
         $ProgressBar
     )
 
-    if ($Backend.installType -eq "desktop-app") {
+    $installType = if ($Backend.installType) { $Backend.installType } else { "cli" }
+
+    if ($installType -eq "desktop-app") {
         Append-Log $LogBox "Opening Claude Desktop download page..." "info"
         Start-Process $Backend.downloadUrl
         Append-Log $LogBox "Please install Claude Desktop from the opened page, then return here." "warn"
+        $ProgressBar.Value = [Math]::Min($ProgressBar.Value + 20, 100)
+        return $true
+    }
+
+    if ($installType -eq "local-cli") {
+        $cmd = Get-Command $Backend.cliCommand -ErrorAction SilentlyContinue
+        if ($cmd) {
+            Append-Log $LogBox "$($Backend.displayName) is already available on PATH." "success"
+        } else {
+            Append-Log $LogBox "$($Backend.displayName) was not found on PATH." "warn"
+            if ($Backend.downloadUrl) {
+                Append-Log $LogBox "Opening setup page..." "info"
+                Start-Process $Backend.downloadUrl
+            }
+            if ($Backend.setupNote) {
+                Append-Log $LogBox $Backend.setupNote "warn"
+            }
+        }
         $ProgressBar.Value = [Math]::Min($ProgressBar.Value + 20, 100)
         return $true
     }
@@ -69,13 +89,14 @@ function Write-Launcher {
     )
 
     $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
+    $launchCommand = if ($Backend.launchCommand) { $Backend.launchCommand } else { $Backend.cliCommand }
 
     if ($isMac) {
         $launcherPath = Join-Path $TianDir "launcher.sh"
         if ($Backend.installType -eq "desktop-app") {
             $content = "#!/usr/bin/env bash`necho 'Opening Claude...'`nopen -a Claude 2>/dev/null || open '$($Backend.downloadUrl)'`n"
         } else {
-            $content = "#!/usr/bin/env bash`nsource `"`$HOME/.zshrc`" 2>/dev/null || source `"`$HOME/.bash_profile`" 2>/dev/null || true`necho 'Starting $($Backend.displayName)...'`n$($Backend.cliCommand)`n"
+            $content = "#!/usr/bin/env bash`nsource `"`$HOME/.zshrc`" 2>/dev/null || source `"`$HOME/.bash_profile`" 2>/dev/null || true`necho 'Starting $($Backend.displayName)...'`n$launchCommand`n"
         }
         Set-Content -Path $launcherPath -Value $content -Encoding UTF8
         & chmod +x $launcherPath
@@ -85,7 +106,7 @@ function Write-Launcher {
         if ($Backend.installType -eq "desktop-app") {
             $content = "@echo off`r`necho Opening Claude Desktop...`r`nstart `"`" `"%LOCALAPPDATA%\AnthropicClaude\Claude.exe`"`r`n"
         } else {
-            $content = "@echo off`r`ntitle TIAN - $($Backend.displayName)`r`necho Starting $($Backend.displayName)...`r`necho.`r`n$($Backend.cliCommand)`r`n"
+            $content = "@echo off`r`ntitle TIAN - $($Backend.displayName)`r`necho Starting $($Backend.displayName)...`r`necho.`r`n$launchCommand`r`n"
         }
         Set-Content -Path $launcherPath -Value $content -Encoding ASCII
         Append-Log $LogBox "Launcher created: launcher.bat" "success"

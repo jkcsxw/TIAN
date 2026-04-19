@@ -21,6 +21,7 @@ Describe "Get-Catalog" {
             $ids = $script:catalog.backends | ForEach-Object { $_.id }
             $ids | Should -Contain "claude-code"
             $ids | Should -Contain "openai-codex"
+            $ids | Should -Contain "ollama-qwen-local"
             $ids | Should -Contain "claude-desktop"
         }
         It "every MCP server has required fields" {

@@ -57,6 +57,18 @@ $pages = @(
 
 $currentPage = 0
 
+function Should-SkipPage {
+    param([string]$PageName)
+
+    if (-not $state.SelectedBackend) { return $false }
+
+    switch ($PageName) {
+        "ApiKey"     { return -not (Test-BackendRequiresApiKey $state.SelectedBackend) }
+        "McpServers" { return -not (Test-BackendSupportsMcp $state.SelectedBackend) }
+        default      { return $false }
+    }
+}
+
 # Build main form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = T "app.title"
@@ -104,8 +116,9 @@ function Show-CurrentPage {
     $panel = New-Panel -X 0 -Y 0 -Width 560 -Height 444
     $pageContainer.Controls.Add($panel)
 
-    $showTotal = $pages.Count - 2  # don't count Install and Done
-    $showCurrent = [Math]::Min($currentPage + 1, $showTotal)
+    $visiblePages = @($pages | Where-Object { $_ -notin @("Install", "Done") -and -not (Should-SkipPage $_) })
+    $showTotal = $visiblePages.Count
+    $showCurrent = if ($visiblePages -contains $pageName) { [array]::IndexOf($visiblePages, $pageName) + 1 } else { $showTotal }
     if ($isDone -or $isInstall) {
         $stepLabel.Text = ""
     } else {
@@ -157,13 +170,17 @@ while ($true) {
 
     if ($navState.Direction -eq "Next") {
         if ($currentPage -lt $pages.Count - 1) {
-            $currentPage++
+            do {
+                $currentPage++
+            } while ($currentPage -lt $pages.Count - 1 -and (Should-SkipPage $pages[$currentPage]))
         } else {
             break
         }
     } elseif ($navState.Direction -eq "Back") {
         if ($currentPage -gt 0) {
-            $currentPage--
+            do {
+                $currentPage--
+            } while ($currentPage -gt 0 -and (Should-SkipPage $pages[$currentPage]))
         }
     } else {
         break

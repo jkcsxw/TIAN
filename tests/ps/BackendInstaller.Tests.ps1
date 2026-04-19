@@ -64,4 +64,42 @@ Describe "Write-Launcher" {
         Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
         $script:LogMessages | Where-Object { $_ -match "Launcher created" } | Should -Not -BeNullOrEmpty
     }
+
+    It "uses launchCommand when provided" {
+        $backend = [PSCustomObject]@{
+            installType   = "local-cli"
+            cliCommand    = "ollama"
+            launchCommand = "ollama run qwen2.5-coder:7b"
+            displayName   = "Ollama Local"
+        }
+        Write-Launcher -Backend $backend -TianDir $script:TempDir -LogBox $null
+        $fileName = if ($IsMacOS) { "launcher.sh" } else { "launcher.bat" }
+        $content = Get-Content (Join-Path $script:TempDir $fileName) -Raw
+        $content | Should -Match "ollama run qwen2.5-coder:7b"
+    }
+}
+
+Describe "Install-Backend" {
+    BeforeEach {
+        $script:LogMessages = @()
+        $script:ProgressBar = New-FakeProgressBar
+    }
+
+    It "accepts local-cli backends and shows setup guidance when the command is missing" {
+        Mock Get-Command { return $null } -ParameterFilter { $Name -eq "ollama" }
+        Mock Start-Process {}
+
+        $backend = [PSCustomObject]@{
+            installType = "local-cli"
+            cliCommand  = "ollama"
+            displayName = "Ollama Local"
+            downloadUrl = "https://ollama.com/download"
+            setupNote   = "Install Ollama, then pull qwen2.5-coder:7b"
+        }
+
+        Install-Backend -Backend $backend -LogBox $null -ProgressBar $script:ProgressBar | Should -BeTrue
+        $script:LogMessages | Should -Contain "Ollama Local was not found on PATH."
+        $script:LogMessages | Should -Contain "Install Ollama, then pull qwen2.5-coder:7b"
+        Assert-MockCalled Start-Process -Times 1 -Exactly
+    }
 }

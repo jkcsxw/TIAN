@@ -67,12 +67,24 @@ _test_cli_backend_has_cliCommand() {
     missing=$(py3 "
 import json
 c=json.load(open('$CATALOG'))
-bad=[b['id'] for b in c['backends'] if b.get('installType')=='cli' and not b.get('cliCommand')]
+bad=[b['id'] for b in c['backends'] if b.get('installType') in ('cli','local-cli') and not b.get('cliCommand')]
 print('\n'.join(bad))
 ")
     assert_empty "$missing"
 }
 it "cli-type backends have a cliCommand" _test_cli_backend_has_cliCommand
+
+_test_cli_backend_has_noninteractive_flag() {
+    local missing
+    missing=$(py3 "
+import json
+c=json.load(open('$CATALOG'))
+bad=[b['id'] for b in c['backends'] if b.get('cliCommand') and not b.get('nonInteractiveFlag')]
+print('\n'.join(bad))
+")
+    assert_empty "$missing"
+}
+it "CLI backends have a nonInteractiveFlag" _test_cli_backend_has_noninteractive_flag
 
 suite "MCP server fields"
 
