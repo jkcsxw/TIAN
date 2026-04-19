@@ -71,7 +71,7 @@ jobs:
         shell: pwsh
         run: |
           $ver = '${{ steps.version.outputs.ver }}'
-          powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1 -Version $ver
+          & .\installer\build-installer.ps1 -Version $ver
 
       - name: Prepare release assets
         id: assets
