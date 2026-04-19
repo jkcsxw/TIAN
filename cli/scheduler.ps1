@@ -51,14 +51,14 @@ function Add-Schedule {
         [string]$TianDir
     )
 
-    if (-not $Name)   { Write-Fail "Missing schedule name. Use --name <name>"; return }
-    if (-not $Prompt) { Write-Fail "Missing task prompt. Use --task `"your prompt`""; return }
+    if (-not $Name)   { Write-Fail "缺少定时任务名称，请使用 --name <名称>。/ Missing schedule name. Use --name <name>"; return }
+    if (-not $Prompt) { Write-Fail "缺少任务提示词，请使用 --task \"您的提示词\"。/ Missing task prompt. Use --task \"your prompt\""; return }
     if (-not $Time)   { $Time = "08:00" }
     if (-not $Repeat) { $Repeat = "daily" }
 
     $schedules = Read-Schedules
     if ($schedules | Where-Object { $_.name -eq $Name }) {
-        Write-Fail "A schedule named '$Name' already exists. Remove it first with: tian-cli schedule remove $Name"
+        Write-Fail "名为 '$Name' 的定时任务已存在，请先删除：tian-cli schedule remove $Name / A schedule named '$Name' already exists."
         return
     }
 
@@ -106,7 +106,7 @@ function Add-Schedule {
 "@
         Set-Content -Path $plistFile -Value $plistContent -Encoding UTF8
         Invoke-Launchctl -Action 'load' -PlistFile $plistFile
-        Write-Ok "Schedule '$Name' registered with launchd."
+        Write-Ok "定时任务 '$Name' 已注册到 launchd。/ Schedule '$Name' registered with launchd."
 
         $entry = [PSCustomObject]@{
             name      = $Name; prompt = $Prompt; time = $Time
@@ -130,8 +130,8 @@ function Add-Schedule {
 
         $result = Start-Process schtasks -ArgumentList $schArgs -Wait -PassThru -NoNewWindow
         if ($result.ExitCode -ne 0) {
-            Write-Fail "Failed to create Windows scheduled task (exit $($result.ExitCode))."
-            Write-Warn "Try running tian-cli as Administrator."
+            Write-Fail "创建Windows定时任务失败（退出码 $($result.ExitCode)）。/ Failed to create Windows scheduled task."
+            Write-Warn "请以管理员身份运行 tian-cli。/ Try running tian-cli as Administrator."
             return
         }
 
@@ -144,17 +144,17 @@ function Add-Schedule {
 
     $schedules += $entry
     Save-Schedules $schedules
-    Write-Ok "Schedule '$Name' created — $Repeat at $Time."
-    Write-Info "Results : tian-cli jobs  (after first run)"
+    Write-Ok "定时任务 '$Name' 已创建 — $Repeat 每天 $Time 执行。/ Schedule '$Name' created — $Repeat at $Time."
+    Write-Info "查看结果 / Results : tian-cli jobs  (首次运行后 / after first run)"
 }
 
 function Remove-Schedule {
     param([string]$Name, [string]$TianDir)
-    if (-not $Name) { Write-Fail "Usage: tian-cli schedule remove <name>"; return }
+    if (-not $Name) { Write-Fail "用法 / Usage: tian-cli schedule remove <名称 name>"; return }
 
     $schedules = Read-Schedules
     $entry = $schedules | Where-Object { $_.name -eq $Name } | Select-Object -First 1
-    if (-not $entry) { Write-Fail "No schedule named '$Name'."; return }
+    if (-not $entry) { Write-Fail "未找到名为 '$Name' 的定时任务。/ No schedule named '$Name'."; return }
 
     $isMac = $IsMacOS -or ($PSVersionTable.Platform -eq 'Unix')
 
@@ -165,22 +165,22 @@ function Remove-Schedule {
         }
     } else {
         $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
-        if ($result.ExitCode -ne 0) { Write-Warn "Could not remove Windows task (may have already been deleted)." }
+        if ($result.ExitCode -ne 0) { Write-Warn "无法删除Windows定时任务（可能已被删除）。/ Could not remove Windows task (may have already been deleted)." }
     }
 
     $keep = @($schedules | Where-Object { $_.name -ne $Name })
     Save-Schedules $keep
-    Write-Ok "Schedule '$Name' removed."
+    Write-Ok "定时任务 '$Name' 已删除。/ Schedule '$Name' removed."
 }
 
 function Show-Schedules {
     $schedules = Read-Schedules
     if (-not $schedules -or $schedules.Count -eq 0) {
-        Write-Info "No schedules found. Create one with: tian-cli schedule add --name <n> --task `"prompt`" --time 08:00"
+        Write-Info "暂无定时任务。创建方式：tian-cli schedule add --name <名称> --task \"提示词\" --time 08:00 / No schedules found."
         return
     }
 
-    Write-Header "Scheduled Tasks"
+    Write-Header "定时任务列表 / Scheduled Tasks"
     Write-Rule
     foreach ($s in $schedules) {
         Write-Color "  $($s.name.PadRight(22))" Cyan -NoNewline

@@ -35,6 +35,7 @@ function Write-Rule    { Write-Color ("─" * 60) DarkGray }
 
 # ── Load shared libs ──────────────────────────────────────────────────────────
 $libDir = Join-Path $TianDir "wizard\lib"
+. "$libDir\Strings.ps1"
 . "$libDir\Catalog.ps1"
 . (Join-Path $PSScriptRoot "runner.ps1")
 . (Join-Path $PSScriptRoot "scheduler.ps1")
@@ -121,17 +122,83 @@ function Cmd-Help {
      ██║   ██║██║  ██║██║ ╚████║
      ╚═╝   ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝  CLI
 
-  Talk Is All you Need
+  $(T "cli.tagline")
 "@ Cyan
 
     Write-Rule
-    Write-Color @"
+    if ($global:TIAN_LANG -eq "zh") {
+        Write-Color @"
+
+  用法
+    tian-cli <命令> [子命令] [选项]
+
+  命令
+    setup               交互式引导安装（首次使用推荐）
+    install             使用参数快速安装
+    status              查看当前安装状态
+    list backends       列出可用AI后端
+    list mcp            列出可用MCP服务器
+    list skills         列出可用技能包
+    add mcp  <id>       添加MCP服务器到配置
+    add skill <id>      安装技能包
+    remove mcp  <id>    从配置中移除MCP服务器
+    repair              重新安装修复当前配置
+    lang en|zh          切换界面语言
+
+    run  "提示词"              立即执行任务（前台）
+    run  "提示词" --background 在后台执行任务
+    jobs                      列出后台任务
+    jobs result <id>          查看已完成任务的输出
+    jobs clear                清除已完成任务（--all 清除全部）
+
+    schedule add              创建定时任务
+    schedule list             列出所有定时任务
+    schedule run <名称>        立即运行某个定时任务
+    schedule remove <名称>     删除定时任务
+
+    help                      显示此帮助
+
+  安装参数
+    --backend <id>      指定AI后端（例如 claude-code）
+    --key     <apikey>  指定API密钥
+    --mcp     <ids>     MCP服务器ID（逗号分隔）
+    --skills  <ids>     技能包ID（逗号分隔）
+    --yes               跳过所有确认提示
+
+  定时参数
+    --name    <名称>    定时任务名称（必填）
+    --task    "提示词"  要执行的任务（必填）
+    --time    HH:MM    执行时间（默认 08:00）
+    --repeat  <频率>    once | hourly | daily | weekly（默认 daily）
+    --day     <星期>    weekly 时指定星期，例如 MON,WED,FRI
+
+  示例
+    tian-cli setup
+    tian-cli install --backend claude-code --key sk-ant-xxx --mcp filesystem,web-search --yes
+    tian-cli list mcp
+    tian-cli add mcp github
+    tian-cli status
+    tian-cli lang en
+
+    tian-cli run "总结今日AI领域最新动态"
+    tian-cli run "帮我写今天的工作日报" --background
+    tian-cli jobs
+    tian-cli jobs result 20240417-083012-ab12cd
+
+    tian-cli schedule add --name morning-brief --task "给我一份简短的早间简报" --time 08:00 --repeat daily
+    tian-cli schedule list
+    tian-cli schedule run morning-brief
+    tian-cli schedule remove morning-brief
+
+"@ White
+    } else {
+        Write-Color @"
 
   USAGE
     tian-cli <command> [subcommand] [options]
 
   COMMANDS
-    setup               Interactive guided setup (recommended for first run)
+    setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
     status              Show what is currently installed
     list backends       List available AI backends
@@ -140,34 +207,35 @@ function Cmd-Help {
     add mcp  <id>       Add an MCP server to your config
     add skill <id>      Install a skill
     remove mcp  <id>    Remove an MCP server from your config
-    repair              Re-run install for the current config
+    repair              Re-run install to fix the current config
+    lang en|zh          Switch interface language
 
-    run  "prompt"       Run a task now (foreground)
-    run  "prompt" --background   Run a task in the background
-    jobs                List background jobs
-    jobs result <id>    Show output of a completed job
-    jobs clear          Clear completed jobs  (--all to clear everything)
+    run  "prompt"              Run a task now (foreground)
+    run  "prompt" --background Run a task in the background
+    jobs                       List background jobs
+    jobs result <id>           Show output of a completed job
+    jobs clear                 Clear completed jobs (--all clears all)
 
-    schedule add        Create a recurring scheduled task
-    schedule list       List all scheduled tasks
-    schedule run <n>    Run a scheduled task immediately
-    schedule remove <n> Delete a scheduled task
+    schedule add               Create a recurring scheduled task
+    schedule list              List all scheduled tasks
+    schedule run <name>        Run a scheduled task immediately
+    schedule remove <name>     Delete a scheduled task
 
-    help                Show this help
+    help                       Show this help
 
   INSTALL FLAGS
-    --backend <id>      AI backend to install  (e.g. claude-code)
-    --key     <apikey>  API key for the backend
-    --mcp     <ids>     Comma-separated MCP server IDs
-    --skills  <ids>     Comma-separated skill IDs
+    --backend <id>      AI backend to use (e.g. claude-code)
+    --key     <apikey>  API key
+    --mcp     <ids>     MCP server IDs (comma-separated)
+    --skills  <ids>     Skill IDs (comma-separated)
     --yes               Skip all confirmation prompts
 
   SCHEDULE FLAGS
     --name    <name>    Schedule name (required)
-    --task    "prompt"  The prompt to run (required)
-    --time    HH:MM     Time of day to run  (default: 08:00)
-    --repeat  <freq>    once | hourly | daily | weekly  (default: daily)
-    --day     <days>    Days for weekly repeat  e.g. MON,WED,FRI
+    --task    "prompt"  Task prompt (required)
+    --time    HH:MM    Time to run (default 08:00)
+    --repeat  <freq>    once | hourly | daily | weekly (default daily)
+    --day     <day>     Day for weekly, e.g. MON,WED,FRI
 
   EXAMPLES
     tian-cli setup
@@ -175,74 +243,71 @@ function Cmd-Help {
     tian-cli list mcp
     tian-cli add mcp github
     tian-cli status
+    tian-cli lang zh
 
-    tian-cli run "Summarise the latest news about AI"
-    tian-cli run "Draft my daily standup update" --background
+    tian-cli run "Summarise today's AI news"
+    tian-cli run "Write my daily work report" --background
     tian-cli jobs
     tian-cli jobs result 20240417-083012-ab12cd
 
     tian-cli schedule add --name morning-brief --task "Give me a short morning briefing" --time 08:00 --repeat daily
-    tian-cli schedule add --name weekly-report --task "Summarise this week's key themes" --time 09:00 --repeat weekly --day MON
     tian-cli schedule list
     tian-cli schedule run morning-brief
     tian-cli schedule remove morning-brief
 
 "@ White
+    }
     Write-Rule
 }
 
 function Cmd-Setup {
-    Write-Header "TIAN Interactive Setup"
+    Write-Header (T "cli.setup_header")
     Write-Rule
 
-    # 1. Backend
-    Write-Header "Step 1 — Choose your AI backend"
-    $backendNames = $catalog.backends | ForEach-Object { "$($_.displayName)  —  $($_.description)" }
-    $idx = Prompt-Choice "Select backend" $backendNames 0
+    Write-Header (T "cli.step1_header")
+    $backendNames = $catalog.backends | ForEach-Object { "$(Get-DisplayName $_)  —  $(Get-Description $_)" }
+    $idx = Prompt-Choice (T "cli.select_backend") $backendNames 0
     $selectedBackend = $catalog.backends[$idx]
-    Write-Ok "Selected: $($selectedBackend.displayName)"
+    Write-Ok (TF "cli.selected" $selectedBackend.displayName)
 
-    # 2. API key
-    Write-Header "Step 2 — Enter your API key"
-    Write-Info "$($selectedBackend.apiKeyLabel)  ($($selectedBackend.apiKeyHint))"
-    Write-Info "Get one at: $($selectedBackend.apiKeyUrl)"
-    $apiKey = Prompt-Secret $selectedBackend.apiKeyLabel
+    Write-Header (T "cli.step2_header")
+    $keyLabel = Get-ApiKeyLabel $selectedBackend
+    Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
+    Write-Info (TF "cli.get_at" $selectedBackend.apiKeyUrl)
+    $apiKey = Prompt-Secret $keyLabel
 
-    # 3. MCP servers
-    Write-Header "Step 3 — Choose MCP tools"
-    $mcpNames = $catalog.mcpServers | ForEach-Object { "$($_.displayName)  —  $($_.description)" }
+    Write-Header (T "cli.step3_header")
+    $mcpNames = $catalog.mcpServers | ForEach-Object { "$(Get-DisplayName $_)  —  $(Get-Description $_)" }
     $defaultIdxs = @()
     for ($i = 0; $i -lt $catalog.mcpServers.Count; $i++) {
         if ($selectedBackend.defaultMcpServers -contains $catalog.mcpServers[$i].id) { $defaultIdxs += $i }
     }
-    $mcpIdxs = Prompt-MultiChoice "Select MCP tools" $mcpNames $defaultIdxs
+    $mcpIdxs = Prompt-MultiChoice (T "cli.select_mcp") $mcpNames $defaultIdxs
     $selectedMcp = @($mcpIdxs | ForEach-Object { $catalog.mcpServers[$_] })
 
-    # Extra env vars for chosen MCP servers
     $extraEnvVars = @{}
     $requiredVars = $selectedMcp | Where-Object { $_.requiredEnvVars } | ForEach-Object { $_.requiredEnvVars }
     foreach ($ev in $requiredVars) {
-        Write-Info "$($ev.label) — $($ev.hint)"
-        if ($ev.url) { Write-Info "Get it at: $($ev.url)" }
-        $val = Prompt-Secret $ev.label
+        $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
+        Write-Info "$evLabel — $($ev.hint)"
+        if ($ev.url) { Write-Info (TF "cli.get_env_at" $ev.url) }
+        $val = Prompt-Secret $evLabel
         if ($val) { $extraEnvVars[$ev.name] = $val }
     }
 
-    # 4. Skills
-    Write-Header "Step 4 — Choose skills"
-    $skillNames = $catalog.skills | ForEach-Object { "$($_.displayName)  —  $($_.description)" }
-    $skillIdxs = Prompt-MultiChoice "Select skills" $skillNames @()
+    Write-Header (T "cli.step4_header")
+    $skillNames = $catalog.skills | ForEach-Object { "$(Get-DisplayName $_)  —  $(Get-Description $_)" }
+    $skillIdxs = Prompt-MultiChoice (T "cli.select_skills") $skillNames @()
     $selectedSkills = @($skillIdxs | ForEach-Object { $catalog.skills[$_] })
 
-    # 5. Confirm
-    Write-Header "Ready to install"
-    Write-Info "Backend : $($selectedBackend.displayName)"
-    Write-Info "MCP     : $(if ($selectedMcp.Count) { ($selectedMcp | ForEach-Object { $_.displayName }) -join ', ' } else { 'none' })"
-    Write-Info "Skills  : $(if ($selectedSkills.Count) { ($selectedSkills | ForEach-Object { $_.displayName }) -join ', ' } else { 'none' })"
+    Write-Header (T "cli.confirm_header")
+    Write-Info (TF "cli.backend_label" $selectedBackend.displayName)
+    Write-Info (TF "cli.mcp_label"     (if ($selectedMcp.Count) { ($selectedMcp | ForEach-Object { Get-DisplayName $_ }) -join ', ' } else { T "cli.none" }))
+    Write-Info (TF "cli.skills_label"  (if ($selectedSkills.Count) { ($selectedSkills | ForEach-Object { Get-DisplayName $_ }) -join ', ' } else { T "cli.none" }))
     Write-Host ""
 
-    if (-not (Confirm-Action "Proceed with installation?")) {
-        Write-Warn "Setup cancelled."
+    if (-not (Confirm-Action (T "cli.confirm_install"))) {
+        Write-Warn (T "cli.cancelled")
         return
     }
 
@@ -250,25 +315,26 @@ function Cmd-Setup {
 }
 
 function Cmd-Install {
-    if (-not $Backend) { Write-Fail "Missing --backend. Run 'tian-cli help' for usage."; exit 1 }
+    if (-not $Backend) { Write-Fail (T "cli.missing_backend"); exit 1 }
 
     $selectedBackend = Get-BackendById $Backend
     if (-not $selectedBackend) {
-        Write-Fail "Unknown backend '$Backend'. Run 'tian-cli list backends' to see options."
+        Write-Fail (TF "cli.unknown_backend" $Backend)
         exit 1
     }
 
     $apiKey = $Key
     if (-not $apiKey) {
-        Write-Info "$($selectedBackend.apiKeyLabel)  ($($selectedBackend.apiKeyHint))"
-        $apiKey = Prompt-Secret $selectedBackend.apiKeyLabel
+        $keyLabel = Get-ApiKeyLabel $selectedBackend
+        Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
+        $apiKey = Prompt-Secret $keyLabel
     }
 
     $selectedMcp = @()
     if ($Mcp) {
         $selectedMcp = @($Mcp -split ',' | ForEach-Object { $_.Trim() } | ForEach-Object {
             $s = Get-McpById $_
-            if (-not $s) { Write-Warn "Unknown MCP id '$_' — skipping." } else { $s }
+            if (-not $s) { Write-Warn (TF "cli.unknown_mcp" $_) } else { $s }
         } | Where-Object { $_ })
     }
 
@@ -276,7 +342,7 @@ function Cmd-Install {
     if ($Skills) {
         $selectedSkills = @($Skills -split ',' | ForEach-Object { $_.Trim() } | ForEach-Object {
             $s = Get-SkillById $_
-            if (-not $s) { Write-Warn "Unknown skill id '$_' — skipping." } else { $s }
+            if (-not $s) { Write-Warn (TF "cli.unknown_skill" $_) } else { $s }
         } | Where-Object { $_ })
     }
 
@@ -285,8 +351,9 @@ function Cmd-Install {
     foreach ($ev in $requiredVars) {
         $existing = [System.Environment]::GetEnvironmentVariable($ev.name, "User")
         if (-not $existing) {
-            Write-Info "Required for $($ev.label):"
-            $val = Prompt-Secret $ev.label
+            $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
+            Write-Info (TF "cli.required_for" $evLabel)
+            $val = Prompt-Secret $evLabel
             if ($val) { $extraEnvVars[$ev.name] = $val }
         }
     }
@@ -295,86 +362,82 @@ function Cmd-Install {
 }
 
 function Run-Install($selectedBackend, $apiKey, $extraEnvVars, $selectedMcp, $selectedSkills) {
-    Write-Header "Installing"
+    Write-Header (T "cli.installing_header")
     Write-Rule
 
-    Write-Info "Step 1/5  Checking Node.js..."
+    Write-Info (T "cli.install_step1")
     $ok = Install-Node -LogBox $null -ProgressBar $fakeProgress
-    if (-not $ok) { Write-Fail "Node.js installation failed. Aborting."; exit 1 }
+    if (-not $ok) { Write-Fail (T "cli.node_fail"); exit 1 }
 
-    Write-Info "Step 2/5  Installing $($selectedBackend.displayName)..."
+    Write-Info (TF "cli.install_step2" $selectedBackend.displayName)
     $ok = Install-Backend -Backend $selectedBackend -LogBox $null -ProgressBar $fakeProgress
-    if (-not $ok) { Write-Fail "Backend installation failed. Aborting."; exit 1 }
+    if (-not $ok) { Write-Fail (T "cli.backend_fail"); exit 1 }
 
-    Write-Info "Step 3/5  Saving API key..."
+    Write-Info (T "cli.install_step3")
     Set-ApiKey -Backend $selectedBackend -ApiKey $apiKey -LogBox $null
     foreach ($kvp in $extraEnvVars.GetEnumerator()) {
         Set-ExtraEnvVar -Name $kvp.Key -Value $kvp.Value -LogBox $null
     }
 
-    Write-Info "Step 4/5  Configuring MCP servers..."
+    Write-Info (T "cli.install_step4")
     Set-McpServers -Backend $selectedBackend -SelectedServers $selectedMcp -LogBox $null -ProgressBar $fakeProgress
 
-    Write-Info "Step 5/5  Installing skills..."
+    Write-Info (T "cli.install_step5")
     Install-Skills -SelectedSkills $selectedSkills -TianDir $TianDir -LogBox $null -ProgressBar $fakeProgress
 
     Write-Launcher -Backend $selectedBackend -TianDir $TianDir -LogBox $null
 
     Write-Rule
-    Write-Ok "Installation complete!"
+    Write-Ok (T "cli.install_ok")
     Write-Host ""
     if ($selectedBackend.cliCommand) {
-        Write-Color "  Run 'tian-cli status' to verify, then launch with:" White
+        Write-Color "  $(T 'cli.verify_tip')" White
         Write-Color "    $($selectedBackend.cliCommand)" Cyan
     }
     Write-Host ""
 }
 
 function Cmd-Status {
-    Write-Header "TIAN Status"
+    Write-Header (T "cli.status_header")
     Write-Rule
 
-    # Node.js
     $node = Get-Command node -ErrorAction SilentlyContinue
     if ($node) { Write-Ok "Node.js    $( & node --version 2>&1 )" }
-    else        { Write-Fail "Node.js    not found" }
+    else        { Write-Fail (T "cli.node_not_found") }
 
-    # Backends
     Write-Host ""
-    Write-Color "  AI Backends:" Gray
+    Write-Color (T "cli.backends_section") Gray
     foreach ($b in $catalog.backends) {
         if (-not $b.cliCommand) { continue }
         $cmd = Get-Command $b.cliCommand -ErrorAction SilentlyContinue
-        if ($cmd) { Write-Ok "$($b.displayName.PadRight(22)) $($b.cliCommand)" }
-        else       { Write-Warn "$($b.displayName.PadRight(22)) not installed" }
+        $name = (Get-DisplayName $b).PadRight(22)
+        if ($cmd) { Write-Ok "$name $($b.cliCommand)" }
+        else       { Write-Warn "$name $(T 'cli.not_installed')" }
     }
 
-    # API keys
     Write-Host ""
-    Write-Color "  API Keys:" Gray
+    Write-Color (T "cli.apikeys_section") Gray
     foreach ($b in $catalog.backends) {
         $varName = $b.apiKeyEnvVar
         $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
-        if ($val) { Write-Ok "$($varName.PadRight(30)) set" }
-        else       { Write-Warn "$($varName.PadRight(30)) not set" }
+        if ($val) { Write-Ok "$($varName.PadRight(30)) $(T 'cli.key_set')" }
+        else       { Write-Warn "$($varName.PadRight(30)) $(T 'cli.key_not_set')" }
     }
 
-    # MCP config
     Write-Host ""
-    Write-Color "  MCP Config Files:" Gray
+    Write-Color (T "cli.mcp_section") Gray
     $targets = $catalog.backends | Select-Object -ExpandProperty mcpConfigTarget -Unique
     foreach ($t in $targets) {
         $fakeBackend = [PSCustomObject]@{ mcpConfigTarget = $t; mcpConfigPath = "" }
         $path = Get-McpConfigPath $fakeBackend
         if (Test-Path $path) { Write-Ok "$t`n     $path" }
-        else                  { Write-Warn "$t — config not found" }
+        else                  { Write-Warn "$t — $(T 'cli.config_not_found')" }
     }
 
-    # Launcher
     Write-Host ""
     $launcherPath = Join-Path $TianDir "launcher.bat"
-    if (Test-Path $launcherPath) { Write-Ok "launcher.bat exists" }
-    else                          { Write-Warn "launcher.bat not found — run setup first" }
+    if (Test-Path $launcherPath) { Write-Ok (T "cli.launcher_ok") }
+    else                          { Write-Warn (T "cli.launcher_missing") }
 
     Write-Host ""
     Write-Rule
@@ -383,45 +446,45 @@ function Cmd-Status {
 function Cmd-List {
     switch ($Subcommand) {
         "backends" {
-            Write-Header "Available AI Backends"
+            Write-Header (T "cli.list_backends")
             Write-Rule
             foreach ($b in $catalog.backends) {
                 Write-Color "  $($b.id.PadRight(18))" Cyan -NoNewline
-                Write-Color " $($b.displayName)" White
-                Write-Color "  $(" " * 18) $($b.description)" Gray
+                Write-Color " $(Get-DisplayName $b)" White
+                Write-Color "  $(" " * 18) $(Get-Description $b)" Gray
                 Write-Host ""
             }
         }
         "mcp" {
-            Write-Header "Available MCP Servers"
+            Write-Header (T "cli.list_mcp")
             Write-Rule
             $groups = $catalog.mcpServers | Group-Object { $_.category }
             foreach ($g in $groups) {
-                Write-Color "  $($g.Name)" Yellow
+                Write-Color "  $(Get-Category $g.Group[0])" Yellow
                 foreach ($s in $g.Group) {
                     Write-Color "    $($s.id.PadRight(20))" Cyan -NoNewline
-                    Write-Color " $($s.displayName.PadRight(26))" White -NoNewline
-                    Write-Color " $($s.description)" Gray
+                    Write-Color " $((Get-DisplayName $s).PadRight(20))" White -NoNewline
+                    Write-Color " $(Get-Description $s)" Gray
                 }
                 Write-Host ""
             }
         }
         "skills" {
-            Write-Header "Available Skills"
+            Write-Header (T "cli.list_skills")
             Write-Rule
             $groups = $catalog.skills | Group-Object { $_.category }
             foreach ($g in $groups) {
-                Write-Color "  $($g.Name)" Yellow
+                Write-Color "  $(Get-Category $g.Group[0])" Yellow
                 foreach ($s in $g.Group) {
                     Write-Color "    $($s.id.PadRight(24))" Cyan -NoNewline
-                    Write-Color " $($s.displayName.PadRight(28))" White -NoNewline
-                    Write-Color " $($s.description)" Gray
+                    Write-Color " $((Get-DisplayName $s).PadRight(20))" White -NoNewline
+                    Write-Color " $(Get-Description $s)" Gray
                 }
                 Write-Host ""
             }
         }
         default {
-            Write-Fail "Unknown list target '$Subcommand'. Try: backends, mcp, skills"
+            Write-Fail (TF "cli.list_unknown" $Subcommand)
         }
     }
     Write-Rule
@@ -511,9 +574,9 @@ function Cmd-Remove {
 }
 
 function Cmd-Repair {
-    Write-Header "TIAN Repair"
-    Write-Info "This will re-run the install for your current config."
-    if (-not (Confirm-Action "Continue?")) { return }
+    Write-Header (T "cli.repair_header")
+    Write-Info (T "cli.repair_info")
+    if (-not (Confirm-Action (T "cli.repair_confirm"))) { return }
     Cmd-Setup
 }
 
@@ -524,54 +587,55 @@ switch ($Command.ToLower()) {
     "status"  { Cmd-Status }
     "list"    { Cmd-List }
     "add"     {
-        # tian-cli add mcp <id>  =>  Command=add, Subcommand=mcp, args[0]=id
         $id = $args[0]
         switch ($Subcommand.ToLower()) {
             "mcp"   {
                 $server = Get-McpById $id
-                if (-not $server) { Write-Fail "Unknown MCP id '$id'. Run 'tian-cli list mcp'."; exit 1 }
-                $backendNames = $catalog.backends | ForEach-Object { $_.displayName }
-                $bIdx = Prompt-Choice "Which backend to add this to?" $backendNames 0
+                if (-not $server) { Write-Fail (TF "cli.unknown_mcp_id" $id); exit 1 }
+                $backendNames = $catalog.backends | ForEach-Object { Get-DisplayName $_ }
+                $bIdx = Prompt-Choice (T "cli.add_which_backend") $backendNames 0
                 $backend = $catalog.backends[$bIdx]
                 if ($server.requiredEnvVars) {
                     foreach ($ev in $server.requiredEnvVars) {
                         $existing = [System.Environment]::GetEnvironmentVariable($ev.name, "User")
                         if (-not $existing) {
-                            Write-Info "$($ev.label)"; if ($ev.url) { Write-Info "Get it at: $($ev.url)" }
-                            $val = Prompt-Secret $ev.label
+                            $evLabel = if ($global:TIAN_LANG -eq "zh" -and $ev.labelZh) { $ev.labelZh } else { $ev.label }
+                            Write-Info $evLabel
+                            if ($ev.url) { Write-Info (TF "cli.get_env_at" $ev.url) }
+                            $val = Prompt-Secret $evLabel
                             if ($val) { Set-ExtraEnvVar -Name $ev.name -Value $val -LogBox $null }
                         }
                     }
                 }
                 Set-McpServers -Backend $backend -SelectedServers @($server) -LogBox $null -ProgressBar $fakeProgress
-                Write-Ok "$($server.displayName) added."
+                Write-Ok (TF "cli.mcp_added" (Get-DisplayName $server))
             }
             "skill" {
                 $skill = Get-SkillById $id
-                if (-not $skill) { Write-Fail "Unknown skill id '$id'. Run 'tian-cli list skills'."; exit 1 }
+                if (-not $skill) { Write-Fail (TF "cli.unknown_skill_id" $id); exit 1 }
                 Install-Skills -SelectedSkills @($skill) -TianDir $TianDir -LogBox $null -ProgressBar $fakeProgress
-                Write-Ok "$($skill.displayName) installed."
+                Write-Ok (TF "cli.skill_installed" (Get-DisplayName $skill))
             }
-            default { Write-Fail "Usage: tian-cli add mcp <id>  |  tian-cli add skill <id>" }
+            default { Write-Fail (T "cli.add_usage") }
         }
     }
     "remove"  {
         $id = $args[0]
         if ($Subcommand.ToLower() -eq "mcp") {
             $server = Get-McpById $id
-            if (-not $server) { Write-Fail "Unknown MCP id '$id'. Run 'tian-cli list mcp'."; exit 1 }
-            $backendNames = $catalog.backends | ForEach-Object { $_.displayName }
-            $bIdx = Prompt-Choice "Which backend to remove this from?" $backendNames 0
+            if (-not $server) { Write-Fail (TF "cli.unknown_mcp_id" $id); exit 1 }
+            $backendNames = $catalog.backends | ForEach-Object { Get-DisplayName $_ }
+            $bIdx = Prompt-Choice (T "cli.remove_which_backend") $backendNames 0
             $backend = $catalog.backends[$bIdx]
             $configPath = Get-McpConfigPath $backend
-            if (-not (Test-Path $configPath)) { Write-Warn "Config not found: $configPath"; exit 1 }
+            if (-not (Test-Path $configPath)) { Write-Warn (TF "cli.config_not_found_path" $configPath); exit 1 }
             $ht = ConvertTo-Hashtable (Get-Content $configPath -Raw | ConvertFrom-Json)
             if ($ht.mcpServers -and $ht.mcpServers.ContainsKey($server.configKey)) {
                 $ht.mcpServers.Remove($server.configKey)
                 $ht | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
-                Write-Ok "$($server.displayName) removed."
-            } else { Write-Warn "$($server.displayName) was not configured." }
-        } else { Write-Fail "Usage: tian-cli remove mcp <id>" }
+                Write-Ok (TF "cli.mcp_removed" (Get-DisplayName $server))
+            } else { Write-Warn (TF "cli.mcp_not_configured" (Get-DisplayName $server)) }
+        } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
     "repair"  { Cmd-Repair }
 
@@ -615,6 +679,16 @@ switch ($Command.ToLower()) {
         }
     }
 
+    "lang" {
+        if ($Subcommand -in "en","zh") {
+            $global:TIAN_LANG = $Subcommand
+            Set-TianLang $Subcommand
+            Write-Ok (T "cli.lang_set")
+        } else {
+            Write-Fail (T "cli.lang_usage")
+        }
+    }
+
     { $_ -in "help","--help","-h","" } { Cmd-Help }
-    default   { Write-Fail "Unknown command '$Command'. Run 'tian-cli help'."; exit 1 }
+    default   { Write-Fail (TF "cli.unknown_cmd" $Command); exit 1 }
 }

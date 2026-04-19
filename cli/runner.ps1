@@ -58,11 +58,11 @@ function Invoke-Task {
     Ensure-TaskDirs
     $backend = Get-ActiveBackend -TianDir $TianDir
     if (-not $backend) {
-        Write-Fail "No AI backend found on PATH. Run 'tian-cli setup' first."
+        Write-Fail "未在系统中找到AI后端，请先运行 'tian-cli setup'。/ No AI backend found on PATH. Run 'tian-cli setup' first."
         return $null
     }
     if (-not $backend.nonInteractiveFlag) {
-        Write-Fail "$($backend.displayName) does not support non-interactive task execution."
+        Write-Fail "$($backend.displayName) 不支持非交互式任务执行。/ does not support non-interactive task execution."
         return $null
     }
 
@@ -102,13 +102,13 @@ function Invoke-Task {
         $meta.pid = $proc.Id
         $meta | ConvertTo-Json | Set-Content $metaFile -Encoding UTF8
 
-        Write-Ok "Task started in background."
-        Write-Info "Job ID : $jobId"
-        Write-Info "Check result with:  tian-cli jobs result $jobId"
+        Write-Ok "任务已在后台启动。/ Task started in background."
+        Write-Info "任务ID / Job ID : $jobId"
+        Write-Info "查看结果 / Check result with:  tian-cli jobs result $jobId"
         return $jobId
     } else {
         # Foreground — stream output directly, also save to file
-        Write-Info "Running task with $($backend.displayName)..."
+        Write-Info "正在使用 $($backend.displayName) 执行任务... / Running task with $($backend.displayName)..."
         Write-Rule
         $output = Invoke-Expression $cmdLine 2>&1
         $output | Out-File -FilePath $outputFile -Encoding UTF8
@@ -182,10 +182,10 @@ function Show-Jobs {
     param([int]$Last = 20)
     $jobs = Sync-JobStatuses | Select-Object -Last $Last
     if (-not $jobs -or $jobs.Count -eq 0) {
-        Write-Info "No jobs found. Run a task with: tian-cli run `"your task`""
+        Write-Info "暂无任务记录。运行任务：tian-cli run \"您的任务提示词\" / No jobs found. Run a task with: tian-cli run \"your task\""
         return
     }
-    Write-Header "Background Jobs (last $Last)"
+    Write-Header "后台任务（最近 $Last 条）/ Background Jobs (last $Last)"
     Write-Rule
     $statusColor = @{ running="Yellow"; done="Green"; error="Red"; scheduled="Cyan" }
     foreach ($job in ($jobs | Sort-Object createdAt -Descending)) {
@@ -199,7 +199,7 @@ function Show-Jobs {
         Write-Color "  $(" " * 28)  $preview..." DarkGray
     }
     Write-Rule
-    Write-Color "  tian-cli jobs result <job-id>   to read output" DarkGray
+    Write-Color "  tian-cli jobs result <任务ID>   查看输出 / to read output" DarkGray
     Write-Host ""
 }
 
@@ -209,21 +209,21 @@ function Show-JobResult {
     $meta = Get-JobStatus $JobId
     if (-not $meta) { Write-Fail "Job '$JobId' not found."; return }
 
-    Write-Header "Job: $($meta.name)"
-    Write-Info "Status  : $($meta.status)"
-    Write-Info "Backend : $($meta.backend)"
-    Write-Info "Created : $($meta.createdAt)"
-    if ($meta.finishedAt) { Write-Info "Finished: $($meta.finishedAt)" }
-    Write-Info "Prompt  : $($meta.prompt)"
+    Write-Header "任务 / Job: $($meta.name)"
+    Write-Info "状态 / Status  : $($meta.status)"
+    Write-Info "后端 / Backend : $($meta.backend)"
+    Write-Info "创建时间 / Created : $($meta.createdAt)"
+    if ($meta.finishedAt) { Write-Info "完成时间 / Finished: $($meta.finishedAt)" }
+    Write-Info "提示词 / Prompt  : $($meta.prompt)"
     Write-Rule
 
     $outputFile = Join-Path $global:TIAN_TASKS_DIR "$JobId.txt"
     if (Test-Path $outputFile) {
         Get-Content $outputFile | ForEach-Object { Write-Host $_ }
     } elseif ($meta.status -eq "running") {
-        Write-Warn "Task is still running. Check again in a moment."
+        Write-Warn "任务仍在执行中，请稍后再查看。/ Task is still running. Check again in a moment."
     } else {
-        Write-Warn "Output file not found."
+        Write-Warn "输出文件未找到。/ Output file not found."
     }
     Write-Rule
 }
@@ -238,7 +238,7 @@ function Clear-Jobs {
             Remove-Item "$base.meta.json" -ErrorAction SilentlyContinue
         }
         Save-Jobs @()
-        Write-Ok "All jobs cleared."
+        Write-Ok "所有任务已清除。/ All jobs cleared."
     } else {
         $keep = @($jobs | Where-Object { $_.status -eq "running" })
         $remove = @($jobs | Where-Object { $_.status -ne "running" })
@@ -248,6 +248,6 @@ function Clear-Jobs {
             Remove-Item "$base.meta.json" -ErrorAction SilentlyContinue
         }
         Save-Jobs $keep
-        Write-Ok "Cleared $($remove.Count) completed job(s). $($keep.Count) running job(s) kept."
+        Write-Ok "已清除 $($remove.Count) 条已完成任务，保留 $($keep.Count) 条运行中任务。/ Cleared $($remove.Count) completed job(s). $($keep.Count) running job(s) kept."
     }
 }

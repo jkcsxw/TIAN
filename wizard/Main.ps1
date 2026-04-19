@@ -6,6 +6,7 @@ Add-Type -AssemblyName System.Drawing
 
 # Load lib modules
 $libDir = Join-Path $PSScriptRoot "lib"
+. "$libDir\Strings.ps1"
 . "$libDir\UiHelpers.ps1"
 . "$libDir\Catalog.ps1"
 . "$libDir\NodeInstaller.ps1"
@@ -58,7 +59,7 @@ $currentPage = 0
 
 # Build main form
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Tian Setup — Talk Is All you Need"
+$form.Text = T "app.title"
 $form.Size = New-Object System.Drawing.Size(580, 500)
 $form.MinimumSize = New-Object System.Drawing.Size(580, 500)
 $form.MaximumSize = New-Object System.Drawing.Size(580, 500)
@@ -108,7 +109,7 @@ function Show-CurrentPage {
     if ($isDone -or $isInstall) {
         $stepLabel.Text = ""
     } else {
-        $stepLabel.Text = "Step $showCurrent of $showTotal"
+        $stepLabel.Text = TF "app.step_of" $showCurrent, $showTotal
     }
 
     $invokeArgs = @($panel, $navState, $state, $catalog, $TianDir)
@@ -125,6 +126,24 @@ function Show-CurrentPage {
 
     $pageContainer.Refresh()
 }
+
+# Language toggle button (top-right corner)
+$langBtn = New-Object System.Windows.Forms.Button
+$langBtn.Text = T "app.lang_btn"
+$langBtn.Size = New-Object System.Drawing.Size(44, 22)
+$langBtn.Location = New-Object System.Drawing.Point(510, 12)
+$langBtn.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+$langBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+$langBtn.FlatAppearance.BorderSize = 1
+$langBtn.Add_Click({
+    $newLang = if ($global:TIAN_LANG -eq "en") { "zh" } else { "en" }
+    $global:TIAN_LANG = $newLang
+    Set-TianLang $newLang
+    $langBtn.Text = T "app.lang_btn"
+    $form.Text = T "app.title"
+    Show-CurrentPage
+})
+$form.Controls.Add($langBtn)
 
 # Navigation loop — each page is shown in a modal-like DialogResult loop
 Show-CurrentPage

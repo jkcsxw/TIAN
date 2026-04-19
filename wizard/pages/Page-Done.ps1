@@ -4,15 +4,13 @@ function Show-Page-Done {
     $success = $NavState.InstallSuccess -ne $false
 
     if ($success) {
-        $icon  = "OK"
-        $titleText = "You're all set!"
+        $titleText  = T "done.title_ok"
         $titleColor = $UI_COLOR_SUCCESS
-        $msgText = "Your AI assistant is ready. Here's a summary of what was installed:"
+        $msgText    = T "done.msg_ok"
     } else {
-        $icon  = "X"
-        $titleText = "Setup completed with errors"
+        $titleText  = T "done.title_err"
         $titleColor = [System.Drawing.Color]::FromArgb(200, 60, 60)
-        $msgText = "Some items may not have installed correctly. You can re-run setup.bat to try again."
+        $msgText    = T "done.msg_err"
     }
 
     $title = New-Label -Text $titleText -X 50 -Y 40 -Width 460 -Height 40 -Font $UI_FONT_TITLE -ForeColor $titleColor
@@ -24,19 +22,18 @@ function Show-Page-Done {
     $sep = New-Separator -X 50 -Y 128 -Width 460
     $Panel.Controls.Add($sep)
 
-    # Summary
     $y = 144
     $summaryItems = @()
     if ($State.SelectedBackend) {
-        $summaryItems += "AI Backend:  $($State.SelectedBackend.displayName)"
+        $summaryItems += TF "done.summary_backend" $State.SelectedBackend.displayName
     }
     if ($State.SelectedMcpServers -and $State.SelectedMcpServers.Count -gt 0) {
-        $names = ($State.SelectedMcpServers | ForEach-Object { $_.displayName }) -join ", "
-        $summaryItems += "MCP Tools:   $names"
+        $names = ($State.SelectedMcpServers | ForEach-Object { Get-DisplayName $_ }) -join ", "
+        $summaryItems += TF "done.summary_mcp" $names
     }
     if ($State.SelectedSkills -and $State.SelectedSkills.Count -gt 0) {
-        $names = ($State.SelectedSkills | ForEach-Object { $_.displayName }) -join ", "
-        $summaryItems += "Skills:      $names"
+        $names = ($State.SelectedSkills | ForEach-Object { Get-DisplayName $_ }) -join ", "
+        $summaryItems += TF "done.summary_skills" $names
     }
 
     foreach ($item in $summaryItems) {
@@ -48,14 +45,10 @@ function Show-Page-Done {
     $sep2 = New-Separator -X 50 -Y ($y + 6) -Width 460
     $Panel.Controls.Add($sep2)
 
-    $tipTitle = New-Label -Text "What to do next:" -X 50 -Y ($y + 20) -Width 460 -Height 22 -Font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
+    $tipTitle = New-Label -Text (T "done.next_title") -X 50 -Y ($y + 20) -Width 460 -Height 22 -Font (New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold))
     $Panel.Controls.Add($tipTitle)
 
-    $tips = @(
-        "1. Click 'Launch Now' below to start chatting",
-        "2. You can also double-click launcher.bat any time",
-        "3. Re-run setup.bat to add more tools or skills"
-    )
+    $tips = @( (T "done.tip1"), (T "done.tip2"), (T "done.tip3") )
     $ty = $y + 44
     foreach ($tip in $tips) {
         $lbl = New-Label -Text $tip -X 50 -Y $ty -Width 460 -Height 20 -Font $UI_FONT_BODY -ForeColor $UI_COLOR_MUTED
@@ -63,14 +56,13 @@ function Show-Page-Done {
         $ty += 22
     }
 
-    # Footer buttons
-    $btnFolder = New-Button -Text "Open Folder" -X 50 -Y 400 -Width 130 -Height 36
+    $btnFolder = New-Button -Text (T "btn.open_folder") -X 50 -Y 400 -Width 130 -Height 36
     $btnFolder.Add_Click({ Start-Process "explorer.exe" $TianDir })
     $Panel.Controls.Add($btnFolder)
 
     if ($success -and $State.SelectedBackend.cliCommand) {
         $launcherPath = Join-Path $TianDir "launcher.bat"
-        $btnLaunch = New-Button -Text "Launch Now" -X 370 -Y 400 -Width 140 -Height 36 -Primary $true
+        $btnLaunch = New-Button -Text (T "btn.launch") -X 370 -Y 400 -Width 140 -Height 36 -Primary $true
         $btnLaunch.Add_Click({
             if (Test-Path $launcherPath) {
                 Start-Process cmd.exe -ArgumentList "/k `"$launcherPath`""
@@ -81,7 +73,7 @@ function Show-Page-Done {
         $Panel.Controls.Add($btnLaunch)
     }
 
-    $btnClose = New-Button -Text "Close" -X 220 -Y 400 -Width 100 -Height 36
+    $btnClose = New-Button -Text (T "btn.close") -X 220 -Y 400 -Width 100 -Height 36
     $btnClose.Add_Click({ $NavState.Form.Close() })
     $Panel.Controls.Add($btnClose)
 }

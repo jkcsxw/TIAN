@@ -3,12 +3,15 @@
     {
       "id": "claude-code",
       "displayName": "Claude Code (Anthropic)",
+      "displayNameZh": "Claude Code（Anthropic）",
       "description": "Anthropic's powerful AI assistant for everyday tasks, writing, research, and automation. Recommended for most users.",
+      "descriptionZh": "Anthropic 出品的强大AI助手，适合日常任务、写作、调研和自动化。推荐大多数用户使用。",
       "npmPackage": "@anthropic-ai/claude-code",
       "cliCommand": "claude",
       "nonInteractiveFlag": "--print",
       "apiKeyEnvVar": "ANTHROPIC_API_KEY",
       "apiKeyLabel": "Anthropic API Key",
+      "apiKeyLabelZh": "Anthropic API 密钥",
       "apiKeyHint": "Starts with sk-ant-...",
       "apiKeyUrl": "https://console.anthropic.com/settings/keys",
       "mcpConfigTarget": "claude_code",
@@ -18,12 +21,15 @@
     {
       "id": "openai-codex",
       "displayName": "OpenAI Codex CLI",
+      "displayNameZh": "OpenAI Codex CLI",
       "description": "OpenAI's coding-focused AI assistant. Great for developers and technical tasks.",
+      "descriptionZh": "OpenAI 出品的编程专用AI助手，非常适合开发者和技术类任务。",
       "npmPackage": "@openai/codex",
       "cliCommand": "codex",
       "nonInteractiveFlag": "--quiet",
       "apiKeyEnvVar": "OPENAI_API_KEY",
       "apiKeyLabel": "OpenAI API Key",
+      "apiKeyLabelZh": "OpenAI API 密钥",
       "apiKeyHint": "Starts with sk-...",
       "apiKeyUrl": "https://platform.openai.com/api-keys",
       "mcpConfigTarget": "openai",
@@ -34,12 +40,15 @@
     {
       "id": "claude-desktop",
       "displayName": "Claude Desktop (Anthropic)",
+      "displayNameZh": "Claude 桌面版（Anthropic）",
       "description": "The Claude desktop app — a user-friendly window for chatting with Claude. No terminal ever needed.",
+      "descriptionZh": "Claude 桌面应用——与Claude对话的友好窗口，完全无需使用终端。",
       "downloadUrl": "https://claude.ai/download",
       "installType": "desktop-app",
       "cliCommand": null,
       "apiKeyEnvVar": "ANTHROPIC_API_KEY",
       "apiKeyLabel": "Anthropic API Key",
+      "apiKeyLabelZh": "Anthropic API 密钥",
       "apiKeyHint": "Starts with sk-ant-... (optional if you log in with your Anthropic account)",
       "apiKeyUrl": "https://console.anthropic.com/settings/keys",
       "mcpConfigTarget": "claude_desktop",
@@ -51,8 +60,11 @@
     {
       "id": "filesystem",
       "displayName": "File System Access",
+      "displayNameZh": "文件系统访问",
       "description": "Let your AI read, write, and organize files on your computer.",
+      "descriptionZh": "让AI读取、写入并整理您电脑上的文件。",
       "category": "Productivity",
+      "categoryZh": "效率工具",
       "npmPackage": "@modelcontextprotocol/server-filesystem",
       "configKey": "filesystem",
       "configSchema": {
@@ -63,14 +75,18 @@
     {
       "id": "web-search",
       "displayName": "Web Search",
+      "displayNameZh": "网络搜索",
       "description": "Let your AI search the internet for up-to-date information.",
+      "descriptionZh": "让AI搜索互联网获取最新信息。",
       "category": "Productivity",
+      "categoryZh": "效率工具",
       "npmPackage": "@modelcontextprotocol/server-brave-search",
       "configKey": "brave-search",
       "requiredEnvVars": [
         {
           "name": "BRAVE_API_KEY",
           "label": "Brave Search API Key",
+          "labelZh": "Brave 搜索 API 密钥",
           "hint": "Free tier available",
           "url": "https://api.search.brave.com/register"
         }
@@ -86,8 +102,11 @@
     {
       "id": "memory",
       "displayName": "Persistent Memory",
+      "displayNameZh": "持久记忆",
       "description": "Give your AI a memory that persists across conversations.",
+      "descriptionZh": "让AI拥有跨对话持续存在的记忆。",
       "category": "Productivity",
+      "categoryZh": "效率工具",
       "npmPackage": "@modelcontextprotocol/server-memory",
       "configKey": "memory",
       "configSchema": {
@@ -98,14 +117,18 @@
     {
       "id": "github",
       "displayName": "GitHub Integration",
+      "displayNameZh": "GitHub 集成",
       "description": "Let your AI read and manage GitHub repositories, issues, and pull requests.",
+      "descriptionZh": "让AI读取和管理 GitHub 仓库、Issues 和 Pull Request。",
       "category": "Developer",
+      "categoryZh": "开发工具",
       "npmPackage": "@modelcontextprotocol/server-github",
       "configKey": "github",
       "requiredEnvVars": [
         {
           "name": "GITHUB_PERSONAL_ACCESS_TOKEN",
           "label": "GitHub Personal Access Token",
+          "labelZh": "GitHub 个人访问令牌",
           "hint": "Create one at github.com/settings/tokens",
           "url": "https://github.com/settings/tokens"
         }
@@ -121,8 +144,11 @@
     {
       "id": "google-drive",
       "displayName": "Google Drive",
+      "displayNameZh": "Google 云端硬盘",
       "description": "Let your AI access and manage your Google Drive files and documents.",
+      "descriptionZh": "让AI访问和管理您的 Google 云端硬盘文件和文档。",
       "category": "Business",
+      "categoryZh": "商业办公",
       "npmPackage": "@modelcontextprotocol/server-gdrive",
       "configKey": "gdrive",
       "configSchema": {
@@ -133,20 +159,25 @@
     {
       "id": "slack",
       "displayName": "Slack",
+      "displayNameZh": "Slack 消息",
       "description": "Let your AI read and send Slack messages on your behalf.",
+      "descriptionZh": "让AI代您读取和发送 Slack 消息。",
       "category": "Business",
+      "categoryZh": "商业办公",
       "npmPackage": "@modelcontextprotocol/server-slack",
       "configKey": "slack",
       "requiredEnvVars": [
         {
           "name": "SLACK_BOT_TOKEN",
           "label": "Slack Bot Token",
+          "labelZh": "Slack 机器人令牌",
           "hint": "Create a Slack app at api.slack.com",
           "url": "https://api.slack.com/apps"
         },
         {
           "name": "SLACK_TEAM_ID",
           "label": "Slack Team ID",
+          "labelZh": "Slack 团队 ID",
           "hint": "Found in your Slack workspace URL"
         }
       ],
@@ -162,14 +193,18 @@
     {
       "id": "postgres",
       "displayName": "PostgreSQL Database",
+      "displayNameZh": "PostgreSQL 数据库",
       "description": "Let your AI query and analyze your PostgreSQL database.",
+      "descriptionZh": "让AI查询和分析您的 PostgreSQL 数据库。",
       "category": "Business",
+      "categoryZh": "商业办公",
       "npmPackage": "@modelcontextprotocol/server-postgres",
       "configKey": "postgres",
       "requiredEnvVars": [
         {
           "name": "POSTGRES_CONNECTION_STRING",
           "label": "PostgreSQL Connection String",
+          "labelZh": "PostgreSQL 连接字符串",
           "hint": "e.g. postgresql://user:pass@localhost/mydb"
         }
       ],
@@ -181,8 +216,11 @@
     {
       "id": "puppeteer",
       "displayName": "Web Browser Control",
+      "displayNameZh": "网页浏览器控制",
       "description": "Let your AI control a web browser to fill forms, scrape data, and automate web tasks.",
+      "descriptionZh": "让AI控制浏览器填写表单、抓取数据和自动化网页操作。",
       "category": "Automation",
+      "categoryZh": "自动化",
       "npmPackage": "@modelcontextprotocol/server-puppeteer",
       "configKey": "puppeteer",
       "configSchema": {
@@ -195,48 +233,66 @@
     {
       "id": "email-assistant",
       "displayName": "Email Assistant",
+      "displayNameZh": "邮件助手",
       "description": "Draft, summarize, and manage emails with AI help.",
+      "descriptionZh": "用AI帮您起草、摘要和管理邮件。",
       "category": "Daily Use",
+      "categoryZh": "日常使用",
       "source": "builtin",
       "promptFile": "skills/email-assistant.md"
     },
     {
       "id": "meeting-notes",
       "displayName": "Meeting Notes",
+      "displayNameZh": "会议记录",
       "description": "Turn raw notes or transcripts into structured action items.",
+      "descriptionZh": "将原始笔记或会议记录转化为结构化的行动项。",
       "category": "Daily Use",
+      "categoryZh": "日常使用",
       "source": "builtin",
       "promptFile": "skills/meeting-notes.md"
     },
     {
       "id": "document-summarizer",
       "displayName": "Document Summarizer",
+      "displayNameZh": "文档摘要",
       "description": "Summarize long documents, PDFs, and reports instantly.",
+      "descriptionZh": "即时摘要长文档、PDF 和报告。",
       "category": "Daily Use",
+      "categoryZh": "日常使用",
       "source": "builtin",
       "promptFile": "skills/document-summarizer.md"
     },
     {
       "id": "customer-support",
       "displayName": "Customer Support Templates",
+      "displayNameZh": "客服回复模板",
       "description": "Generate professional customer support responses and templates.",
+      "descriptionZh": "生成专业的客服回复和模板。",
       "category": "Business",
+      "categoryZh": "商业办公",
       "source": "builtin",
       "promptFile": "skills/customer-support.md"
     },
     {
       "id": "data-analyst",
       "displayName": "Data Analyst",
+      "displayNameZh": "数据分析师",
       "description": "Analyze spreadsheets and data, generate insights and summaries.",
+      "descriptionZh": "分析表格和数据，生成洞察和摘要。",
       "category": "Business",
+      "categoryZh": "商业办公",
       "source": "builtin",
       "promptFile": "skills/data-analyst.md"
     },
     {
       "id": "social-media",
       "displayName": "Social Media Content",
+      "displayNameZh": "社交媒体内容",
       "description": "Create posts, captions, and content for LinkedIn, Twitter, and more.",
+      "descriptionZh": "为 LinkedIn、Twitter 等平台创作帖子、说明文字和内容。",
       "category": "Marketing",
+      "categoryZh": "市场营销",
       "source": "builtin",
       "promptFile": "skills/social-media.md"
     }
