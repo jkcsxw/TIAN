@@ -71,20 +71,30 @@ Describe "Add-Schedule" {
         { Add-Schedule -Name "test" -Prompt "" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot) } | Should -Throw
     }
     It "defaults Time to 08:00 when not provided" {
+        if ($IsLinux) { Set-ItResult -Skipped -Because "Linux scheduling is intentionally unsupported" }
         Add-Schedule -Name "n1" -Prompt "p" -TianDir (Get-TianRoot) -Repeat "daily"
         $s = Read-Schedules | Where-Object { $_.name -eq "n1" }
         $s.time | Should -Be "08:00"
     }
     It "rejects duplicate schedule names" {
+        if ($IsLinux) { Set-ItResult -Skipped -Because "Linux scheduling is intentionally unsupported" }
         Add-Schedule -Name "dup" -Prompt "first" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
         { Add-Schedule -Name "dup" -Prompt "second" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot) } | Should -Throw
     }
     It "persists entry to schedules.json" {
+        if ($IsLinux) { Set-ItResult -Skipped -Because "Linux scheduling is intentionally unsupported" }
         Add-Schedule -Name "persist-test" -Prompt "do something" -Time "10:00" -Repeat "daily" -TianDir (Get-TianRoot)
         $s = Read-Schedules | Where-Object { $_.name -eq "persist-test" }
         $s | Should -Not -BeNullOrEmpty
         $s.prompt | Should -Be "do something"
         $s.time   | Should -Be "10:00"
+    }
+
+    It "rejects schedule creation on Linux" {
+        if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
+        {
+            Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
+        } | Should -Throw "Linux scheduling is not available in the built-in CLI yet*"
     }
 
     Context "Windows schtasks argument construction" {
