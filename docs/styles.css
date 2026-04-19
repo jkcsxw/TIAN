@@ -119,20 +119,8 @@ a {
   color: #fff;
 }
 
-body [data-lang] {
-  display: none;
-}
-
-html[data-lang="en"] [data-lang="en"],
-html[data-lang="zh"] [data-lang="zh"] {
-  display: inline;
-}
-
-html[data-lang="en"] p[data-lang="en"],
-html[data-lang="zh"] p[data-lang="zh"],
-html[data-lang="en"] li[data-lang="en"],
-html[data-lang="zh"] li[data-lang="zh"] {
-  display: block;
+[data-copy-lang][hidden] {
+  display: none !important;
 }
 
 .eyebrow,
