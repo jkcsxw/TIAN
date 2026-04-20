@@ -16,7 +16,21 @@ ok()   { echo -e "${GREEN}[ok]${RESET} $*" >&2; log "[ok] $*"; }
 warn() { echo -e "${YELLOW}[!!]${RESET} $*" >&2; log "[!!] $*"; }
 info() { echo -e "${DIM}[..]${RESET} $*" >&2; log "[..] $*"; }
 
-IMPROVE_PROMPT='You are an AI assistant improving the TIAN project — a shell-based installer that helps non-technical users set up AI tools on their computers. The project lives at /home/zxk1995/code/TIAN. Your job: inspect the codebase, pick ONE concrete improvement (new feature, bug fix, documentation, or UX improvement), implement it by editing the relevant file(s), and write a brief summary of what you changed and why. Focus on high-impact, low-risk changes. Do not break existing functionality.'
+IMPROVE_PROMPT='You are an AI engineer improving the TIAN project — a shell-based installer that helps non-technical users set up AI tools (Claude, Codex, Ollama) on their computers. The project lives at /home/zxk1995/code/TIAN.
+
+Your job: read the codebase, then pick and fully implement ONE improvement. You have full write access to all files. Prioritise by impact:
+
+1. New features that would genuinely help users (e.g. a `tian-cli doctor` command that diagnoses common setup problems, a `tian-cli update` command, an `uninstall` command, multi-backend fallback when one is rate-limited, coloured quota status, a `tian-cli run --watch` mode, wizard improvements, Windows/WSL detection, etc.)
+2. Bug fixes for real user-facing problems
+3. UX improvements (better error messages, progress indicators, help text)
+4. Documentation improvements
+
+Rules:
+- Implement the change fully — do not leave TODOs or placeholders
+- Do not break existing commands
+- Write a short summary at the end: what you changed, which file(s), and why
+
+Start by reading the files you need, then make the change.'
 
 mkdir -p "$TASKS_DIR" "$HOME/.tian"
 [[ -f "$JOBS_FILE" ]] || echo '[]' > "$JOBS_FILE"
@@ -110,9 +124,9 @@ PYEOF
 }
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
-QUOTA_WAIT_MINUTES="${QUOTA_WAIT_MINUTES:-60}"   # how long to wait when both are rate-limited
-CYCLE_WAIT_MINUTES="${CYCLE_WAIT_MINUTES:-120}"  # how long to wait between improvement cycles
-ITERATIONS="${ITERATIONS:-0}"                    # 0 = run forever
+QUOTA_WAIT_MINUTES="${QUOTA_WAIT_MINUTES:-30}"  # wait when both backends are rate-limited
+CYCLE_WAIT_MINUTES="${CYCLE_WAIT_MINUTES:-5}"   # short pause between cycles when quota is available
+ITERATIONS="${ITERATIONS:-0}"                   # 0 = run forever
 
 log "=== TIAN improvement loop started (quota_wait=${QUOTA_WAIT_MINUTES}m, cycle_wait=${CYCLE_WAIT_MINUTES}m) ==="
 
@@ -141,8 +155,18 @@ while true; do
     fi
 
     job_id=$(run_improvement "$backend" "$flag")
-    wait_for_job "$job_id" && ok "Improvement complete. See: tian-cli jobs result $job_id" || warn "Improvement job may still be running."
-
-    info "Waiting ${CYCLE_WAIT_MINUTES} minutes before next cycle..."
-    sleep $(( CYCLE_WAIT_MINUTES * 60 ))
+    if wait_for_job "$job_id"; then
+        ok "Improvement complete. See: tian-cli jobs result $job_id"
+        # Re-check quota immediately — if still available, only pause briefly
+        if check_claude_quota || check_codex_quota; then
+            info "Quota still available. Waiting ${CYCLE_WAIT_MINUTES} minutes before next cycle..."
+            sleep $(( CYCLE_WAIT_MINUTES * 60 ))
+        else
+            warn "Quota exhausted after job. Waiting ${QUOTA_WAIT_MINUTES} minutes..."
+            sleep $(( QUOTA_WAIT_MINUTES * 60 ))
+        fi
+    else
+        warn "Improvement job timed out or failed. Waiting ${CYCLE_WAIT_MINUTES} minutes..."
+        sleep $(( CYCLE_WAIT_MINUTES * 60 ))
+    fi
 done
