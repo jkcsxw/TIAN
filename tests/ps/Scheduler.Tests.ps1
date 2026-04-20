@@ -11,6 +11,7 @@ BeforeAll {
     function global:Write-Info { param($t) }
     function global:Write-Warn { param($t) }
     function global:Write-Fail { param($t) throw $t }
+    function global:Invoke-Task { param($Prompt, $TianDir, [switch]$Background, $JobName, $ScheduleName) }
 
     . "$(Get-TianRoot)/cli/scheduler.ps1"
     # Restore to temp path (scheduler.ps1 overwrote the local var when dot-sourced)
@@ -97,6 +98,14 @@ Describe "Add-Schedule" {
         Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
         $s = Read-Schedules | Where-Object { $_.name -eq "linux-test" }
         $s | Should -Not -BeNullOrEmpty
+    }
+
+    It "uses schedule run indirection on Linux so schedules carry their own names" {
+        if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
+        Mock Get-Command { param($Name) if ($Name -eq "crontab") { return [PSCustomObject]@{ Name = "crontab" } } } -ParameterFilter { $Name -eq "crontab" }
+        Mock Add-LinuxCrontabEntry { param($Name, $CrontabLine) $script:CapturedCronLine = $CrontabLine }
+        Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
+        $script:CapturedCronLine | Should -Match 'schedule run --name "linux-test"'
     }
 
     Context "Windows schtasks argument construction" {
@@ -206,5 +215,18 @@ Describe "Get-CrontabEntry" {
     It "defaults weekly to Monday (1) when no day specified" {
         $line = Get-CrontabEntry -Repeat "weekly" -Time "07:00" -DayOfWeek "" -Command "echo hi"
         $line | Should -Match "^0 7 \* \* 1"
+    }
+}
+
+Describe "Invoke-ScheduleNow" {
+    It "passes schedule metadata into Invoke-Task" {
+        Mock Invoke-Task {}
+        Save-Schedules @([PSCustomObject]@{ name = "brief"; prompt = "p"; time = "08:00"; repeat = "daily" })
+
+        Invoke-ScheduleNow -Name "brief" -TianDir (Get-TianRoot)
+
+        Should -Invoke Invoke-Task -Times 1 -ParameterFilter {
+            $Prompt -eq "p" -and $Background -and $JobName -eq "brief" -and $ScheduleName -eq "brief"
+        }
     }
 }

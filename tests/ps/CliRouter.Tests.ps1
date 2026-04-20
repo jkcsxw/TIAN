@@ -59,6 +59,12 @@ Describe "CLI jobs command" {
         Invoke-Tian @("jobs", "clear") | Out-Null
         $LASTEXITCODE | Should -Be 0
     }
+
+    It "accepts positional job IDs for 'jobs result'" {
+        $jobId = "missing-job-$([guid]::NewGuid().ToString('N'))"
+        $out = Invoke-Tian @("jobs", "result", $jobId)
+        ($out -join " ") | Should -Match "Job '$jobId' not found"
+    }
 }
 
 Describe "CLI schedule subcommands" {
@@ -69,5 +75,17 @@ Describe "CLI schedule subcommands" {
     It "schedule remove without --name outputs an error message" {
         $out = Invoke-Tian @("schedule", "remove")
         ($out -join " ") | Should -Match "name|Usage|required"
+    }
+
+    It "accepts positional names for 'schedule run'" {
+        $scheduleName = "missing-schedule-$([guid]::NewGuid().ToString('N'))"
+        $out = Invoke-Tian @("schedule", "run", $scheduleName)
+        ($out -join " ") | Should -Match "No schedule named '$scheduleName'"
+    }
+
+    It "accepts positional names for 'schedule remove'" {
+        $scheduleName = "missing-schedule-$([guid]::NewGuid().ToString('N'))"
+        $out = Invoke-Tian @("schedule", "remove", $scheduleName)
+        ($out -join " ") | Should -Match "No schedule named '$scheduleName'"
     }
 }

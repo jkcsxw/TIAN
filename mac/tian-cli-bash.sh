@@ -2,6 +2,7 @@
 # TIAN native bash CLI — used on macOS/Linux when PowerShell Core (pwsh) is not installed
 set -euo pipefail
 TIAN_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
+export TIAN_DIR
 shift || true
 CATALOG="$TIAN_DIR/config/catalog.json"
 TASKS_DIR="$HOME/.tian/tasks"
@@ -49,7 +50,120 @@ ensure_dirs() {
     [[ -f "$SCHEDULES_FILE" ]] || echo '[]' > "$SCHEDULES_FILE"
 }
 
+resolve_schedule_name_by_prompt() {
+    local prompt="${1:-}"
+    python3 - "$SCHEDULES_FILE" "$prompt" <<'PYEOF'
+import json, sys
+try:
+    schedules = json.load(open(sys.argv[1]))
+except Exception:
+    schedules = []
+if not isinstance(schedules, list):
+    schedules = [schedules]
+matches = [s.get("name", "") for s in schedules if s.get("prompt") == sys.argv[2]]
+print(matches[0] if len(matches) == 1 else "")
+PYEOF
+}
+
 new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
+
+sync_job_statuses() {
+    python3 - "$JOBS_FILE" <<'PYEOF'
+import json, os, re, subprocess, sys
+from datetime import datetime
+
+jobs_file = sys.argv[1]
+try:
+    jobs = json.load(open(jobs_file))
+except Exception:
+    jobs = []
+
+changed = False
+for job in jobs:
+    if job.get("status") != "running":
+        continue
+    pid = job.get("pid")
+    alive = False
+    if pid:
+        try:
+            os.kill(int(pid), 0)
+            alive = True
+        except Exception:
+            alive = False
+    if not alive:
+        job_id = job.get("id", "")
+        out_file = os.path.expanduser(f"~/.tian/tasks/{job_id}.txt")
+        text = open(out_file, encoding="utf-8", errors="ignore").read() if os.path.exists(out_file) else ""
+        quota = re.search(r"insufficient_quota|quota(?:\s+is)?\s+exhausted|quota_exhausted|rate\.limit|rate limit|429|too many requests|overloaded", text, re.I) is not None
+        job["status"] = "stopped" if quota else "done"
+        job["finishedAt"] = datetime.now().isoformat()
+        if quota:
+            job["stopReason"] = "quota_exhausted"
+            schedule_name = job.get("scheduleName", "")
+            if schedule_name:
+                tian_dir = os.environ.get("TIAN_DIR", "")
+                if tian_dir:
+                    subprocess.run(["bash", os.path.join(tian_dir, "tian-cli.sh"), "schedule", "remove", schedule_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        changed = True
+
+if changed:
+    json.dump(jobs, open(jobs_file, "w"), indent=2)
+PYEOF
+}
+
+terminate_pid_tree() {
+    local pid="${1:-}"
+    [[ -z "$pid" ]] && return 0
+    if command -v pgrep &>/dev/null; then
+        local child
+        while IFS= read -r child; do
+            [[ -n "$child" ]] && terminate_pid_tree "$child"
+        done < <(pgrep -P "$pid" 2>/dev/null || true)
+    fi
+    kill -TERM "$pid" 2>/dev/null || true
+    sleep 1
+    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+}
+
+stop_jobs() {
+    local target="${1:-}"
+    local reason="${2:-stopped_by_user}"
+    local matched=0
+    while IFS='|' read -r jid pid; do
+        [[ -z "$jid" ]] && continue
+        matched=1
+        [[ -n "$pid" ]] && terminate_pid_tree "$pid"
+        python3 - "$JOBS_FILE" "$jid" "$reason" <<'PYEOF'
+import json, sys
+from datetime import datetime
+
+jobs_file, job_id, reason = sys.argv[1], sys.argv[2], sys.argv[3]
+jobs = json.load(open(jobs_file))
+for job in jobs:
+    if job.get("id") == job_id:
+        job["status"] = "stopped"
+        job["finishedAt"] = datetime.now().isoformat()
+        job["stopReason"] = reason
+        break
+json.dump(jobs, open(jobs_file, "w"), indent=2)
+PYEOF
+        ok "Stopped job $jid"
+    done < <(python3 - "$JOBS_FILE" "$target" <<'PYEOF'
+import json, sys
+
+jobs_file, target = sys.argv[1], sys.argv[2]
+jobs = json.load(open(jobs_file))
+for job in jobs:
+    if job.get("status") != "running":
+        continue
+    if target and target != "--all" and job.get("id") != target:
+        continue
+    print(f"{job.get('id','')}|{job.get('pid','')}")
+PYEOF
+)
+
+    [[ "$matched" -eq 1 ]] || info "No matching running jobs found."
+}
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 cmd_help() {
@@ -76,6 +190,7 @@ $(rule)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs tail <id>      Stream live output of a running job (or show result if done)
+    jobs stop <id>      Stop a running job (--all stops every running job)
     jobs clear          Clear completed jobs
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
     schedule list       List scheduled tasks
@@ -131,7 +246,27 @@ PYEOF
 cmd_run() {
     local prompt="$1"; shift || true
     local background=false
-    [[ "${1:-}" == "-b" || "${1:-}" == "--background" ]] && background=true
+    local job_name=""
+    local schedule_name=""
+    while [[ $# -gt 0 ]]; do
+        case "${1:-}" in
+            -b|--background)
+                background=true
+                shift
+                ;;
+            --job-name)
+                job_name="${2:-}"
+                shift 2
+                ;;
+            --schedule-name)
+                schedule_name="${2:-}"
+                shift 2
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
 
     local backend_row; backend_row=$(active_backend)
     local cmd; cmd=$(echo "$backend_row" | cut -d'|' -f1)
@@ -142,31 +277,41 @@ cmd_run() {
     ensure_dirs
     local job_id; job_id=$(new_job_id)
     local out_file="$TASKS_DIR/$job_id.txt"
+    [[ -n "$schedule_name" ]] || schedule_name=$(resolve_schedule_name_by_prompt "$prompt")
+    [[ -n "$job_name" ]] || [[ -z "$schedule_name" ]] || job_name="$schedule_name"
 
     if $background; then
         info "Running in background (job: $job_id)..."
-        # Run AI command, then update job status to done/failed when it exits
+        # Run AI command, then classify quota exhaustion so scheduled jobs can be disabled.
         nohup bash -c '
 "$1" "$2" "$3" >"$4" 2>&1
 _ec=$?
 python3 -c "
-import json, sys
-jf, jid, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
+import json, os, re, subprocess, sys
+jf, jid, code, out_file, schedule_name, tian_dir = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]
 jobs = json.load(open(jf))
+text = open(out_file, encoding=\"utf-8\", errors=\"ignore\").read() if os.path.exists(out_file) else \"\"
+quota = re.search(r\"insufficient_quota|quota(?:\\s+is)?\\s+exhausted|quota_exhausted|rate\\.limit|rate limit|429|too many requests|overloaded\", text, re.I) is not None
 for j in jobs:
     if j[\"id\"] == jid:
-        j[\"status\"] = \"done\" if code == 0 else \"failed\"
+        j[\"status\"] = \"stopped\" if quota else (\"done\" if code == 0 else \"failed\")
+        if quota:
+            j[\"stopReason\"] = \"quota_exhausted\"
         break
 json.dump(jobs, open(jf, \"w\"), indent=2)
-" "$5" "$6" "$_ec"
-' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
-        python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" <<'PYEOF'
+if quota and schedule_name:
+    subprocess.run([\"bash\", os.path.join(tian_dir, \"tian-cli.sh\"), \"schedule\", \"remove\", schedule_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+" "$5" "$6" "$_ec" "$4" "$7" "$8"
+' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" &>/dev/null &
+        local pid=$!
+        python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" "$pid" "$job_name" "$schedule_name" <<'PYEOF'
 import json, sys
 from datetime import datetime
-jobs_file, jid, prompt, cmd = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+jobs_file, jid, prompt, cmd, pid, job_name, schedule_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6], sys.argv[7]
 jobs = json.load(open(jobs_file))
-jobs.append({"id": jid, "name": jid, "prompt": prompt, "backend": cmd,
-             "status": "running", "createdAt": datetime.now().isoformat()})
+jobs.append({"id": jid, "name": job_name or jid, "prompt": prompt, "backend": cmd,
+             "scheduleName": schedule_name or "", "status": "running",
+             "createdAt": datetime.now().isoformat(), "pid": pid})
 json.dump(jobs, open(jobs_file, 'w'), indent=2)
 PYEOF
         ok "Job started: $job_id"
@@ -182,6 +327,7 @@ PYEOF
 cmd_jobs() {
     local sub="${1:-}"; shift || true
     ensure_dirs
+    sync_job_statuses
     case "$sub" in
         result)
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs result <job-id>"
@@ -207,6 +353,11 @@ PYEOF
                 info "Job $id status: $status"
                 cat "$f"
             fi
+            ;;
+        stop)
+            local target="${1:-}"
+            [[ -n "$target" ]] || target="--all"
+            stop_jobs "$target"
             ;;
         clear)
             python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
@@ -258,7 +409,7 @@ _schedule_add_linux() {
         *)      cron_expr="$minute $hour * * *" ;;
     esac
 
-    local job_line="$cron_expr  bash '$TIAN_DIR/tian-cli.sh' run '$prompt' -b  # tian-$name"
+    local job_line="$cron_expr  bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'  # tian-$name"
 
     # Remove existing entry for this name then append new one
     ( crontab -l 2>/dev/null | grep -v "# tian-$name" ; echo "$job_line" ) | crontab -
@@ -307,9 +458,9 @@ _schedule_add_macos() {
     <array>
         <string>/bin/bash</string>
         <string>$TIAN_DIR/tian-cli.sh</string>
+        <string>schedule</string>
         <string>run</string>
-        <string>$prompt</string>
-        <string>-b</string>
+        <string>$name</string>
     </array>
     <key>StandardOutPath</key>
     <string>$HOME/.tian/tasks/schedule-$name.log</string>
@@ -396,7 +547,7 @@ PYEOF
 )
             [[ -z "$prompt" ]] && fail "Schedule '$name' not found."
             info "Running '$name' now..."
-            cmd_run "$prompt" -b
+            cmd_run "$prompt" -b --job-name "$name" --schedule-name "$name"
             ;;
 
         remove)

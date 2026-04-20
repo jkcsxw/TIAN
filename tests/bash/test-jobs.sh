@@ -35,6 +35,52 @@ save_jobs() {
     echo "$json" > "$JOBS_FILE"
 }
 
+resolve_schedule_name_by_prompt() {
+    local prompt="$1"
+    python3 - "$TMPDIR_TEST/schedules.json" "$prompt" <<'PYEOF'
+import json, sys
+try:
+    schedules = json.load(open(sys.argv[1]))
+except Exception:
+    schedules = []
+if not isinstance(schedules, list):
+    schedules = [schedules]
+matches = [s.get("name", "") for s in schedules if s.get("prompt") == sys.argv[2]]
+print(matches[0] if len(matches) == 1 else "")
+PYEOF
+}
+
+sync_job_statuses() {
+    python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
+import json, os, re, sys
+from datetime import datetime
+
+jobs_file, tasks_dir = sys.argv[1], sys.argv[2]
+jobs = json.load(open(jobs_file))
+for job in jobs:
+    if job.get("status") != "running":
+        continue
+    pid = job.get("pid")
+    alive = False
+    if pid:
+        try:
+            os.kill(int(pid), 0)
+            alive = True
+        except Exception:
+            alive = False
+    if alive:
+        continue
+    out_file = os.path.join(tasks_dir, f"{job['id']}.txt")
+    text = open(out_file, encoding="utf-8", errors="ignore").read() if os.path.exists(out_file) else ""
+    quota = re.search(r"insufficient_quota|quota(?:\s+is)?\s+exhausted|quota_exhausted|rate\.limit|rate limit|429|too many requests|overloaded", text, re.I) is not None
+    job["status"] = "stopped" if quota else "done"
+    job["finishedAt"] = datetime.now().isoformat()
+    if quota:
+        job["stopReason"] = "quota_exhausted"
+json.dump(jobs, open(jobs_file, "w"), indent=2)
+PYEOF
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 suite "new_job_id"
@@ -96,5 +142,48 @@ _test_ensure_dirs() {
     JOBS_FILE="$TMPDIR_TEST/jobs.json"
 }
 it "creates tasks dir and empty jobs file" _test_ensure_dirs
+
+suite "resolve_schedule_name_by_prompt"
+
+_test_resolve_unique_schedule() {
+    echo '[{"name":"brief","prompt":"hello"},{"name":"other","prompt":"world"}]' > "$TMPDIR_TEST/schedules.json"
+    local result
+    result=$(resolve_schedule_name_by_prompt "hello")
+    assert_eq "$result" "brief"
+}
+it "returns a matching schedule name for a unique prompt" _test_resolve_unique_schedule
+
+_test_resolve_duplicate_schedule() {
+    echo '[{"name":"a","prompt":"dup"},{"name":"b","prompt":"dup"}]' > "$TMPDIR_TEST/schedules.json"
+    local result
+    result=$(resolve_schedule_name_by_prompt "dup")
+    assert_empty "$result"
+}
+it "returns empty when multiple schedules share the same prompt" _test_resolve_duplicate_schedule
+
+suite "sync_job_statuses"
+
+_test_sync_marks_done() {
+    local id="job-done"
+    echo '[{"id":"job-done","status":"running","pid":999999}]' > "$JOBS_FILE"
+    echo 'normal output' > "$TASKS_DIR/$id.txt"
+    sync_job_statuses
+    local result
+    result=$(read_jobs)
+    assert_contains "$result" '"status": "done"'
+}
+it "marks dead running jobs as done when output is normal" _test_sync_marks_done
+
+_test_sync_marks_quota_stopped() {
+    local id="job-quota"
+    echo '[{"id":"job-quota","status":"running","pid":999999,"scheduleName":"brief"}]' > "$JOBS_FILE"
+    echo 'Error 429 insufficient_quota' > "$TASKS_DIR/$id.txt"
+    sync_job_statuses
+    local result
+    result=$(read_jobs)
+    assert_contains "$result" '"status": "stopped"'
+    assert_contains "$result" '"stopReason": "quota_exhausted"'
+}
+it "marks dead running jobs as stopped when quota is exhausted" _test_sync_marks_quota_stopped
 
 finish

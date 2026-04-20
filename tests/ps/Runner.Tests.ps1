@@ -2,6 +2,12 @@ BeforeAll {
     . "$PSScriptRoot/helpers/TestHelpers.ps1"
     . "$(Get-TianRoot)/wizard/lib/Catalog.ps1"
 
+    function global:Write-Ok   { param($t) }
+    function global:Write-Info { param($t) }
+    function global:Write-Warn { param($t) }
+    function global:Write-Fail { param($t) throw $t }
+    function global:Remove-Schedule { param($Name, $TianDir) }
+
     # Point runner storage to a temp dir
     $script:TempRunnerDir = New-TestTempDir
     $script:OrigTasksDir  = $null  # overridden below
@@ -9,12 +15,14 @@ BeforeAll {
     # Save temp paths BEFORE dot-sourcing (runner.ps1 overwrites these local vars)
     $_tmpTasksDir = Join-Path $script:TempRunnerDir "tasks"
     $_tmpJobsFile = Join-Path $script:TempRunnerDir "jobs.json"
+    $_tmpSchedFile = Join-Path $script:TempRunnerDir "schedules.json"
 
     . "$(Get-TianRoot)/cli/runner.ps1"
 
     # Restore to temp paths (runner.ps1 overwrote the local vars when dot-sourced)
     $global:TIAN_TASKS_DIR = $_tmpTasksDir
     $global:TIAN_JOBS_FILE = $_tmpJobsFile
+    $global:TIAN_SCHEDULES_FILE = $_tmpSchedFile
 }
 AfterAll { Remove-Item $script:TempRunnerDir -Recurse -Force -ErrorAction SilentlyContinue }
 
@@ -88,6 +96,7 @@ Describe "Get-JobStatus" {
 Describe "Sync-JobStatuses" {
     BeforeEach {
         Remove-Item $global:TIAN_JOBS_FILE -ErrorAction SilentlyContinue
+        Remove-Item $global:TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
         Ensure-TaskDirs
     }
 
@@ -109,6 +118,27 @@ Describe "Sync-JobStatuses" {
         Save-Jobs @([PSCustomObject]$meta)
         $result = Sync-JobStatuses
         ($result | Where-Object { $_.id -eq $id }).status | Should -Be "done"
+    }
+
+    It "marks dead running jobs as stopped when output indicates quota exhaustion" {
+        $id  = New-JobId
+        $fakeDeadPid = 999998
+        '[{"name":"sched-1","prompt":"quota prompt"}]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+        $meta = [PSCustomObject]@{
+            id = $id; status = "running"; pid = $fakeDeadPid; prompt = "quota prompt"; scheduleName = "sched-1"; createdAt = [DateTime]::Now.ToString("o")
+        }
+        $meta | ConvertTo-Json | Set-Content (Join-Path $global:TIAN_TASKS_DIR "$id.meta.json") -Encoding UTF8
+        "429 insufficient_quota" | Set-Content (Join-Path $global:TIAN_TASKS_DIR "$id.txt")
+        Save-Jobs @($meta)
+
+        Mock Get-Process { $null } -ParameterFilter { $Id -eq $fakeDeadPid }
+        Mock Remove-Schedule {}
+
+        $result = Sync-JobStatuses
+        $job = $result | Where-Object { $_.id -eq $id }
+        $job.status | Should -Be "stopped"
+        $job.stopReason | Should -Be "quota_exhausted"
+        Should -Invoke Remove-Schedule -Times 1 -ParameterFilter { $Name -eq "sched-1" }
     }
 }
 
@@ -142,5 +172,96 @@ Describe "Clear-Jobs" {
         Clear-Jobs -All
         $remaining = Read-Jobs
         $remaining.Count | Should -Be 0
+    }
+}
+
+Describe "Stop-Jobs" {
+    BeforeEach {
+        Remove-Item $global:TIAN_JOBS_FILE -ErrorAction SilentlyContinue
+        if (Test-Path $global:TIAN_TASKS_DIR) { Remove-Item $global:TIAN_TASKS_DIR -Recurse -Force }
+        Ensure-TaskDirs
+    }
+
+    It "marks a running job as stopped and preserves finishedAt" {
+        $id = New-JobId
+        $meta = [PSCustomObject]@{
+            id = $id; status = "running"; pid = 4321; prompt = "r"; createdAt = [DateTime]::Now.ToString("o")
+        }
+        $meta | ConvertTo-Json | Set-Content (Join-Path $global:TIAN_TASKS_DIR "$id.meta.json") -Encoding UTF8
+        Save-Jobs @($meta)
+
+        Mock Stop-Process {} -ParameterFilter { $Id -eq 4321 }
+        Stop-Jobs -JobId $id
+
+        $job = @(Read-Jobs) | Where-Object { $_.id -eq $id }
+        $job.status | Should -Be "stopped"
+        $job.finishedAt | Should -Not -BeNullOrEmpty
+
+        $savedMeta = Get-JobStatus -JobId $id
+        $savedMeta.status | Should -Be "stopped"
+        $savedMeta.stopReason | Should -Be "stopped_by_user"
+    }
+}
+
+Describe "Invoke-Task" {
+    BeforeEach {
+        Remove-Item $global:TIAN_JOBS_FILE -ErrorAction SilentlyContinue
+        if (Test-Path $global:TIAN_TASKS_DIR) { Remove-Item $global:TIAN_TASKS_DIR -Recurse -Force }
+        Ensure-TaskDirs
+    }
+
+    It "persists the spawned PID into the jobs registry for background tasks" {
+        Mock Get-ActiveBackend {
+            [PSCustomObject]@{
+                id = "fake-backend"
+                displayName = "Fake Backend"
+                cliCommand = "fake-cli"
+                nonInteractiveFlag = "--prompt"
+            }
+        }
+        Mock Get-RunnerShellCommand { "/tmp/pwsh" }
+        Mock Start-RunnerBackgroundProcess { [PSCustomObject]@{ Id = 2468 } }
+
+        $jobId = Invoke-Task -Prompt "run in background" -TianDir (Get-TianRoot) -Background
+
+        $job = @(Read-Jobs) | Where-Object { $_.id -eq $jobId } | Select-Object -First 1
+        $job.pid | Should -Be 2468
+        $job.status | Should -Be "running"
+
+        $savedMeta = Get-JobStatus -JobId $jobId
+        $savedMeta.pid | Should -Be 2468
+    }
+}
+
+Describe "Test-QuotaExhaustedText" {
+    It "matches common quota exhaustion output" {
+        Test-QuotaExhaustedText "Error 429: insufficient_quota for this request" | Should -BeTrue
+    }
+
+    It "does not match ordinary successful output" {
+        Test-QuotaExhaustedText "Task completed successfully." | Should -BeFalse
+    }
+}
+
+Describe "Get-RunnerShellCommand" {
+    It "returns pwsh path when running on PowerShell Core" {
+        Mock Get-Process { [PSCustomObject]@{ Path = "/tmp/pwsh" } } -ParameterFilter { $Id -eq $PID }
+        Get-RunnerShellCommand | Should -Be "/tmp/pwsh"
+    }
+}
+
+Describe "Resolve-ScheduleNameByPrompt" {
+    BeforeEach {
+        '[]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+    }
+
+    It "returns the schedule name when the prompt is unique" {
+        '[{"name":"brief","prompt":"hello"},{"name":"other","prompt":"world"}]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+        Resolve-ScheduleNameByPrompt -Prompt "hello" | Should -Be "brief"
+    }
+
+    It "returns null when multiple schedules share the same prompt" {
+        '[{"name":"a","prompt":"dup"},{"name":"b","prompt":"dup"}]' | Set-Content $global:TIAN_SCHEDULES_FILE -Encoding UTF8
+        Resolve-ScheduleNameByPrompt -Prompt "dup" | Should -BeNullOrEmpty
     }
 }
