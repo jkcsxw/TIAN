@@ -158,6 +158,7 @@ function Cmd-Help {
     run  "提示词" --background 在后台执行任务
     jobs                      列出后台任务
     jobs result <id>          查看已完成任务的输出
+    jobs stop <id>            停止运行中的任务（--all 停止全部）
     jobs clear                清除已完成任务（--all 清除全部）
 
     schedule add              创建定时任务
@@ -227,6 +228,7 @@ function Cmd-Help {
     run  "prompt" --background Run a task in the background
     jobs                       List background jobs
     jobs result <id>           Show output of a completed job
+    jobs stop <id>             Stop a running job (--all stops all)
     jobs clear                 Clear completed jobs (--all clears all)
 
     schedule add               Create a recurring scheduled task
@@ -1046,8 +1048,14 @@ switch ($Command.ToLower()) {
     "jobs" {
         switch ($Subcommand.ToLower()) {
             "result" {
-                if (-not $Name) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
-                Show-JobResult -JobId $Name
+                $jobId = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                if (-not $jobId) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
+                Show-JobResult -JobId $jobId
+            }
+            "stop"   {
+                $jobId = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                if (-not $All -and -not $jobId) { Write-Fail "Usage: tian-cli jobs stop <job-id> [--all]"; exit 1 }
+                Stop-Jobs -JobId $jobId -All:$All
             }
             "clear"  { Clear-Jobs -All:$All }
             ""       { Show-Jobs }
@@ -1062,12 +1070,14 @@ switch ($Command.ToLower()) {
             }
             "list"   { Show-Schedules }
             "run"    {
-                if (-not $Name) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
-                Invoke-ScheduleNow -Name $Name -TianDir $TianDir
+                $scheduleName = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                if (-not $scheduleName) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
+                Invoke-ScheduleNow -Name $scheduleName -TianDir $TianDir
             }
             "remove" {
-                if (-not $Name) { Write-Fail "Usage: tian-cli schedule remove --name <name>"; exit 1 }
-                Remove-Schedule -Name $Name -TianDir $TianDir
+                $scheduleName = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                if (-not $scheduleName) { Write-Fail "Usage: tian-cli schedule remove --name <name>"; exit 1 }
+                Remove-Schedule -Name $scheduleName -TianDir $TianDir
             }
             default  { Write-Fail "Usage: tian-cli schedule add|list|run|remove" }
         }

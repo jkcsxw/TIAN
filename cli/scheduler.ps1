@@ -153,9 +153,10 @@ function Add-Schedule {
     <array>
         <string>/bin/bash</string>
         <string>$cliPath</string>
+        <string>schedule</string>
         <string>run</string>
-        <string>$($Prompt -replace '"','&quot;')</string>
-        <string>--background</string>
+        <string>--name</string>
+        <string>$Name</string>
     </array>
     <key>StandardOutPath</key>
     <string>$env:HOME/.tian/tasks/schedule-$Name.log</string>
@@ -181,7 +182,7 @@ function Add-Schedule {
             return
         }
         $cliPath     = Join-Path $TianDir "tian-cli.sh"
-        $cronCommand = "bash `"$cliPath`" run `"$($Prompt -replace '"','\"')`" --background"
+        $cronCommand = "bash `"$cliPath`" schedule run --name `"$Name`""
         $cronLine    = Get-CrontabEntry -Repeat $Repeat -Time $Time -DayOfWeek $DayOfWeek -Command $cronCommand
         Add-LinuxCrontabEntry -Name $Name -CrontabLine $cronLine
         Write-Ok "定时任务 '$Name' 已添加到 crontab。/ Schedule '$Name' added to crontab."
@@ -195,7 +196,7 @@ function Add-Schedule {
         # ── Windows Task Scheduler ────────────────────────────────────────────
         $taskName = Get-TaskName $Name
         $cliPath  = Join-Path $TianDir "tian-cli.bat"
-        $action   = "`"$cliPath`" run `"$($Prompt -replace '"','\"')`" --background --yes"
+        $action   = "`"$cliPath`" schedule run --name `"$Name`" --yes"
 
         $schArgs = @("/Create", "/F", "/TN", $taskName, "/TR", $action, "/ST", $Time)
         switch ($Repeat.ToLower()) {
@@ -291,5 +292,5 @@ function Invoke-ScheduleNow {
     if (-not $entry) { Write-Fail "No schedule named '$Name'."; return }
 
     Write-Info "Running scheduled task '$Name' now..."
-    Invoke-Task -Prompt $entry.prompt -TianDir $TianDir -Background -JobName $Name
+    Invoke-Task -Prompt $entry.prompt -TianDir $TianDir -Background -JobName $Name -ScheduleName $Name
 }

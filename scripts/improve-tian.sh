@@ -70,6 +70,49 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>" \
     git push 2>&1 | tee -a "$LOG_FILE" >&2 && ok "Changes pushed (job $job_id)." || warn "git push failed — changes committed locally only."
 }
 
+terminate_pid_tree() {
+    local pid="${1:-}"
+    [[ -z "$pid" ]] && return 0
+    if command -v pgrep &>/dev/null; then
+        local child
+        while IFS= read -r child; do
+            [[ -n "$child" ]] && terminate_pid_tree "$child"
+        done < <(pgrep -P "$pid" 2>/dev/null || true)
+    fi
+    kill -TERM "$pid" 2>/dev/null || true
+    sleep 1
+    kill -0 "$pid" 2>/dev/null && kill -KILL "$pid" 2>/dev/null || true
+}
+
+stop_job() {
+    local job_id="$1"
+    local reason="${2:-quota_exhausted}"
+    local pid
+    pid=$(python3 - "$JOBS_FILE" "$job_id" <<'PYEOF'
+import json, sys
+jobs = json.load(open(sys.argv[1]))
+job = next((j for j in jobs if j.get("id") == sys.argv[2]), None)
+print(job.get("pid", "") if job else "")
+PYEOF
+)
+    [[ -n "$pid" ]] && terminate_pid_tree "$pid"
+    python3 - "$JOBS_FILE" "$job_id" "$reason" <<'PYEOF'
+import json, sys
+from datetime import datetime
+
+jobs_file, job_id, reason = sys.argv[1], sys.argv[2], sys.argv[3]
+jobs = json.load(open(jobs_file))
+for job in jobs:
+    if job.get("id") == job_id and job.get("status") == "running":
+        job["status"] = "stopped"
+        job["finishedAt"] = datetime.now().isoformat()
+        job["stopReason"] = reason
+        break
+json.dump(jobs, open(jobs_file, "w"), indent=2)
+PYEOF
+    warn "Stopped job $job_id ($reason)."
+}
+
 run_improvement() {
     local backend="$1"   # "claude" or "codex"
     local flag="$2"      # flags for the backend
@@ -113,14 +156,15 @@ json.dump(jobs, open(jf, \"w\"), indent=2)
 " "$6" "$7" "$_ec"
 ' -- "$TIAN_DIR" "$backend" "$flag" "$IMPROVE_PROMPT" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
     fi
+    local pid=$!
 
-    python3 - "$JOBS_FILE" "$job_id" "$IMPROVE_PROMPT" "$backend" <<'PYEOF'
+    python3 - "$JOBS_FILE" "$job_id" "$IMPROVE_PROMPT" "$backend" "$pid" <<'PYEOF'
 import json, sys
 from datetime import datetime
-jobs_file, jid, prompt, cmd = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+jobs_file, jid, prompt, cmd, pid = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
 jobs = json.load(open(jobs_file))
 jobs.append({"id": jid, "name": "improve-tian", "prompt": prompt, "backend": cmd,
-             "status": "running", "createdAt": datetime.now().isoformat()})
+             "status": "running", "createdAt": datetime.now().isoformat(), "pid": pid})
 json.dump(jobs, open(jobs_file, 'w'), indent=2)
 PYEOF
     ok "Improvement job started: $job_id (backend: $backend)"
@@ -143,8 +187,13 @@ jobs = json.load(open(sys.argv[1]))
 j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
 print(j.get('status','running') if j else 'running')
 " "$JOBS_FILE" "$job_id" 2>/dev/null || echo "running")
-        if [[ "$status" == "done" || "$status" == "failed" ]]; then
+        if [[ "$status" == "done" || "$status" == "failed" || "$status" == "stopped" ]]; then
             [[ "$status" == "done" ]] && return 0 || return 1
+        fi
+        if ! check_claude_quota && ! check_codex_quota; then
+            warn "All backend quota is exhausted while job $job_id is running."
+            stop_job "$job_id" "quota_exhausted"
+            return 1
         fi
     done
     warn "Job $job_id timed out after ${max_wait}s"
@@ -177,9 +226,8 @@ while true; do
         backend="codex"
         flag="--quiet"
     else
-        warn "Both Claude and Codex are rate-limited. Waiting ${QUOTA_WAIT_MINUTES} minutes..."
-        sleep $(( QUOTA_WAIT_MINUTES * 60 ))
-        continue
+        warn "Both Claude and Codex are rate-limited. No quota remains, exiting loop."
+        break
     fi
 
     job_id=$(run_improvement "$backend" "$flag")
@@ -196,7 +244,7 @@ while true; do
         info "Quota still available. Waiting ${CYCLE_WAIT_MINUTES} minutes before next cycle..."
         sleep $(( CYCLE_WAIT_MINUTES * 60 ))
     else
-        warn "Quota exhausted. Waiting ${QUOTA_WAIT_MINUTES} minutes..."
-        sleep $(( QUOTA_WAIT_MINUTES * 60 ))
+        warn "Quota exhausted after job completion. Exiting loop."
+        break
     fi
 done
