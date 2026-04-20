@@ -141,6 +141,7 @@ function Cmd-Help {
   命令
     setup               交互式引导安装（首次使用推荐）
     install             使用参数快速安装
+    doctor              诊断常见安装问题
     status              查看当前安装状态
     list backends       列出可用AI后端
     list mcp            列出可用MCP服务器
@@ -206,6 +207,7 @@ function Cmd-Help {
   COMMANDS
     setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
+    doctor              Check your setup and diagnose common problems
     status              Show what is currently installed
     list backends       List available AI backends
     list mcp            List available MCP servers
@@ -600,6 +602,165 @@ function Cmd-Remove {
     }
 }
 
+function Cmd-Doctor {
+    Write-Header "TIAN Doctor — Setup Diagnostics"
+    Write-Rule
+
+    $okCount   = 0
+    $warnCount = 0
+    $failCount = 0
+
+    # ── Runtime ───────────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  Runtime" DarkGray
+
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if ($nodeCmd) {
+        $nodeVer = (& node --version 2>&1).TrimStart('v')
+        $major   = [int]($nodeVer -split '\.')[0]
+        if ($major -ge 18) {
+            Write-Ok "Node.js v$nodeVer"; $okCount++
+        } else {
+            Write-Warn "Node.js v$nodeVer installed but v18+ required — upgrade at https://nodejs.org"
+            $warnCount++
+        }
+    } else {
+        Write-Fail "Node.js not found — install from https://nodejs.org"
+        $failCount++
+    }
+
+    $npxCmd = Get-Command npx -ErrorAction SilentlyContinue
+    if ($npxCmd) { Write-Ok "npx $((& npx --version 2>&1) -join '')"; $okCount++ }
+    else          { Write-Warn "npx not found — install Node.js to get it"; $warnCount++ }
+
+    # ── AI Backends ───────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  AI Backends" DarkGray
+    foreach ($b in $catalog.backends) {
+        if (-not $b.cliCommand) { continue }
+        $cmd  = Get-Command $b.cliCommand -ErrorAction SilentlyContinue
+        $name = (Get-DisplayName $b).PadRight(24)
+        if ($cmd) {
+            Write-Ok "$name  $($b.cliCommand)"; $okCount++
+        } else {
+            $hint = if ($b.npmPackage) { "  (install: npm install -g $($b.npmPackage))" } else { "" }
+            Write-Warn "$name not installed$hint"
+            $warnCount++
+        }
+    }
+
+    # ── API Keys ──────────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  API Keys" DarkGray
+    $seenVars = @{}
+    foreach ($b in $catalog.backends) {
+        $varName = $b.apiKeyEnvVar
+        if (-not $varName -or $seenVars.ContainsKey($varName)) { continue }
+        $seenVars[$varName] = $true
+
+        $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
+        if (-not $val) { $val = [System.Environment]::GetEnvironmentVariable($varName, "Process") }
+        $padName = $varName.PadRight(30)
+
+        if (-not $val) {
+            Write-Fail "$padName not set — run: tian-cli setup"
+            $failCount++
+        } else {
+            $hint          = if ($b.apiKeyHint) { $b.apiKeyHint } else { "" }
+            $prefixMatch   = [regex]::Match($hint, 'sk-\w+')
+            $expectedPrefix = if ($prefixMatch.Success) { $prefixMatch.Value } else { "" }
+
+            if ($expectedPrefix -and -not $val.StartsWith($expectedPrefix)) {
+                Write-Warn "$padName set but format looks wrong (expected prefix: $expectedPrefix)"
+                $warnCount++
+            } elseif ($val.Length -lt 20) {
+                Write-Warn "$padName set but value seems too short — verify your key"
+                $warnCount++
+            } else {
+                Write-Ok "$padName set ($($val.Length) chars)"
+                $okCount++
+            }
+        }
+    }
+
+    # ── MCP Config ────────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  MCP Config" DarkGray
+    $targets = $catalog.backends |
+        Where-Object { (Test-BackendSupportsMcp $_) -and $_.mcpConfigTarget } |
+        Select-Object -ExpandProperty mcpConfigTarget -Unique
+    foreach ($t in $targets) {
+        $fakeBackend = [PSCustomObject]@{ mcpConfigTarget = $t; mcpConfigPath = "" }
+        $path = Get-McpConfigPath $fakeBackend
+        if (Test-Path $path) {
+            try {
+                $cfg      = Get-Content $path -Raw | ConvertFrom-Json
+                $mcpCount = if ($cfg.mcpServers) {
+                    ($cfg.mcpServers | Get-Member -MemberType NoteProperty -ErrorAction SilentlyContinue).Count
+                } else { 0 }
+                Write-Ok "$t config valid — $mcpCount server(s) configured"; $okCount++
+            } catch {
+                Write-Fail "$t config has invalid JSON: $path"; $failCount++
+            }
+        } else {
+            Write-Info "$t config not found (OK if not using $t)"
+        }
+    }
+
+    # ── Catalog & Launcher ────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  TIAN Installation" DarkGray
+    $catalogPath = Join-Path $TianDir "config\catalog.json"
+    if (Test-Path $catalogPath) { Write-Ok "catalog.json found"; $okCount++ }
+    else                         { Write-Fail "catalog.json missing — reinstall TIAN"; $failCount++ }
+
+    $launcherPath = Join-Path $TianDir "launcher.bat"
+    if (Test-Path $launcherPath) { Write-Ok "launcher.bat present"; $okCount++ }
+    else                          { Write-Warn "launcher.bat missing — run: tian-cli repair"; $warnCount++ }
+
+    $tianHome = Join-Path $env:USERPROFILE ".tian"
+    if (Test-Path $tianHome) { Write-Ok "~\.tian directory present"; $okCount++ }
+    else                      { Write-Info "~\.tian not yet created (created on first job run)" }
+
+    # ── Network Connectivity ──────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  Connectivity" DarkGray
+    try {
+        $req          = [System.Net.WebRequest]::Create("https://api.anthropic.com")
+        $req.Timeout  = 5000
+        $req.Method   = "HEAD"
+        $resp = $req.GetResponse()
+        $resp.Close()
+        Write-Ok "Anthropic API reachable"; $okCount++
+    } catch [System.Net.WebException] {
+        if ($_.Exception.Response) {
+            Write-Ok "Anthropic API reachable (HTTP $([int]$_.Exception.Response.StatusCode))"; $okCount++
+        } else {
+            Write-Warn "Cannot reach api.anthropic.com — check internet / firewall"; $warnCount++
+        }
+    } catch {
+        Write-Warn "Connectivity check failed: $($_.Exception.Message)"; $warnCount++
+    }
+
+    # ── Summary ───────────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Rule
+    Write-Color "  " White -NoNewline
+    Write-Color "[ok] $okCount   " Green -NoNewline
+    Write-Color "[!!] $warnCount   " Yellow -NoNewline
+    Write-Color "[xx] $failCount" Red
+
+    Write-Host ""
+    if ($failCount -gt 0) {
+        Write-Color "  Fix the errors above, then re-run: tian-cli doctor" Red
+    } elseif ($warnCount -gt 0) {
+        Write-Color "  Setup mostly OK — review warnings above." Yellow
+    } else {
+        Write-Color "  All checks passed — you're ready to use TIAN!" Green
+    }
+    Write-Host ""
+}
+
 function Cmd-Repair {
     Write-Header (T "cli.repair_header")
     Write-Info (T "cli.repair_info")
@@ -664,6 +825,7 @@ switch ($Command.ToLower()) {
             } else { Write-Warn (TF "cli.mcp_not_configured" (Get-DisplayName $server)) }
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
+    "doctor"  { Cmd-Doctor }
     "repair"  { Cmd-Repair }
 
     "run" {
