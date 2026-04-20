@@ -26,6 +26,36 @@ TIAN 是一个简单的安装工具，帮助用户在自己的电脑上开始使
 - 添加文件读取、网页搜索等实用工具
 - 启动一个可以直接使用的 AI 工作环境
 
+## What TIAN Can Do That A Website Usually Cannot | TIAN 和普通网页聊天机器人不一样的地方
+
+Website chatbots are mainly a chat box. TIAN can connect AI to tools on your own computer and the services you already use.
+
+That means TIAN can help with work like:
+
+- reading, organizing, and updating files on your computer
+- working with shared files in Google Drive
+- helping draft and manage email workflows
+- preparing content for slides, reports, and documents using your real files
+- pulling information from Slack, GitHub, databases, and web search
+- running tasks in the background while you do something else
+- scheduling repeated jobs like a morning brief or daily follow-up
+
+In plain words: ChatGPT or Claude on a website can answer questions. TIAN can be set up to do useful work with your files, tools, and recurring tasks.
+
+普通网页聊天机器人主要只是一个对话框，而 TIAN 可以把 AI 连接到您自己的电脑和已经在使用的工具。
+
+这意味着 TIAN 可以帮助您：
+
+- 读取、整理和更新电脑里的文件
+- 处理 Google Drive 里的共享文件
+- 协助起草和处理邮件相关工作流
+- 基于真实文件准备幻灯片、报告和文档内容
+- 从 Slack、GitHub、数据库和网页搜索中获取信息
+- 在后台持续运行任务，不需要一直盯着聊天窗口
+- 安排每天重复执行的任务，例如早报或日常跟进
+
+简单说：网页上的 ChatGPT 或 Claude 更像“回答问题”，而 TIAN 可以进一步连接您的文件、工具和定时任务，真正帮您做事。
+
 ## Who It Is For | 适合谁
 
 - people who want to use AI but do not have a technical background
@@ -42,12 +72,16 @@ TIAN 是一个简单的安装工具，帮助用户在自己的电脑上开始使
 - organize notes and documents
 - search the web
 - work with your own files
+- connect to services like Google Drive, Slack, GitHub, and databases
+- run background jobs and scheduled tasks
 - add extra tools and skills later
 
 - 写邮件、计划、总结和报告
 - 整理笔记和文档
 - 搜索网页信息
 - 处理您自己的文件
+- 连接 Google Drive、Slack、GitHub、数据库等服务
+- 运行后台任务和定时任务
 - 后续继续添加更多工具和技能
 
 ## Before You Start | 开始前需要知道
@@ -121,6 +155,9 @@ You can ask TIAN things like:
 - "Plan a 3-day trip for me."
 - "Read this file and explain it in simple words."
 - "Search for the latest news about this topic."
+- "Look through my project files and update the report outline."
+- "Create a daily 8am briefing for me."
+- "Use the connected workspace files to prepare content for my slides."
 
 您可以这样使用 TIAN：
 
@@ -129,15 +166,22 @@ You can ask TIAN things like:
 - “帮我规划一个 3 天行程。”
 - “读取这个文件，并用简单的话解释。”
 - “帮我搜索这个话题的最新消息。”
+- “查看我的项目文件，并更新报告提纲。”
+- “帮我创建一个每天早上 8 点的简报任务。”
+- “使用已连接的工作文件，帮我准备演示文稿内容。”
 
 ## Why People Use It | 为什么有人会用它
 
 - it saves time
 - it removes most of the setup work
+- it connects AI to your files and tools instead of leaving it trapped in a browser tab
+- it can keep working in the background and on a schedule
 - it keeps AI tools on your own computer instead of forcing you to figure everything out by hand
 
 - 节省时间
 - 省去大部分安装配置工作
+- 让 AI 连接到您的文件和工具，而不只是停留在浏览器标签页里
+- 可以在后台运行，也可以按计划自动执行
 - 让您在自己的电脑上使用 AI，而不是自己手动折腾所有步骤
 
 ## Need More Detail? | 想看更详细说明？
