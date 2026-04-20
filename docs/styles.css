@@ -34,7 +34,8 @@ a {
   color: inherit;
 }
 
-[data-copy-lang][hidden] {
+[data-page-lang="en"] [data-copy-lang="zh"],
+[data-page-lang="zh"] [data-copy-lang="en"] {
   display: none !important;
 }
 
