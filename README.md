@@ -10,13 +10,27 @@ Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 
 ## Live Demo | 在线演示
 
-Open the GitHub Pages demo here:
+Open the GitHub Pages interactive demo here:
 
 [Try the demo site](https://jkcsxw.github.io/TIAN/)
 
-这里可以直接打开 GitHub Pages 在线演示：
+The demo now shows concrete workflows like:
+
+- drafting a customer email from real notes
+- building slide content from your files
+- creating a research brief from web and workspace sources
+- setting up a recurring morning briefing task
+
+这里可以直接打开 GitHub Pages 交互演示：
 
 [打开演示站点](https://jkcsxw.github.io/TIAN/)
+
+演示中可以直接看到这些真实使用场景：
+
+- 根据真实资料起草客户邮件
+- 根据文件整理演示文稿内容
+- 结合网页和工作区信息生成调研简报
+- 创建每天自动运行的晨间简报任务
 
 ## What TIAN Is | TIAN 是什么
 

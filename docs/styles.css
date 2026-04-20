@@ -252,9 +252,14 @@ a {
   font-size: 1.18rem;
 }
 
-.demo-banner {
+.demo-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.demo-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
   padding: 24px;
@@ -284,6 +289,96 @@ a {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: flex-end;
+}
+
+.demo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.demo-tab {
+  border: 1px solid rgba(24, 33, 29, 0.12);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.demo-tab:hover,
+.demo-tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.demo-stage {
+  position: relative;
+}
+
+.demo-flow {
+  display: grid;
+  gap: 18px;
+}
+
+.demo-prompt,
+.demo-card {
+  padding: 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(24, 33, 29, 0.08);
+  background: var(--surface-strong);
+}
+
+.demo-prompt {
+  background:
+    linear-gradient(180deg, rgba(210, 141, 57, 0.08), rgba(255, 253, 248, 1));
+}
+
+.demo-label {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.demo-prompt p:last-child,
+.demo-console p:last-child {
+  margin-bottom: 0;
+}
+
+.demo-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+}
+
+.demo-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+
+.demo-console {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #edf4f0;
+  border: 1px solid rgba(24, 33, 29, 0.08);
+}
+
+.demo-console p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
 }
 
 .featured {
@@ -358,11 +453,12 @@ a {
   .simple-grid,
   .audience-grid,
   .start-grid,
+  .demo-grid,
   .example-grid {
     grid-template-columns: 1fr;
   }
 
-  .demo-banner {
+  .demo-header {
     display: grid;
   }
 
