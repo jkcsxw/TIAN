@@ -785,25 +785,25 @@
     }());
 
     (function () {
-      var stage = document.querySelector(“.demo-stage”);
+      var stage = document.querySelector(".demo-stage");
       if (!stage) { return; }
 
-      var tabs        = stage.querySelectorAll(“[data-demo-scenario]”);
-      var contextNode = stage.querySelector(“[data-demo-context]”);
-      var promptNode  = stage.querySelector(“[data-demo-prompt]”);
-      var sourcesNode = stage.querySelector(“[data-demo-sources]”);
-      var stepsNode   = stage.querySelector(“[data-demo-steps]”);
-      var consoleNode = stage.querySelector(“[data-demo-console]”);
-      var statusNode  = stage.querySelector(“[data-demo-status]”);
-      var progressFill = stage.querySelector(“[data-demo-progress]”);
-      var runButton   = stage.querySelector(“[data-demo-run]”);
-      var resetButton = stage.querySelector(“[data-demo-reset]”);
+      var tabs        = stage.querySelectorAll("[data-demo-scenario]");
+      var contextNode = stage.querySelector("[data-demo-context]");
+      var promptNode  = stage.querySelector("[data-demo-prompt]");
+      var sourcesNode = stage.querySelector("[data-demo-sources]");
+      var stepsNode   = stage.querySelector("[data-demo-steps]");
+      var consoleNode = stage.querySelector("[data-demo-console]");
+      var statusNode  = stage.querySelector("[data-demo-status]");
+      var progressFill = stage.querySelector("[data-demo-progress]");
+      var runButton   = stage.querySelector("[data-demo-run]");
+      var resetButton = stage.querySelector("[data-demo-reset]");
       var timers        = [];
       var typingTimers  = [];
-      var activeScenario = “email”;
+      var activeScenario = "email";
       var hasAutoPlayed  = false;
 
-      var scenarioOrder = [“email”, “slides”, “research”, “schedule”, “meeting”];
+      var scenarioOrder = ["email", "slides", "research", "schedule", "meeting"];
       var stepTimings   = [
         [1.1, 1.4, 0.9],
         [1.3, 1.8, 1.0],
@@ -818,43 +818,43 @@
 
       function clearTypingTimers() {
         while (typingTimers.length) { clearInterval(typingTimers.pop()); }
-        var cursor = promptNode.querySelector(“.typing-cursor”);
+        var cursor = promptNode.querySelector(".typing-cursor");
         if (cursor) { cursor.remove(); }
       }
 
       function cloneTemplatePart(scenario, selector) {
-        var tmpl = stage.querySelector('[data-demo-template=”' + scenario + '”]');
+        var tmpl = stage.querySelector('[data-demo-template="' + scenario + '"]');
         if (!tmpl) { return null; }
         return tmpl.content.querySelector(selector).cloneNode(true);
       }
 
       function setStatus(state) {
-        statusNode.className = “demo-status is-” + state;
-        if (state === “running”) {
-          statusNode.innerHTML = '<span data-copy-lang=”en”>Running\u2026</span><span data-copy-lang=”zh”>运行中\u2026</span>';
-        } else if (state === “done”) {
-          statusNode.innerHTML = '<span data-copy-lang=”en”>Complete</span><span data-copy-lang=”zh”>已完成</span>';
+        statusNode.className = "demo-status is-" + state;
+        if (state === "running") {
+          statusNode.innerHTML = '<span data-copy-lang="en">Running\u2026</span><span data-copy-lang="zh">运行中\u2026</span>';
+        } else if (state === "done") {
+          statusNode.innerHTML = '<span data-copy-lang="en">Complete</span><span data-copy-lang="zh">已完成</span>';
         } else {
-          statusNode.innerHTML = '<span data-copy-lang=”en”>Ready</span><span data-copy-lang=”zh”>待运行</span>';
+          statusNode.innerHTML = '<span data-copy-lang="en">Ready</span><span data-copy-lang="zh">待运行</span>';
         }
       }
 
       function setProgress(fraction) {
         if (progressFill) {
-          progressFill.style.width = Math.round(fraction * 100) + “%”;
+          progressFill.style.width = Math.round(fraction * 100) + "%";
         }
       }
 
       function typewriterOnPrompt() {
         clearTypingTimers();
-        var lang = document.documentElement.getAttribute(“data-page-lang”) || “en”;
-        var visibleSpan = promptNode.querySelector('[data-copy-lang=”' + lang + '”]');
+        var lang = document.documentElement.getAttribute("data-page-lang") || "en";
+        var visibleSpan = promptNode.querySelector('[data-copy-lang="' + lang + '"]');
         if (!visibleSpan) { return; }
         var fullText = visibleSpan.textContent;
-        visibleSpan.textContent = “”;
-        var cursor = document.createElement(“span”);
-        cursor.className = “typing-cursor”;
-        cursor.setAttribute(“aria-hidden”, “true”);
+        visibleSpan.textContent = "";
+        var cursor = document.createElement("span");
+        cursor.className = "typing-cursor";
+        cursor.setAttribute("aria-hidden", "true");
         promptNode.appendChild(cursor);
         var i = 0;
         var tid = setInterval(function () {
@@ -876,21 +876,21 @@
         setProgress(0);
 
         Array.prototype.forEach.call(tabs, function (tab) {
-          var active = tab.getAttribute(“data-demo-scenario”) === scenario;
-          tab.classList.toggle(“is-active”, active);
-          tab.setAttribute(“aria-selected”, active ? “true” : “false”);
+          var active = tab.getAttribute("data-demo-scenario") === scenario;
+          tab.classList.toggle("is-active", active);
+          tab.setAttribute("aria-selected", active ? "true" : "false");
         });
 
-        var promptTemplate  = cloneTemplatePart(scenario, “[data-demo-prompt-template]”);
-        var contextTemplate = cloneTemplatePart(scenario, “[data-demo-context-template]”);
-        var sourcesTemplate = cloneTemplatePart(scenario, “[data-demo-sources-template]”);
-        var stepsTemplate   = cloneTemplatePart(scenario, “[data-demo-steps-template]”);
+        var promptTemplate  = cloneTemplatePart(scenario, "[data-demo-prompt-template]");
+        var contextTemplate = cloneTemplatePart(scenario, "[data-demo-context-template]");
+        var sourcesTemplate = cloneTemplatePart(scenario, "[data-demo-sources-template]");
+        var stepsTemplate   = cloneTemplatePart(scenario, "[data-demo-steps-template]");
 
-        contextNode.innerHTML = “”;
-        promptNode.innerHTML  = “”;
-        sourcesNode.innerHTML = “”;
-        stepsNode.innerHTML   = “”;
-        consoleNode.innerHTML = “”;
+        contextNode.innerHTML = "";
+        promptNode.innerHTML  = "";
+        sourcesNode.innerHTML = "";
+        stepsNode.innerHTML   = "";
+        consoleNode.innerHTML = "";
 
         Array.prototype.forEach.call(contextTemplate.childNodes, function (node) {
           contextNode.appendChild(node.cloneNode(true));
@@ -903,15 +903,15 @@
         });
         Array.prototype.forEach.call(stepsTemplate.children, function (step, index) {
           var item = step.cloneNode(true);
-          item.className = “demo-step”;
-          item.setAttribute(“data-step-state”, “idle”);
-          item.insertAdjacentHTML(“afterbegin”, '<span class=”demo-step-index”>0' + (index + 1) + '</span>');
-          item.insertAdjacentHTML(“beforeend”,  '<span class=”demo-step-timing”></span>');
+          item.className = "demo-step";
+          item.setAttribute("data-step-state", "idle");
+          item.insertAdjacentHTML("afterbegin", '<span class="demo-step-index">0' + (index + 1) + '</span>');
+          item.insertAdjacentHTML("beforeend",  '<span class="demo-step-timing"></span>');
           stepsNode.appendChild(item);
         });
 
-        consoleNode.innerHTML = '<p class=”demo-placeholder”><span data-copy-lang=”en”>Click \u201cRun demo\u201d to simulate the workflow.</span><span data-copy-lang=”zh”>点击\u201c运行演示\u201d来模拟整个工作流。</span></p>';
-        setStatus(“ready”);
+        consoleNode.innerHTML = '<p class="demo-placeholder"><span data-copy-lang="en">Click \u201cRun demo\u201d to simulate the workflow.</span><span data-copy-lang="zh">点击\u201c运行演示\u201d来模拟整个工作流。</span></p>';
+        setStatus("ready");
         typewriterOnPrompt();
       }
 
@@ -921,32 +921,32 @@
         setProgress(0);
 
         // Reset step states without re-rendering context/prompt
-        var allSteps = stepsNode.querySelectorAll(“.demo-step”);
+        var allSteps = stepsNode.querySelectorAll(".demo-step");
         Array.prototype.forEach.call(allSteps, function (step) {
-          step.setAttribute(“data-step-state”, “idle”);
-          var timing = step.querySelector(“.demo-step-timing”);
-          if (timing) { timing.textContent = “”; }
+          step.setAttribute("data-step-state", "idle");
+          var timing = step.querySelector(".demo-step-timing");
+          if (timing) { timing.textContent = ""; }
         });
-        consoleNode.innerHTML = “”;
+        consoleNode.innerHTML = "";
 
-        setStatus(“running”);
+        setStatus("running");
         runButton.disabled  = true;
         resetButton.disabled = true;
 
-        var steps          = stepsNode.querySelectorAll(“.demo-step”);
-        var resultTemplate = cloneTemplatePart(activeScenario, “[data-demo-result-template]”);
+        var steps          = stepsNode.querySelectorAll(".demo-step");
+        var resultTemplate = cloneTemplatePart(activeScenario, "[data-demo-result-template]");
         var results        = Array.prototype.slice.call(resultTemplate.children);
         var sIdx           = scenarioOrder.indexOf(activeScenario);
         var timingRow      = stepTimings[sIdx >= 0 ? sIdx : 0];
 
         Array.prototype.forEach.call(steps, function (step, index) {
           timers.push(window.setTimeout(function () {
-            step.setAttribute(“data-step-state”, “active”);
+            step.setAttribute("data-step-state", "active");
             if (index > 0) {
               var prev = steps[index - 1];
-              prev.setAttribute(“data-step-state”, “done”);
-              var prevT = prev.querySelector(“.demo-step-timing”);
-              if (prevT) { prevT.textContent = (timingRow[index - 1] || 1.0).toFixed(1) + “s”; }
+              prev.setAttribute("data-step-state", "done");
+              var prevT = prev.querySelector(".demo-step-timing");
+              if (prevT) { prevT.textContent = (timingRow[index - 1] || 1.0).toFixed(1) + "s"; }
               setProgress(index / steps.length);
             }
           }, 700 * index));
@@ -956,14 +956,14 @@
             if (result) {
               var clone = result.cloneNode(true);
               consoleNode.appendChild(clone);
-              clone.scrollIntoView({ behavior: “smooth”, block: “nearest” });
+              clone.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
             if (index === steps.length - 1) {
-              step.setAttribute(“data-step-state”, “done”);
-              var lastT = step.querySelector(“.demo-step-timing”);
-              if (lastT) { lastT.textContent = (timingRow[index] || 1.0).toFixed(1) + “s”; }
+              step.setAttribute("data-step-state", "done");
+              var lastT = step.querySelector(".demo-step-timing");
+              if (lastT) { lastT.textContent = (timingRow[index] || 1.0).toFixed(1) + "s"; }
               setProgress(1);
-              setStatus(“done”);
+              setStatus("done");
               runButton.disabled  = false;
               resetButton.disabled = false;
             }
@@ -972,15 +972,15 @@
       }
 
       Array.prototype.forEach.call(tabs, function (tab) {
-        tab.addEventListener(“click”, function () {
+        tab.addEventListener("click", function () {
           runButton.disabled  = false;
           resetButton.disabled = false;
-          renderScenario(tab.getAttribute(“data-demo-scenario”));
+          renderScenario(tab.getAttribute("data-demo-scenario"));
         });
       });
 
-      runButton.addEventListener(“click”, runScenario);
-      resetButton.addEventListener(“click”, function () {
+      runButton.addEventListener("click", runScenario);
+      resetButton.addEventListener("click", function () {
         runButton.disabled  = false;
         resetButton.disabled = false;
         renderScenario(activeScenario);
@@ -989,8 +989,8 @@
       renderScenario(activeScenario);
 
       // Auto-play once when the demo section enters the viewport
-      var demoSection = document.querySelector(“#demo”);
-      if (demoSection && “IntersectionObserver” in window) {
+      var demoSection = document.querySelector("#demo");
+      if (demoSection && "IntersectionObserver" in window) {
         var autoObserver = new IntersectionObserver(function (entries) {
           entries.forEach(function (entry) {
             if (entry.isIntersecting && !hasAutoPlayed) {
@@ -1008,25 +1008,25 @@
 
     // Section scroll entrance animations
     (function () {
-      if (!(“IntersectionObserver” in window)) { return; }
-      var sections = document.querySelectorAll(“.section”);
+      if (!("IntersectionObserver" in window)) { return; }
+      var sections = document.querySelectorAll(".section");
       var vh = window.innerHeight || document.documentElement.clientHeight;
       Array.prototype.forEach.call(sections, function (section) {
         if (section.getBoundingClientRect().top >= vh) {
-          section.classList.add(“is-offscreen”);
+          section.classList.add("is-offscreen");
         }
       });
       var observer = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            entry.target.classList.remove(“is-offscreen”);
-            entry.target.classList.add(“is-visible”);
+            entry.target.classList.remove("is-offscreen");
+            entry.target.classList.add("is-visible");
             observer.unobserve(entry.target);
           }
         });
-      }, { threshold: 0.07, rootMargin: “0px 0px -30px 0px” });
+      }, { threshold: 0.07, rootMargin: "0px 0px -30px 0px" });
       Array.prototype.forEach.call(sections, function (section) {
-        if (section.classList.contains(“is-offscreen”)) {
+        if (section.classList.contains("is-offscreen")) {
           observer.observe(section);
         }
       });
