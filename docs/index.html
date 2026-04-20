@@ -228,13 +228,19 @@
         <div class="demo-shell">
           <div class="demo-header">
             <div>
-              <h2 class="demo-title"><span data-copy-lang="en">Pick a workflow and see what TIAN actually does.</span><span data-copy-lang="zh">选择一个工作流，直接看 TIAN 实际会怎么做。</span></h2>
-              <p class="demo-copy"><span data-copy-lang="en">This is a simulated walkthrough of real tasks TIAN can handle on your computer after setup.</span><span data-copy-lang="zh">这是一个模拟演示，展示 TIAN 安装完成后如何在您的电脑上处理真实任务。</span></p>
+              <h2 class="demo-title"><span data-copy-lang="en">Pick a workflow and inspect the exact context, steps, and output.</span><span data-copy-lang="zh">选择一个工作流，直接查看上下文、执行步骤和最终结果。</span></h2>
+              <p class="demo-copy"><span data-copy-lang="en">This is a simulated but concrete walkthrough of how TIAN works after setup: it reads connected files and services, assembles the right context, and returns something you can actually use.</span><span data-copy-lang="zh">这是一个具体的模拟演示，展示 TIAN 在安装完成后的实际工作方式：读取已连接的文件和服务，整理出合适的上下文，并返回可以直接使用的结果。</span></p>
             </div>
             <div class="demo-actions">
               <a class="button secondary" href="https://github.com/jkcsxw/TIAN"><span data-copy-lang="en">Open GitHub Repo</span><span data-copy-lang="zh">打开 GitHub 仓库</span></a>
               <a class="button primary" href="https://github.com/jkcsxw/TIAN/releases"><span data-copy-lang="en">Get TIAN</span><span data-copy-lang="zh">获取 TIAN</span></a>
             </div>
+          </div>
+
+          <div class="demo-trust-bar">
+            <span class="demo-trust-pill"><span data-copy-lang="en">Mock data, realistic workflow</span><span data-copy-lang="zh">模拟数据，真实工作流</span></span>
+            <span class="demo-trust-pill"><span data-copy-lang="en">Shows files, tools, and final deliverables</span><span data-copy-lang="zh">展示文件、工具和最终交付结果</span></span>
+            <span class="demo-trust-pill"><span data-copy-lang="en">Switch scenarios to compare use cases</span><span data-copy-lang="zh">切换场景，比较不同使用方式</span></span>
           </div>
 
           <div class="demo-stage">
@@ -255,6 +261,14 @@
 
             <div class="demo-playground">
               <div class="demo-brief">
+                <div class="demo-card">
+                  <div class="demo-heading-row">
+                    <p class="demo-label"><span data-copy-lang="en">Connected workspace</span><span data-copy-lang="zh">已连接工作区</span></p>
+                    <span class="demo-subtle"><span data-copy-lang="en">What TIAN can already access</span><span data-copy-lang="zh">TIAN 当前可访问的内容</span></span>
+                  </div>
+                  <div class="demo-context-grid" data-demo-context></div>
+                </div>
+
                 <div class="demo-prompt">
                   <div class="demo-heading-row">
                     <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
@@ -298,90 +312,230 @@
             </div>
 
             <template data-demo-template="email">
+              <div data-demo-context-template>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Apps</span><span data-copy-lang="zh">应用</span></p>
+                  <strong>Gmail, Drive, Calendar</strong>
+                  <p><span data-copy-lang="en">Connected with workspace permissions.</span><span data-copy-lang="zh">已使用工作区权限完成连接。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Recent files</span><span data-copy-lang="zh">最近文件</span></p>
+                  <strong><span data-copy-lang="en">`pricing-faq-q2.pdf`</span><span data-copy-lang="zh">`pricing-faq-q2.pdf`</span></strong>
+                  <p><span data-copy-lang="en">Updated 2 hours ago by Sales Ops.</span><span data-copy-lang="zh">2 小时前由销售运营更新。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Customer thread</span><span data-copy-lang="zh">客户往来</span></p>
+                  <strong><span data-copy-lang="en">8 messages, 2 stakeholders</span><span data-copy-lang="zh">8 封邮件，2 位相关人</span></strong>
+                  <p><span data-copy-lang="en">Latest reply arrived this morning.</span><span data-copy-lang="zh">最新回复今天早上收到。</span></p>
+                </article>
+              </div>
               <div data-demo-prompt-template>
-                <span data-copy-lang="en">"Read the customer thread, check our pricing notes, and draft a calm reply that offers next steps."</span>
-                <span data-copy-lang="zh">“读取客户邮件往来，查看我们的报价说明，并起草一封语气平和、包含下一步安排的回复。”</span>
+                <span data-copy-lang="en">"Read the Acme customer thread, check our latest pricing FAQ, and draft a calm reply that gives them a lower-risk rollout option."</span>
+                <span data-copy-lang="zh">“读取 Acme 客户的邮件往来，查看最新报价 FAQ，并起草一封语气平和的回复，给他们一个风险更低的上线方案。”</span>
               </div>
               <div data-demo-sources-template>
-                <span class="demo-chip"><span data-copy-lang="en">Email thread from your workspace</span><span data-copy-lang="zh">工作区中的邮件往来</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Pricing FAQ document</span><span data-copy-lang="zh">报价 FAQ 文档</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Customer history notes</span><span data-copy-lang="zh">客户历史记录</span></span>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Workspace email thread</span><span data-copy-lang="zh">工作区邮件线程</span></strong>
+                  <p><span data-copy-lang="en">Acme renewal discussion, last message at 9:12 AM.</span><span data-copy-lang="zh">Acme 续约讨论，最后一封邮件时间为上午 9:12。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">`pricing-faq-q2.pdf`</span><span data-copy-lang="zh">`pricing-faq-q2.pdf`</span></strong>
+                  <p><span data-copy-lang="en">Checks current discount guardrails and rollout options.</span><span data-copy-lang="zh">核对当前折扣边界和上线方式。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">CRM account notes</span><span data-copy-lang="zh">CRM 客户备注</span></strong>
+                  <p><span data-copy-lang="en">Flags budget pressure and legal review as known blockers.</span><span data-copy-lang="zh">标记预算压力和法务审核是已知阻碍点。</span></p>
+                </article>
               </div>
               <ol data-demo-steps-template>
-                <li><span data-copy-lang="en">Read the recent customer thread and detect the main blocker.</span><span data-copy-lang="zh">读取最近的客户往来，并识别主要阻碍点。</span></li>
-                <li><span data-copy-lang="en">Cross-check pricing notes and existing onboarding options.</span><span data-copy-lang="zh">对照报价说明和现有上线选项。</span></li>
-                <li><span data-copy-lang="en">Draft the reply with a clear tone, next steps, and attachments.</span><span data-copy-lang="zh">生成语气明确的回复，并补上下一步和附件建议。</span></li>
+                <li><span data-copy-lang="en">Read the thread, identify the real blocker, and extract the decision owners.</span><span data-copy-lang="zh">读取邮件线程，识别真正的阻碍点，并提取决策相关人。</span></li>
+                <li><span data-copy-lang="en">Check current pricing rules and find the safest rollout option that still keeps momentum.</span><span data-copy-lang="zh">检查当前报价规则，找到既能推进又更稳妥的上线方式。</span></li>
+                <li><span data-copy-lang="en">Draft a reply with the offer, proposed next call, and the right attachment.</span><span data-copy-lang="zh">生成包含方案、下一次沟通安排和正确附件的回复草稿。</span></li>
               </ol>
               <div data-demo-result-template>
-                <p><span data-copy-lang="en">Summary: Customer is blocked on onboarding timing and budget approval.</span><span data-copy-lang="zh">总结：客户当前卡在上线时间和预算审批。</span></p>
-                <p><span data-copy-lang="en">Draft: Thanks for the update. We can hold the current pricing through Friday and start with a smaller first phase...</span><span data-copy-lang="zh">草稿：感谢您的更新。我们可以将当前报价保留到本周五，并先从较小的第一阶段开始……</span></p>
-                <p><span data-copy-lang="en">Next actions: add legal review note, propose Tuesday call, attach pricing PDF.</span><span data-copy-lang="zh">下一步：补充法务说明、建议周二电话、附上报价 PDF。</span></p>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Detected blocker</span><span data-copy-lang="zh">识别出的阻碍点</span></p>
+                  <p><span data-copy-lang="en">Acme is not rejecting the deal. They need a smaller phase-one scope that fits this quarter's budget and avoids waiting on full legal review.</span><span data-copy-lang="zh">Acme 并不是拒绝合作，而是需要一个更小的第一阶段范围，以适配本季度预算并避免等待完整法务审核。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Draft reply</span><span data-copy-lang="zh">回复草稿</span></p>
+                  <p><span data-copy-lang="en">Thanks for the update. To keep things moving, we can start with the onboarding-only package this month, keep current pricing through Friday, and expand once procurement is cleared...</span><span data-copy-lang="zh">感谢您的更新。为了继续推进，我们可以本月先从仅包含上线支持的套餐开始，当前报价保留到本周五，等采购审批通过后再扩展范围……</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Artifacts created</span><span data-copy-lang="zh">已生成内容</span></p>
+                  <p><span data-copy-lang="en">Email draft, Tuesday call suggestion, and `pricing-faq-q2.pdf` attached.</span><span data-copy-lang="zh">已生成邮件草稿、周二电话建议，并附上 `pricing-faq-q2.pdf`。</span></p>
+                </article>
               </div>
             </template>
 
             <template data-demo-template="slides">
+              <div data-demo-context-template>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Apps</span><span data-copy-lang="zh">应用</span></p>
+                  <strong>Drive, Notion, Figma</strong>
+                  <p><span data-copy-lang="en">Product and GTM docs are already indexed.</span><span data-copy-lang="zh">产品和市场资料已完成索引。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Source pack</span><span data-copy-lang="zh">资料包</span></p>
+                  <strong><span data-copy-lang="en">Q1 report + roadmap + feedback</span><span data-copy-lang="zh">Q1 报告 + 路线图 + 反馈</span></strong>
+                  <p><span data-copy-lang="en">Enough for a first-pass deck without manual copy-paste.</span><span data-copy-lang="zh">无需手动复制粘贴即可生成首版演示稿。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Target output</span><span data-copy-lang="zh">目标输出</span></p>
+                  <strong><span data-copy-lang="en">6-slide board update</span><span data-copy-lang="zh">6 页董事会更新稿</span></strong>
+                  <p><span data-copy-lang="en">Built around proof, not generic filler.</span><span data-copy-lang="zh">围绕证据整理，而不是空泛内容。</span></p>
+                </article>
+              </div>
               <div data-demo-prompt-template>
-                <span data-copy-lang="en">"Use last quarter's report, product notes, and customer quotes to prepare a 6-slide presentation outline."</span>
-                <span data-copy-lang="zh">“使用上季度报告、产品说明和客户评价，整理出一个 6 页的演示文稿提纲。”</span>
+                <span data-copy-lang="en">"Use last quarter's report, roadmap notes, and customer quotes to prepare a 6-slide board update with the strongest supporting evidence."</span>
+                <span data-copy-lang="zh">“使用上季度报告、路线图说明和客户评价，整理一个 6 页的董事会更新提纲，并挑出最有力的支撑证据。”</span>
               </div>
               <div data-demo-sources-template>
-                <span class="demo-chip"><span data-copy-lang="en">Quarterly report files</span><span data-copy-lang="zh">季度报告文件</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Feature roadmap notes</span><span data-copy-lang="zh">功能路线图说明</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Customer feedback folder</span><span data-copy-lang="zh">客户反馈资料夹</span></span>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">`board-metrics-q1.xlsx`</span><span data-copy-lang="zh">`board-metrics-q1.xlsx`</span></strong>
+                  <p><span data-copy-lang="en">Revenue, activation, expansion, and retention trends.</span><span data-copy-lang="zh">收入、激活、扩展和留存趋势。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Roadmap notes</span><span data-copy-lang="zh">路线图说明</span></strong>
+                  <p><span data-copy-lang="en">What shipped, what slipped, and why customers cared.</span><span data-copy-lang="zh">哪些已发布、哪些延期，以及客户为什么在意。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Customer quote folder</span><span data-copy-lang="zh">客户评价资料夹</span></strong>
+                  <p><span data-copy-lang="en">Pulls proof points for ROI, speed, and rollout confidence.</span><span data-copy-lang="zh">提取关于 ROI、速度和落地信心的证明材料。</span></p>
+                </article>
               </div>
               <ol data-demo-steps-template>
-                <li><span data-copy-lang="en">Scan the report for growth signals and headline metrics.</span><span data-copy-lang="zh">扫描报告，提取增长信号和关键指标。</span></li>
-                <li><span data-copy-lang="en">Map product updates to the strongest customer outcomes.</span><span data-copy-lang="zh">把产品更新映射到最强的客户结果上。</span></li>
-                <li><span data-copy-lang="en">Assemble a 6-slide outline with evidence and quotes.</span><span data-copy-lang="zh">整理成包含证据和客户引用的 6 页演示提纲。</span></li>
+                <li><span data-copy-lang="en">Scan the report and rank the metrics the board will care about first.</span><span data-copy-lang="zh">扫描报告，并优先排序董事会最关心的指标。</span></li>
+                <li><span data-copy-lang="en">Map shipped work to visible customer impact and remove weak claims.</span><span data-copy-lang="zh">把已发布内容映射到清晰的客户影响上，并去掉证据不足的说法。</span></li>
+                <li><span data-copy-lang="en">Build a 6-slide outline with slide titles, evidence, and speaker notes.</span><span data-copy-lang="zh">生成包含标题、证据和讲解备注的 6 页提纲。</span></li>
               </ol>
               <div data-demo-result-template>
-                <p><span data-copy-lang="en">Slide 1: market problem and why it matters now.</span><span data-copy-lang="zh">第 1 页：市场问题，以及为什么现在重要。</span></p>
-                <p><span data-copy-lang="en">Slide 3: product improvements linked to usage growth from the report.</span><span data-copy-lang="zh">第 3 页：把产品改进和报告中的使用增长数据对应起来。</span></p>
-                <p><span data-copy-lang="en">Slide 5: customer quotes grouped by ROI, speed, and ease of rollout.</span><span data-copy-lang="zh">第 5 页：按 ROI、速度和易部署性整理客户评价。</span></p>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Slide structure</span><span data-copy-lang="zh">页结构</span></p>
+                  <p><span data-copy-lang="en">Slide 1: quarter headline. Slide 2: key metrics. Slide 3: shipped product impact. Slide 4: customer proof. Slide 5: risks and responses. Slide 6: next-quarter focus.</span><span data-copy-lang="zh">第 1 页：季度结论。第 2 页：关键指标。第 3 页：产品发布带来的影响。第 4 页：客户证据。第 5 页：风险与应对。第 6 页：下季度重点。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Evidence used</span><span data-copy-lang="zh">使用的证据</span></p>
+                  <p><span data-copy-lang="en">Activation improved after the new onboarding flow, and three customer quotes support rollout speed and lower support load.</span><span data-copy-lang="zh">新上线流程发布后，激活率有所提升，且有三条客户评价支持“上线更快、支持负担更低”的结论。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Artifacts created</span><span data-copy-lang="zh">已生成内容</span></p>
+                  <p><span data-copy-lang="en">Board-deck outline with talking points and suggested chart callouts.</span><span data-copy-lang="zh">已生成董事会演示提纲，包含讲解要点和图表标注建议。</span></p>
+                </article>
               </div>
             </template>
 
             <template data-demo-template="research">
+              <div data-demo-context-template>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Apps</span><span data-copy-lang="zh">应用</span></p>
+                  <strong>Web search, Notion, Drive</strong>
+                  <p><span data-copy-lang="en">Fresh public updates can be merged with saved internal notes.</span><span data-copy-lang="zh">可将最新公开信息与内部记录合并分析。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Deadline</span><span data-copy-lang="zh">截止时间</span></p>
+                  <strong><span data-copy-lang="en">Team brief before noon</span><span data-copy-lang="zh">中午前发给团队的简报</span></strong>
+                  <p><span data-copy-lang="en">Output needs to be concise and decision-ready.</span><span data-copy-lang="zh">输出需要简洁且适合决策。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Template</span><span data-copy-lang="zh">模板</span></p>
+                  <strong><span data-copy-lang="en">Saved strategy brief</span><span data-copy-lang="zh">已保存的策略简报模板</span></strong>
+                  <p><span data-copy-lang="en">Keeps format consistent for the team.</span><span data-copy-lang="zh">保证团队收到的格式一致。</span></p>
+                </article>
+              </div>
               <div data-demo-prompt-template>
-                <span data-copy-lang="en">"Search the web, compare three competitors, and write a brief I can send to the team before noon."</span>
-                <span data-copy-lang="zh">“搜索网页，比较三个竞争对手，并整理一份中午前可以发给团队的简报。”</span>
+                <span data-copy-lang="en">"Search the web for the latest moves from three competitors, compare them to our notes, and write a brief I can send to the team before noon."</span>
+                <span data-copy-lang="zh">“搜索网页上的三个竞品最新动态，对照我们的内部记录，并整理一份中午前可以发给团队的简报。”</span>
               </div>
               <div data-demo-sources-template>
-                <span class="demo-chip"><span data-copy-lang="en">Web search results</span><span data-copy-lang="zh">网页搜索结果</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Your internal comparison notes</span><span data-copy-lang="zh">内部竞品比较记录</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Saved strategy template</span><span data-copy-lang="zh">已保存的策略简报模板</span></span>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Fresh web search</span><span data-copy-lang="zh">最新网页搜索</span></strong>
+                  <p><span data-copy-lang="en">Launch posts, pricing pages, and recent announcements.</span><span data-copy-lang="zh">发布文章、定价页面和最新公告。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Internal comparison notes</span><span data-copy-lang="zh">内部竞品记录</span></strong>
+                  <p><span data-copy-lang="en">Existing positioning, win/loss notes, and known gaps.</span><span data-copy-lang="zh">已有定位、输赢单记录和已知差距。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Strategy brief template</span><span data-copy-lang="zh">策略简报模板</span></strong>
+                  <p><span data-copy-lang="en">Formats findings into a team-ready update.</span><span data-copy-lang="zh">把发现整理成团队可直接阅读的更新。</span></p>
+                </article>
               </div>
               <ol data-demo-steps-template>
-                <li><span data-copy-lang="en">Pull fresh competitor updates and launches from the web.</span><span data-copy-lang="zh">抓取最新的竞品动态和公开发布信息。</span></li>
-                <li><span data-copy-lang="en">Merge them with internal notes and score the differences.</span><span data-copy-lang="zh">与内部记录合并，并对差异进行评估。</span></li>
-                <li><span data-copy-lang="en">Write a team-ready brief with risks and recommended response.</span><span data-copy-lang="zh">输出可直接发给团队的简报，附上风险和建议动作。</span></li>
+                <li><span data-copy-lang="en">Pull fresh competitor launches, pricing changes, and messaging from the web.</span><span data-copy-lang="zh">抓取竞品最新发布、定价变化和对外表述。</span></li>
+                <li><span data-copy-lang="en">Merge them with internal notes and isolate what actually changed.</span><span data-copy-lang="zh">与内部记录合并，并识别真正发生变化的部分。</span></li>
+                <li><span data-copy-lang="en">Write a brief with risks, positioning shifts, and recommended response.</span><span data-copy-lang="zh">整理出包含风险、定位变化和建议动作的简报。</span></li>
               </ol>
               <div data-demo-result-template>
-                <p><span data-copy-lang="en">Market update: two rivals launched AI copilots this quarter.</span><span data-copy-lang="zh">市场更新：本季度有两家对手推出了 AI 助手产品。</span></p>
-                <p><span data-copy-lang="en">Comparison table: pricing, integrations, positioning, launch risk.</span><span data-copy-lang="zh">对比表：价格、集成能力、定位、上线风险。</span></p>
-                <p><span data-copy-lang="en">Team-ready brief: recommended response, open questions, and immediate follow-ups.</span><span data-copy-lang="zh">团队简报：建议动作、待确认问题和立即跟进项。</span></p>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Market update</span><span data-copy-lang="zh">市场更新</span></p>
+                  <p><span data-copy-lang="en">Two competitors added AI assistant positioning this quarter, but only one launched a credible workflow integration story.</span><span data-copy-lang="zh">本季度有两家竞品新增了 AI 助手定位，但只有一家真正上线了可信的工作流集成能力。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Comparison table</span><span data-copy-lang="zh">对比表</span></p>
+                  <p><span data-copy-lang="en">Summarized pricing, integrations, proof points, gaps, and launch risk in one team-readable matrix.</span><span data-copy-lang="zh">已将价格、集成能力、证明材料、短板和上线风险整理成一张团队可直接阅读的矩阵表。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Recommended response</span><span data-copy-lang="zh">建议动作</span></p>
+                  <p><span data-copy-lang="en">Lean into connected-workspace workflows, publish one stronger proof case, and update comparison collateral this week.</span><span data-copy-lang="zh">强化“已连接工作区”的工作流叙事，补充一个更强的案例证明，并在本周更新对比材料。</span></p>
+                </article>
               </div>
             </template>
 
             <template data-demo-template="schedule">
+              <div data-demo-context-template>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Apps</span><span data-copy-lang="zh">应用</span></p>
+                  <strong>Calendar, Slack, Drive, Web</strong>
+                  <p><span data-copy-lang="en">The morning brief can pull from multiple sources automatically.</span><span data-copy-lang="zh">晨间简报可以自动从多个来源汇总。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Schedule</span><span data-copy-lang="zh">时间安排</span></p>
+                  <strong><span data-copy-lang="en">Weekdays at 8:00 AM</span><span data-copy-lang="zh">工作日上午 8:00</span></strong>
+                  <p><span data-copy-lang="en">Runs without reopening the same prompt.</span><span data-copy-lang="zh">无需每天重复打开同一段提示词。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Delivery</span><span data-copy-lang="zh">发送位置</span></p>
+                  <strong><span data-copy-lang="en">Slack summary + saved note</span><span data-copy-lang="zh">Slack 摘要 + 保存到笔记</span></strong>
+                  <p><span data-copy-lang="en">Readable where the team already works.</span><span data-copy-lang="zh">发送到团队已经在使用的工作位置。</span></p>
+                </article>
+              </div>
               <div data-demo-prompt-template>
-                <span data-copy-lang="en">"Every weekday at 8am, check the latest updates from my workspace and prepare a morning brief."</span>
-                <span data-copy-lang="zh">“每个工作日上午 8 点，检查我工作区里的最新更新并生成一份晨间简报。”</span>
+                <span data-copy-lang="en">"Every weekday at 8am, review my workspace updates, today's calendar, and any urgent alerts, then prepare a morning brief for Slack."</span>
+                <span data-copy-lang="zh">“每个工作日上午 8 点，检查我工作区里的更新、今天的日程和紧急提醒，然后为 Slack 生成一份晨间简报。”</span>
               </div>
               <div data-demo-sources-template>
-                <span class="demo-chip"><span data-copy-lang="en">Scheduled job at 8:00 AM</span><span data-copy-lang="zh">上午 8:00 的定时任务</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Sources: files, messages, web updates</span><span data-copy-lang="zh">来源：文件、消息、网页更新</span></span>
-                <span class="demo-chip"><span data-copy-lang="en">Delivery to your preferred workspace</span><span data-copy-lang="zh">发送到您指定的工作区</span></span>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Scheduled trigger</span><span data-copy-lang="zh">定时触发</span></strong>
+                  <p><span data-copy-lang="en">Runs at 8:00 AM on weekdays.</span><span data-copy-lang="zh">在工作日上午 8:00 自动运行。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Workspace signals</span><span data-copy-lang="zh">工作区信号</span></strong>
+                  <p><span data-copy-lang="en">Unread messages, file changes, meetings, and web alerts.</span><span data-copy-lang="zh">未读消息、文件更新、会议和网页提醒。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Delivery target</span><span data-copy-lang="zh">发送目标</span></strong>
+                  <p><span data-copy-lang="en">Posts a summary to Slack and saves the full note.</span><span data-copy-lang="zh">把摘要发到 Slack，并保存完整笔记。</span></p>
+                </article>
               </div>
               <ol data-demo-steps-template>
-                <li><span data-copy-lang="en">Create the weekday 8:00 AM schedule and assign the sources.</span><span data-copy-lang="zh">创建工作日早上 8 点的任务，并绑定信息来源。</span></li>
-                <li><span data-copy-lang="en">Collect overnight changes, meetings, tasks, and alerts.</span><span data-copy-lang="zh">收集隔夜更新、会议、待办事项和提醒。</span></li>
-                <li><span data-copy-lang="en">Deliver a ready-to-read morning brief automatically.</span><span data-copy-lang="zh">自动生成并发送可直接阅读的晨间简报。</span></li>
+                <li><span data-copy-lang="en">Create the weekday schedule and map which sources should be checked each morning.</span><span data-copy-lang="zh">创建工作日定时任务，并绑定每天早上要检查的来源。</span></li>
+                <li><span data-copy-lang="en">Collect overnight changes, meetings, pending tasks, and urgent alerts.</span><span data-copy-lang="zh">收集隔夜更新、会议、待办事项和紧急提醒。</span></li>
+                <li><span data-copy-lang="en">Deliver a brief with priority items, schedule highlights, and actions to take first.</span><span data-copy-lang="zh">发送包含优先事项、日程重点和首要动作的晨间简报。</span></li>
               </ol>
               <div data-demo-result-template>
-                <p><span data-copy-lang="en">08:00 brief created automatically.</span><span data-copy-lang="zh">08:00 自动生成简报。</span></p>
-                <p><span data-copy-lang="en">Includes: yesterday's changes, pending tasks, meetings, and alerts.</span><span data-copy-lang="zh">包含：昨天的更新、待办事项、会议安排和提醒。</span></p>
-                <p><span data-copy-lang="en">No need to open the same prompt every morning.</span><span data-copy-lang="zh">不需要每天早上重复输入同一段提示。</span></p>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Scheduled result</span><span data-copy-lang="zh">定时结果</span></p>
+                  <p><span data-copy-lang="en">At 8:00 AM, TIAN posts a concise Slack summary with urgent items at the top.</span><span data-copy-lang="zh">上午 8:00，TIAN 会先把紧急事项放在最上方，并发出一条简洁的 Slack 摘要。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">What it includes</span><span data-copy-lang="zh">包含内容</span></p>
+                  <p><span data-copy-lang="en">Yesterday's file changes, today's meetings, open tasks, and any overnight alerts worth checking first.</span><span data-copy-lang="zh">昨天的文件变更、今天的会议、未完成任务，以及隔夜出现的重点提醒。</span></p>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Why it matters</span><span data-copy-lang="zh">价值</span></p>
+                  <p><span data-copy-lang="en">The workflow runs on its own, so you do not have to repeat the same prompt every morning.</span><span data-copy-lang="zh">整个流程会自动运行，因此您不必每天早上重复输入同一段提示词。</span></p>
+                </article>
               </div>
             </template>
           </div>
@@ -529,6 +683,7 @@
       }
 
       var tabs = stage.querySelectorAll("[data-demo-scenario]");
+      var contextNode = stage.querySelector("[data-demo-context]");
       var promptNode = stage.querySelector("[data-demo-prompt]");
       var sourcesNode = stage.querySelector("[data-demo-sources]");
       var stepsNode = stage.querySelector("[data-demo-steps]");
@@ -582,14 +737,19 @@
         });
 
         var promptTemplate = cloneTemplatePart(scenario, "[data-demo-prompt-template]");
+        var contextTemplate = cloneTemplatePart(scenario, "[data-demo-context-template]");
         var sourcesTemplate = cloneTemplatePart(scenario, "[data-demo-sources-template]");
         var stepsTemplate = cloneTemplatePart(scenario, "[data-demo-steps-template]");
 
+        contextNode.innerHTML = "";
         promptNode.innerHTML = "";
         sourcesNode.innerHTML = "";
         stepsNode.innerHTML = "";
         consoleNode.innerHTML = "";
 
+        Array.prototype.forEach.call(contextTemplate.childNodes, function (node) {
+          contextNode.appendChild(node.cloneNode(true));
+        });
         Array.prototype.forEach.call(promptTemplate.childNodes, function (node) {
           promptNode.appendChild(node.cloneNode(true));
         });
