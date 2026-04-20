@@ -240,7 +240,7 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
         # Persist the PID in both metadata stores so stop/status commands read the same state.
         $meta.pid = $proc.Id
         $meta | ConvertTo-Json -Depth 5 | Set-Content $metaFile -Encoding UTF8
-        $jobs = Read-Jobs
+        $jobs = @([array](Read-Jobs))
         for ($i = 0; $i -lt $jobs.Count; $i++) {
             if ($jobs[$i].id -eq $jobId) {
                 $jobs[$i] = [PSCustomObject]$meta
