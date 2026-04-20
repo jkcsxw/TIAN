@@ -90,11 +90,13 @@ Describe "Add-Schedule" {
         $s.time   | Should -Be "10:00"
     }
 
-    It "rejects schedule creation on Linux" {
+    It "creates schedule on Linux via crontab when crontab is available" {
         if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
-        {
-            Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
-        } | Should -Throw "Linux scheduling is not available in the built-in CLI yet*"
+        Mock Get-Command { param($Name) if ($Name -eq "crontab") { return [PSCustomObject]@{ Name = "crontab" } } } -ParameterFilter { $Name -eq "crontab" }
+        Mock Add-LinuxCrontabEntry { }
+        Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
+        $s = Read-Schedules | Where-Object { $_.name -eq "linux-test" }
+        $s | Should -Not -BeNullOrEmpty
     }
 
     Context "Windows schtasks argument construction" {
@@ -156,5 +158,53 @@ Describe "Remove-Schedule" {
     }
     It "fails when Name is empty" {
         { Remove-Schedule -Name "" -TianDir (Get-TianRoot) } | Should -Throw
+    }
+}
+
+Describe "Convert-DayNameToInt" {
+    It "converts MON to 1" { Convert-DayNameToInt "MON" | Should -Be 1 }
+    It "converts SUN to 0" { Convert-DayNameToInt "SUN" | Should -Be 0 }
+    It "converts SAT to 6" { Convert-DayNameToInt "SAT" | Should -Be 6 }
+    It "is case-insensitive" { Convert-DayNameToInt "wed" | Should -Be 3 }
+    It "throws on unknown day" { { Convert-DayNameToInt "XYZ" } | Should -Throw }
+}
+
+Describe "Build-LaunchdWeeklyXml" {
+    It "emits single dict for single day" {
+        $xml = Build-LaunchdWeeklyXml -DayOfWeek "MON" -Hour 8 -Minute 30
+        $xml | Should -Match "<key>Weekday</key><integer>1</integer>"
+        $xml | Should -Match "<key>Hour</key><integer>8</integer>"
+        $xml | Should -Match "<key>Minute</key><integer>30</integer>"
+        $xml | Should -Not -Match "<array>"
+    }
+    It "emits array for multiple days" {
+        $xml = Build-LaunchdWeeklyXml -DayOfWeek "MON,WED,FRI" -Hour 9 -Minute 0
+        $xml | Should -Match "<array>"
+        $xml | Should -Match "<integer>1</integer>"
+        $xml | Should -Match "<integer>3</integer>"
+        $xml | Should -Match "<integer>5</integer>"
+    }
+    It "defaults to Monday when DayOfWeek is empty" {
+        $xml = Build-LaunchdWeeklyXml -DayOfWeek "" -Hour 8 -Minute 0
+        $xml | Should -Match "<key>Weekday</key><integer>1</integer>"
+    }
+}
+
+Describe "Get-CrontabEntry" {
+    It "returns daily cron expression" {
+        $line = Get-CrontabEntry -Repeat "daily" -Time "08:30" -DayOfWeek "" -Command "echo hi"
+        $line | Should -Match "^30 8 \* \* \*"
+    }
+    It "returns hourly cron expression" {
+        $line = Get-CrontabEntry -Repeat "hourly" -Time "00:00" -DayOfWeek "" -Command "echo hi"
+        $line | Should -Match "^0 \* \* \* \*"
+    }
+    It "uses first day for weekly" {
+        $line = Get-CrontabEntry -Repeat "weekly" -Time "09:00" -DayOfWeek "FRI" -Command "echo hi"
+        $line | Should -Match "^0 9 \* \* 5"
+    }
+    It "defaults weekly to Monday (1) when no day specified" {
+        $line = Get-CrontabEntry -Repeat "weekly" -Time "07:00" -DayOfWeek "" -Command "echo hi"
+        $line | Should -Match "^0 7 \* \* 1"
     }
 }
