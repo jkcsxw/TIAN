@@ -238,125 +238,152 @@
           </div>
 
           <div class="demo-stage">
-            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-email" checked>
-            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-slides">
-            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-research">
-            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-schedule">
-
             <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
-              <label class="demo-tab" for="demo-email" role="tab">
+              <button class="demo-tab is-active" type="button" role="tab" aria-selected="true" data-demo-scenario="email">
                 <span data-copy-lang="en">Email reply</span><span data-copy-lang="zh">邮件回复</span>
-              </label>
-              <label class="demo-tab" for="demo-slides" role="tab">
+              </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" data-demo-scenario="slides">
                 <span data-copy-lang="en">Slides from files</span><span data-copy-lang="zh">根据文件做演示稿</span>
-              </label>
-              <label class="demo-tab" for="demo-research" role="tab">
+              </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" data-demo-scenario="research">
                 <span data-copy-lang="en">Research brief</span><span data-copy-lang="zh">调研简报</span>
-              </label>
-              <label class="demo-tab" for="demo-schedule" role="tab">
+              </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" data-demo-scenario="schedule">
                 <span data-copy-lang="en">Scheduled task</span><span data-copy-lang="zh">定时任务</span>
-              </label>
+              </button>
             </div>
 
-            <article class="demo-flow demo-flow-email">
-              <div class="demo-prompt">
-                <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
-                <p><span data-copy-lang="en">"Read the customer thread, check our pricing notes, and draft a calm reply that offers next steps."</span><span data-copy-lang="zh">“读取客户邮件往来，查看我们的报价说明，并起草一封语气平和、包含下一步安排的回复。”</span></p>
-              </div>
-              <div class="demo-grid">
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN uses</span><span data-copy-lang="zh">TIAN 会调用</span></p>
-                  <ul class="demo-list">
-                    <li><span data-copy-lang="en">Email thread from your workspace</span><span data-copy-lang="zh">工作区中的邮件往来</span></li>
-                    <li><span data-copy-lang="en">Pricing FAQ document</span><span data-copy-lang="zh">报价 FAQ 文档</span></li>
-                    <li><span data-copy-lang="en">Customer history notes</span><span data-copy-lang="zh">客户历史记录</span></li>
-                  </ul>
-                </div>
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN returns</span><span data-copy-lang="zh">TIAN 输出</span></p>
-                  <div class="demo-console">
-                    <p><span data-copy-lang="en">Summary: Customer is blocked on onboarding timing and budget approval.</span><span data-copy-lang="zh">总结：客户当前卡在上线时间和预算审批。</span></p>
-                    <p><span data-copy-lang="en">Draft: Thanks for the update. We can hold the current pricing through Friday and start with a smaller first phase...</span><span data-copy-lang="zh">草稿：感谢您的更新。我们可以将当前报价保留到本周五，并先从较小的第一阶段开始……</span></p>
-                    <p><span data-copy-lang="en">Next actions: add legal review note, propose Tuesday call, attach pricing PDF.</span><span data-copy-lang="zh">下一步：补充法务说明、建议周二电话、附上报价 PDF。</span></p>
+            <div class="demo-playground">
+              <div class="demo-brief">
+                <div class="demo-prompt">
+                  <div class="demo-heading-row">
+                    <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
+                    <span class="demo-status" data-demo-status>
+                      <span data-copy-lang="en">Ready</span><span data-copy-lang="zh">待运行</span>
+                    </span>
                   </div>
+                  <p data-demo-prompt></p>
                 </div>
-              </div>
-            </article>
 
-            <article class="demo-flow demo-flow-slides">
-              <div class="demo-prompt">
-                <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
-                <p><span data-copy-lang="en">"Use last quarter's report, product notes, and customer quotes to prepare a 6-slide presentation outline."</span><span data-copy-lang="zh">“使用上季度报告、产品说明和客户评价，整理出一个 6 页的演示文稿提纲。”</span></p>
-              </div>
-              <div class="demo-grid">
                 <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN uses</span><span data-copy-lang="zh">TIAN 会调用</span></p>
-                  <ul class="demo-list">
-                    <li><span data-copy-lang="en">Quarterly report files</span><span data-copy-lang="zh">季度报告文件</span></li>
-                    <li><span data-copy-lang="en">Feature roadmap notes</span><span data-copy-lang="zh">功能路线图说明</span></li>
-                    <li><span data-copy-lang="en">Customer feedback folder</span><span data-copy-lang="zh">客户反馈资料夹</span></li>
-                  </ul>
+                  <p class="demo-label"><span data-copy-lang="en">TIAN pulls in</span><span data-copy-lang="zh">TIAN 会读取</span></p>
+                  <div class="demo-source-list" data-demo-sources></div>
                 </div>
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN returns</span><span data-copy-lang="zh">TIAN 输出</span></p>
-                  <div class="demo-console">
-                    <p><span data-copy-lang="en">Slide 1: market problem and why it matters now.</span><span data-copy-lang="zh">第 1 页：市场问题，以及为什么现在重要。</span></p>
-                    <p><span data-copy-lang="en">Slide 3: product improvements linked to usage growth from the report.</span><span data-copy-lang="zh">第 3 页：把产品改进和报告中的使用增长数据对应起来。</span></p>
-                    <p><span data-copy-lang="en">Slide 5: customer quotes grouped by ROI, speed, and ease of rollout.</span><span data-copy-lang="zh">第 5 页：按 ROI、速度和易部署性整理客户评价。</span></p>
-                  </div>
-                </div>
-              </div>
-            </article>
 
-            <article class="demo-flow demo-flow-research">
-              <div class="demo-prompt">
-                <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
-                <p><span data-copy-lang="en">"Search the web, compare three competitors, and write a brief I can send to the team before noon."</span><span data-copy-lang="zh">“搜索网页，比较三个竞争对手，并整理一份中午前可以发给团队的简报。”</span></p>
-              </div>
-              <div class="demo-grid">
                 <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN uses</span><span data-copy-lang="zh">TIAN 会调用</span></p>
-                  <ul class="demo-list">
-                    <li><span data-copy-lang="en">Web search results</span><span data-copy-lang="zh">网页搜索结果</span></li>
-                    <li><span data-copy-lang="en">Your internal comparison notes</span><span data-copy-lang="zh">内部竞品比较记录</span></li>
-                    <li><span data-copy-lang="en">Saved strategy template</span><span data-copy-lang="zh">已保存的策略简报模板</span></li>
-                  </ul>
-                </div>
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN returns</span><span data-copy-lang="zh">TIAN 输出</span></p>
-                  <div class="demo-console">
-                    <p><span data-copy-lang="en">Market update: two rivals launched AI copilots this quarter.</span><span data-copy-lang="zh">市场更新：本季度有两家对手推出了 AI 助手产品。</span></p>
-                    <p><span data-copy-lang="en">Comparison table: pricing, integrations, positioning, launch risk.</span><span data-copy-lang="zh">对比表：价格、集成能力、定位、上线风险。</span></p>
-                    <p><span data-copy-lang="en">Team-ready brief: recommended response, open questions, and immediate follow-ups.</span><span data-copy-lang="zh">团队简报：建议动作、待确认问题和立即跟进项。</span></p>
+                  <div class="demo-heading-row">
+                    <p class="demo-label"><span data-copy-lang="en">Flow</span><span data-copy-lang="zh">执行流程</span></p>
+                    <div class="demo-controls">
+                      <button class="button secondary demo-run-button" type="button" data-demo-run>
+                        <span data-copy-lang="en">Run demo</span><span data-copy-lang="zh">运行演示</span>
+                      </button>
+                      <button class="button secondary demo-reset-button" type="button" data-demo-reset>
+                        <span data-copy-lang="en">Reset</span><span data-copy-lang="zh">重置</span>
+                      </button>
+                    </div>
                   </div>
+                  <ol class="demo-steps" data-demo-steps></ol>
                 </div>
               </div>
-            </article>
 
-            <article class="demo-flow demo-flow-schedule">
-              <div class="demo-prompt">
-                <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
-                <p><span data-copy-lang="en">"Every weekday at 8am, check the latest updates from my workspace and prepare a morning brief."</span><span data-copy-lang="zh">“每个工作日上午 8 点，检查我工作区里的最新更新并生成一份晨间简报。”</span></p>
-              </div>
-              <div class="demo-grid">
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN sets up</span><span data-copy-lang="zh">TIAN 会设置</span></p>
-                  <ul class="demo-list">
-                    <li><span data-copy-lang="en">Scheduled job at 8:00 AM</span><span data-copy-lang="zh">上午 8:00 的定时任务</span></li>
-                    <li><span data-copy-lang="en">Sources: files, messages, web updates</span><span data-copy-lang="zh">来源：文件、消息、网页更新</span></li>
-                    <li><span data-copy-lang="en">Delivery to your preferred workspace</span><span data-copy-lang="zh">发送到您指定的工作区</span></li>
-                  </ul>
-                </div>
-                <div class="demo-card">
-                  <p class="demo-label"><span data-copy-lang="en">TIAN returns</span><span data-copy-lang="zh">TIAN 输出</span></p>
-                  <div class="demo-console">
-                    <p><span data-copy-lang="en">08:00 brief created automatically.</span><span data-copy-lang="zh">08:00 自动生成简报。</span></p>
-                    <p><span data-copy-lang="en">Includes: yesterday's changes, pending tasks, meetings, and alerts.</span><span data-copy-lang="zh">包含：昨天的更新、待办事项、会议安排和提醒。</span></p>
-                    <p><span data-copy-lang="en">No need to open the same prompt every morning.</span><span data-copy-lang="zh">不需要每天早上重复输入同一段提示。</span></p>
+              <div class="demo-output-card">
+                <div class="demo-heading-row">
+                  <div>
+                    <p class="demo-label"><span data-copy-lang="en">Outcome</span><span data-copy-lang="zh">结果</span></p>
+                    <h3 class="demo-output-title"><span data-copy-lang="en">Watch the response assemble step by step.</span><span data-copy-lang="zh">点击后查看响应如何逐步生成。</span></h3>
                   </div>
                 </div>
+                <div class="demo-console" data-demo-console aria-live="polite"></div>
               </div>
-            </article>
+            </div>
+
+            <template data-demo-template="email">
+              <div data-demo-prompt-template>
+                <span data-copy-lang="en">"Read the customer thread, check our pricing notes, and draft a calm reply that offers next steps."</span>
+                <span data-copy-lang="zh">“读取客户邮件往来，查看我们的报价说明，并起草一封语气平和、包含下一步安排的回复。”</span>
+              </div>
+              <div data-demo-sources-template>
+                <span class="demo-chip"><span data-copy-lang="en">Email thread from your workspace</span><span data-copy-lang="zh">工作区中的邮件往来</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Pricing FAQ document</span><span data-copy-lang="zh">报价 FAQ 文档</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Customer history notes</span><span data-copy-lang="zh">客户历史记录</span></span>
+              </div>
+              <ol data-demo-steps-template>
+                <li><span data-copy-lang="en">Read the recent customer thread and detect the main blocker.</span><span data-copy-lang="zh">读取最近的客户往来，并识别主要阻碍点。</span></li>
+                <li><span data-copy-lang="en">Cross-check pricing notes and existing onboarding options.</span><span data-copy-lang="zh">对照报价说明和现有上线选项。</span></li>
+                <li><span data-copy-lang="en">Draft the reply with a clear tone, next steps, and attachments.</span><span data-copy-lang="zh">生成语气明确的回复，并补上下一步和附件建议。</span></li>
+              </ol>
+              <div data-demo-result-template>
+                <p><span data-copy-lang="en">Summary: Customer is blocked on onboarding timing and budget approval.</span><span data-copy-lang="zh">总结：客户当前卡在上线时间和预算审批。</span></p>
+                <p><span data-copy-lang="en">Draft: Thanks for the update. We can hold the current pricing through Friday and start with a smaller first phase...</span><span data-copy-lang="zh">草稿：感谢您的更新。我们可以将当前报价保留到本周五，并先从较小的第一阶段开始……</span></p>
+                <p><span data-copy-lang="en">Next actions: add legal review note, propose Tuesday call, attach pricing PDF.</span><span data-copy-lang="zh">下一步：补充法务说明、建议周二电话、附上报价 PDF。</span></p>
+              </div>
+            </template>
+
+            <template data-demo-template="slides">
+              <div data-demo-prompt-template>
+                <span data-copy-lang="en">"Use last quarter's report, product notes, and customer quotes to prepare a 6-slide presentation outline."</span>
+                <span data-copy-lang="zh">“使用上季度报告、产品说明和客户评价，整理出一个 6 页的演示文稿提纲。”</span>
+              </div>
+              <div data-demo-sources-template>
+                <span class="demo-chip"><span data-copy-lang="en">Quarterly report files</span><span data-copy-lang="zh">季度报告文件</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Feature roadmap notes</span><span data-copy-lang="zh">功能路线图说明</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Customer feedback folder</span><span data-copy-lang="zh">客户反馈资料夹</span></span>
+              </div>
+              <ol data-demo-steps-template>
+                <li><span data-copy-lang="en">Scan the report for growth signals and headline metrics.</span><span data-copy-lang="zh">扫描报告，提取增长信号和关键指标。</span></li>
+                <li><span data-copy-lang="en">Map product updates to the strongest customer outcomes.</span><span data-copy-lang="zh">把产品更新映射到最强的客户结果上。</span></li>
+                <li><span data-copy-lang="en">Assemble a 6-slide outline with evidence and quotes.</span><span data-copy-lang="zh">整理成包含证据和客户引用的 6 页演示提纲。</span></li>
+              </ol>
+              <div data-demo-result-template>
+                <p><span data-copy-lang="en">Slide 1: market problem and why it matters now.</span><span data-copy-lang="zh">第 1 页：市场问题，以及为什么现在重要。</span></p>
+                <p><span data-copy-lang="en">Slide 3: product improvements linked to usage growth from the report.</span><span data-copy-lang="zh">第 3 页：把产品改进和报告中的使用增长数据对应起来。</span></p>
+                <p><span data-copy-lang="en">Slide 5: customer quotes grouped by ROI, speed, and ease of rollout.</span><span data-copy-lang="zh">第 5 页：按 ROI、速度和易部署性整理客户评价。</span></p>
+              </div>
+            </template>
+
+            <template data-demo-template="research">
+              <div data-demo-prompt-template>
+                <span data-copy-lang="en">"Search the web, compare three competitors, and write a brief I can send to the team before noon."</span>
+                <span data-copy-lang="zh">“搜索网页，比较三个竞争对手，并整理一份中午前可以发给团队的简报。”</span>
+              </div>
+              <div data-demo-sources-template>
+                <span class="demo-chip"><span data-copy-lang="en">Web search results</span><span data-copy-lang="zh">网页搜索结果</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Your internal comparison notes</span><span data-copy-lang="zh">内部竞品比较记录</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Saved strategy template</span><span data-copy-lang="zh">已保存的策略简报模板</span></span>
+              </div>
+              <ol data-demo-steps-template>
+                <li><span data-copy-lang="en">Pull fresh competitor updates and launches from the web.</span><span data-copy-lang="zh">抓取最新的竞品动态和公开发布信息。</span></li>
+                <li><span data-copy-lang="en">Merge them with internal notes and score the differences.</span><span data-copy-lang="zh">与内部记录合并，并对差异进行评估。</span></li>
+                <li><span data-copy-lang="en">Write a team-ready brief with risks and recommended response.</span><span data-copy-lang="zh">输出可直接发给团队的简报，附上风险和建议动作。</span></li>
+              </ol>
+              <div data-demo-result-template>
+                <p><span data-copy-lang="en">Market update: two rivals launched AI copilots this quarter.</span><span data-copy-lang="zh">市场更新：本季度有两家对手推出了 AI 助手产品。</span></p>
+                <p><span data-copy-lang="en">Comparison table: pricing, integrations, positioning, launch risk.</span><span data-copy-lang="zh">对比表：价格、集成能力、定位、上线风险。</span></p>
+                <p><span data-copy-lang="en">Team-ready brief: recommended response, open questions, and immediate follow-ups.</span><span data-copy-lang="zh">团队简报：建议动作、待确认问题和立即跟进项。</span></p>
+              </div>
+            </template>
+
+            <template data-demo-template="schedule">
+              <div data-demo-prompt-template>
+                <span data-copy-lang="en">"Every weekday at 8am, check the latest updates from my workspace and prepare a morning brief."</span>
+                <span data-copy-lang="zh">“每个工作日上午 8 点，检查我工作区里的最新更新并生成一份晨间简报。”</span>
+              </div>
+              <div data-demo-sources-template>
+                <span class="demo-chip"><span data-copy-lang="en">Scheduled job at 8:00 AM</span><span data-copy-lang="zh">上午 8:00 的定时任务</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Sources: files, messages, web updates</span><span data-copy-lang="zh">来源：文件、消息、网页更新</span></span>
+                <span class="demo-chip"><span data-copy-lang="en">Delivery to your preferred workspace</span><span data-copy-lang="zh">发送到您指定的工作区</span></span>
+              </div>
+              <ol data-demo-steps-template>
+                <li><span data-copy-lang="en">Create the weekday 8:00 AM schedule and assign the sources.</span><span data-copy-lang="zh">创建工作日早上 8 点的任务，并绑定信息来源。</span></li>
+                <li><span data-copy-lang="en">Collect overnight changes, meetings, tasks, and alerts.</span><span data-copy-lang="zh">收集隔夜更新、会议、待办事项和提醒。</span></li>
+                <li><span data-copy-lang="en">Deliver a ready-to-read morning brief automatically.</span><span data-copy-lang="zh">自动生成并发送可直接阅读的晨间简报。</span></li>
+              </ol>
+              <div data-demo-result-template>
+                <p><span data-copy-lang="en">08:00 brief created automatically.</span><span data-copy-lang="zh">08:00 自动生成简报。</span></p>
+                <p><span data-copy-lang="en">Includes: yesterday's changes, pending tasks, meetings, and alerts.</span><span data-copy-lang="zh">包含：昨天的更新、待办事项、会议安排和提醒。</span></p>
+                <p><span data-copy-lang="en">No need to open the same prompt every morning.</span><span data-copy-lang="zh">不需要每天早上重复输入同一段提示。</span></p>
+              </div>
+            </template>
           </div>
         </div>
       </section>
@@ -493,6 +520,148 @@
           el.hidden = el.getAttribute("data-copy-lang") !== lang;
         });
       }
+    }());
+
+    (function () {
+      var stage = document.querySelector(".demo-stage");
+      if (!stage) {
+        return;
+      }
+
+      var tabs = stage.querySelectorAll("[data-demo-scenario]");
+      var promptNode = stage.querySelector("[data-demo-prompt]");
+      var sourcesNode = stage.querySelector("[data-demo-sources]");
+      var stepsNode = stage.querySelector("[data-demo-steps]");
+      var consoleNode = stage.querySelector("[data-demo-console]");
+      var statusNode = stage.querySelector("[data-demo-status]");
+      var runButton = stage.querySelector("[data-demo-run]");
+      var resetButton = stage.querySelector("[data-demo-reset]");
+      var timers = [];
+      var activeScenario = "email";
+
+      function clearTimers() {
+        while (timers.length) {
+          window.clearTimeout(timers.pop());
+        }
+      }
+
+      function cloneTemplatePart(scenario, selector) {
+        var template = stage.querySelector('[data-demo-template="' + scenario + '"]');
+        if (!template) {
+          return null;
+        }
+        return template.content.querySelector(selector).cloneNode(true);
+      }
+
+      function setLanguageOnNode(node) {
+        var lang = document.documentElement.getAttribute("data-page-lang") || "en";
+        Array.prototype.forEach.call(node.querySelectorAll("[data-copy-lang]"), function (el) {
+          el.hidden = el.getAttribute("data-copy-lang") !== lang;
+        });
+      }
+
+      function setStatus(state) {
+        statusNode.className = "demo-status is-" + state;
+        if (state === "running") {
+          statusNode.innerHTML = '<span data-copy-lang="en">Running</span><span data-copy-lang="zh">运行中</span>';
+        } else if (state === "done") {
+          statusNode.innerHTML = '<span data-copy-lang="en">Complete</span><span data-copy-lang="zh">已完成</span>';
+        } else {
+          statusNode.innerHTML = '<span data-copy-lang="en">Ready</span><span data-copy-lang="zh">待运行</span>';
+        }
+        setLanguageOnNode(statusNode);
+      }
+
+      function renderScenario(scenario) {
+        activeScenario = scenario;
+        clearTimers();
+        Array.prototype.forEach.call(tabs, function (tab) {
+          var active = tab.getAttribute("data-demo-scenario") === scenario;
+          tab.classList.toggle("is-active", active);
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+        });
+
+        var promptTemplate = cloneTemplatePart(scenario, "[data-demo-prompt-template]");
+        var sourcesTemplate = cloneTemplatePart(scenario, "[data-demo-sources-template]");
+        var stepsTemplate = cloneTemplatePart(scenario, "[data-demo-steps-template]");
+
+        promptNode.innerHTML = "";
+        sourcesNode.innerHTML = "";
+        stepsNode.innerHTML = "";
+        consoleNode.innerHTML = "";
+
+        Array.prototype.forEach.call(promptTemplate.childNodes, function (node) {
+          promptNode.appendChild(node.cloneNode(true));
+        });
+        Array.prototype.forEach.call(sourcesTemplate.childNodes, function (node) {
+          sourcesNode.appendChild(node.cloneNode(true));
+        });
+        Array.prototype.forEach.call(stepsTemplate.children, function (step, index) {
+          var item = step.cloneNode(true);
+          item.className = "demo-step";
+          item.setAttribute("data-step-state", "idle");
+          item.insertAdjacentHTML("afterbegin", '<span class="demo-step-index">0' + (index + 1) + '</span>');
+          stepsNode.appendChild(item);
+        });
+
+        consoleNode.innerHTML = '<p class="demo-placeholder"><span data-copy-lang="en">Click "Run demo" to simulate the workflow.</span><span data-copy-lang="zh">点击“运行演示”来模拟整个工作流。</span></p>';
+        setStatus("ready");
+        setLanguageOnNode(stage);
+      }
+
+      function runScenario() {
+        clearTimers();
+        renderScenario(activeScenario);
+        setStatus("running");
+        runButton.disabled = true;
+        resetButton.disabled = true;
+
+        var steps = stepsNode.querySelectorAll(".demo-step");
+        var resultTemplate = cloneTemplatePart(activeScenario, "[data-demo-result-template]");
+        var results = Array.prototype.slice.call(resultTemplate.children);
+
+        consoleNode.innerHTML = "";
+
+        Array.prototype.forEach.call(steps, function (step, index) {
+          timers.push(window.setTimeout(function () {
+            step.setAttribute("data-step-state", "active");
+            if (index > 0) {
+              steps[index - 1].setAttribute("data-step-state", "done");
+            }
+          }, 600 * index));
+
+          timers.push(window.setTimeout(function () {
+            var result = results[index];
+            if (result) {
+              consoleNode.appendChild(result.cloneNode(true));
+              setLanguageOnNode(consoleNode);
+            }
+            if (index === steps.length - 1) {
+              step.setAttribute("data-step-state", "done");
+              setStatus("done");
+              runButton.disabled = false;
+              resetButton.disabled = false;
+            }
+          }, (600 * index) + 500));
+        });
+      }
+
+      Array.prototype.forEach.call(tabs, function (tab) {
+        tab.addEventListener("click", function () {
+          runButton.disabled = false;
+          resetButton.disabled = false;
+          renderScenario(tab.getAttribute("data-demo-scenario"));
+        });
+      });
+
+      runButton.addEventListener("click", runScenario);
+      resetButton.addEventListener("click", function () {
+        runButton.disabled = false;
+        resetButton.disabled = false;
+        renderScenario(activeScenario);
+      });
+
+      renderScenario(activeScenario);
     }());
 
   </script>
