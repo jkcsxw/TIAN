@@ -332,7 +332,8 @@ if not server:
 config = {}
 if os.path.exists(config_path):
     try:
-        config = json.load(open(config_path))
+        with open(config_path) as fh:
+            config = json.load(fh)
     except Exception:
         config = {}
 if not isinstance(config, dict):
@@ -366,7 +367,8 @@ remove_mcp_server() {
 import json, sys
 
 config_path, config_key = sys.argv[1], sys.argv[2]
-config = json.load(open(config_path))
+with open(config_path) as fh:
+    config = json.load(fh)
 servers = config.get("mcpServers", {})
 if config_key in servers:
     del servers[config_key]
@@ -387,7 +389,8 @@ resolve_schedule_name_by_prompt() {
     python3 - "$SCHEDULES_FILE" "$prompt" <<'PYEOF'
 import json, sys
 try:
-    schedules = json.load(open(sys.argv[1]))
+    with open(sys.argv[1]) as fh:
+        schedules = json.load(fh)
 except Exception:
     schedules = []
 if not isinstance(schedules, list):
@@ -406,7 +409,8 @@ from datetime import datetime
 
 jobs_file = sys.argv[1]
 try:
-    jobs = json.load(open(jobs_file))
+    with open(jobs_file) as fh:
+        jobs = json.load(fh)
 except Exception:
     jobs = []
 
@@ -439,7 +443,8 @@ for job in jobs:
         changed = True
 
 if changed:
-    json.dump(jobs, open(jobs_file, "w"), indent=2)
+    with open(jobs_file, "w") as fh:
+        json.dump(jobs, fh, indent=2)
 PYEOF
 }
 
@@ -470,21 +475,24 @@ import json, sys
 from datetime import datetime
 
 jobs_file, job_id, reason = sys.argv[1], sys.argv[2], sys.argv[3]
-jobs = json.load(open(jobs_file))
+with open(jobs_file) as fh:
+    jobs = json.load(fh)
 for job in jobs:
     if job.get("id") == job_id:
         job["status"] = "stopped"
         job["finishedAt"] = datetime.now().isoformat()
         job["stopReason"] = reason
         break
-json.dump(jobs, open(jobs_file, "w"), indent=2)
+with open(jobs_file, "w") as fh:
+    json.dump(jobs, fh, indent=2)
 PYEOF
         ok "Stopped job $jid"
     done < <(python3 - "$JOBS_FILE" "$target" <<'PYEOF'
 import json, sys
 
 jobs_file, target = sys.argv[1], sys.argv[2]
-jobs = json.load(open(jobs_file))
+with open(jobs_file) as fh:
+    jobs = json.load(fh)
 for job in jobs:
     if job.get("status") != "running":
         continue
@@ -643,7 +651,8 @@ _ec=$?
 python3 -c "
 import json, os, re, subprocess, sys
 jf, jid, code, out_file, schedule_name, tian_dir = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]
-jobs = json.load(open(jf))
+with open(jf) as _fh:
+    jobs = json.load(_fh)
 text = open(out_file, encoding=\"utf-8\", errors=\"ignore\").read() if os.path.exists(out_file) else \"\"
 quota = re.search(r\"insufficient_quota|quota(?:\\s+is)?\\s+exhausted|quota_exhausted|rate\\.limit|rate limit|429|too many requests|overloaded\", text, re.I) is not None
 for j in jobs:
@@ -652,7 +661,8 @@ for j in jobs:
         if quota:
             j[\"stopReason\"] = \"quota_exhausted\"
         break
-json.dump(jobs, open(jf, \"w\"), indent=2)
+with open(jf, \"w\") as _fh:
+    json.dump(jobs, _fh, indent=2)
 if quota and schedule_name:
     subprocess.run([\"bash\", os.path.join(tian_dir, \"tian-cli.sh\"), \"schedule\", \"remove\", schedule_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 " "$5" "$6" "$_ec" "$4" "$7" "$8"
@@ -662,11 +672,13 @@ if quota and schedule_name:
 import json, sys
 from datetime import datetime
 jobs_file, jid, prompt, cmd, pid, job_name, schedule_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6], sys.argv[7]
-jobs = json.load(open(jobs_file))
+with open(jobs_file) as fh:
+    jobs = json.load(fh)
 jobs.append({"id": jid, "name": job_name or jid, "prompt": prompt, "backend": cmd,
              "scheduleName": schedule_name or "", "status": "running",
              "createdAt": datetime.now().isoformat(), "pid": pid})
-json.dump(jobs, open(jobs_file, 'w'), indent=2)
+with open(jobs_file, 'w') as fh:
+    json.dump(jobs, fh, indent=2)
 PYEOF
         ok "Job started: $job_id"
         info "Check result with: bash tian-cli.sh jobs result $job_id"
@@ -703,7 +715,8 @@ cmd_jobs() {
             local status
             status=$(python3 - "$JOBS_FILE" "$id" <<'PYEOF'
 import json, sys
-jobs = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as fh:
+    jobs = json.load(fh)
 j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
 print(j.get('status', 'unknown') if j else 'unknown')
 PYEOF
@@ -725,12 +738,14 @@ PYEOF
             python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
 import json, sys, os, glob
 jobs_file, tasks_dir = sys.argv[1], sys.argv[2]
-jobs = json.load(open(jobs_file))
+with open(jobs_file) as fh:
+    jobs = json.load(fh)
 keep = [j for j in jobs if j.get('status') == 'running']
 for j in [x for x in jobs if x.get('status') != 'running']:
     for f in glob.glob(f"{tasks_dir}/{j['id']}*"):
         os.remove(f)
-json.dump(keep, open(jobs_file, 'w'), indent=2)
+with open(jobs_file, 'w') as fh:
+    json.dump(keep, fh, indent=2)
 print(f"  Cleared {len(jobs)-len(keep)} completed jobs.")
 PYEOF
             ;;
@@ -738,7 +753,8 @@ PYEOF
             ensure_dirs
             python3 - "$JOBS_FILE" <<'PYEOF'
 import json, sys
-jobs = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as fh:
+    jobs = json.load(fh)
 if not jobs:
     print("  No jobs yet. Run: bash tian-cli.sh run \"your task\"")
 else:
@@ -774,17 +790,19 @@ _schedule_add_linux() {
     local job_line="$cron_expr  bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'  # tian-$name"
 
     # Remove existing entry for this name then append new one
-    ( crontab -l 2>/dev/null | grep -v "# tian-$name" ; echo "$job_line" ) | crontab -
+    ( crontab -l 2>/dev/null | grep -vF "# tian-$name" ; echo "$job_line" ) | crontab -
 
     python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "" <<'PYEOF'
 import json, sys
 from datetime import datetime
 sf, name, prompt, time, repeat, _ = sys.argv[1:]
-schedules = json.load(open(sf))
+with open(sf) as fh:
+    schedules = json.load(fh)
 schedules = [s for s in schedules if s.get('name') != name]
 schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat,
                   "createdAt": datetime.now().isoformat()})
-json.dump(schedules, open(sf, 'w'), indent=2)
+with open(sf, 'w') as fh:
+    json.dump(schedules, fh, indent=2)
 PYEOF
     ok "Schedule '$name' created ($repeat at $time) via crontab."
     info "Results will appear in: bash tian-cli.sh jobs"
@@ -839,11 +857,13 @@ PLIST
 import json, sys
 from datetime import datetime
 sf, name, prompt, time, repeat, plist = sys.argv[1:]
-schedules = json.load(open(sf))
+with open(sf) as fh:
+    schedules = json.load(fh)
 schedules = [s for s in schedules if s.get('name') != name]
 schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat,
                   "plistFile": plist, "createdAt": datetime.now().isoformat()})
-json.dump(schedules, open(sf, 'w'), indent=2)
+with open(sf, 'w') as fh:
+    json.dump(schedules, fh, indent=2)
 PYEOF
     ok "Schedule '$name' created ($repeat at $time) via launchd."
     info "Results will appear in: bash tian-cli.sh jobs"
@@ -851,7 +871,7 @@ PYEOF
 
 _schedule_remove_linux() {
     local name="$1"
-    ( crontab -l 2>/dev/null | grep -v "# tian-$name" ) | crontab - 2>/dev/null || true
+    ( crontab -l 2>/dev/null | grep -vF "# tian-$name" ) | crontab - 2>/dev/null || true
 }
 
 _schedule_remove_macos() {
@@ -884,7 +904,8 @@ cmd_schedule() {
             ensure_dirs
             python3 - "$SCHEDULES_FILE" <<'PYEOF'
 import json, sys
-schedules = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as fh:
+    schedules = json.load(fh)
 if not schedules:
     print("  No schedules. Create one with: bash tian-cli.sh schedule add <name> \"prompt\" HH:MM daily")
 else:
@@ -902,7 +923,8 @@ PYEOF
             local prompt
             prompt=$(python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
 import json, sys
-s = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as fh:
+    s = json.load(fh)
 e = next((x for x in s if x['name'] == sys.argv[2]), None)
 print(e['prompt'] if e else '')
 PYEOF
@@ -919,7 +941,8 @@ PYEOF
             if [[ "$platform" == "macos" ]]; then
                 plist_file=$(python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
 import json, sys
-s = json.load(open(sys.argv[1]))
+with open(sys.argv[1]) as fh:
+    s = json.load(fh)
 e = next((x for x in s if x['name'] == sys.argv[2]), None)
 print(e.get('plistFile', '') if e else '')
 PYEOF
@@ -931,8 +954,10 @@ PYEOF
             python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
 import json, sys
 sf, name = sys.argv[1], sys.argv[2]
-schedules = [s for s in json.load(open(sf)) if s.get('name') != name]
-json.dump(schedules, open(sf, 'w'), indent=2)
+with open(sf) as fh:
+    schedules = [s for s in json.load(fh) if s.get('name') != name]
+with open(sf, 'w') as fh:
+    json.dump(schedules, fh, indent=2)
 PYEOF
             ok "Schedule '$name' removed."
             ;;
@@ -1080,7 +1105,7 @@ PYEOF
     while IFS='|' read -r label path; do
         [[ -n "$path" ]] || continue
         if [[ -f "$path" ]]; then
-            python3 -c "import json; json.load(open('$path'))" 2>/dev/null \
+            TIAN_CHECK_PATH="$path" python3 -c "import json,os; json.load(open(os.environ['TIAN_CHECK_PATH']))" 2>/dev/null \
                 && ok "$label config valid: $path" \
                 || { warn "$label config has invalid JSON: $path"; ((issues++)) || true; }
         else
@@ -1284,13 +1309,16 @@ catalog_path, profile = sys.argv[1], sys.argv[2]
 if not profile or not os.path.isfile(profile):
     print("  [!!]  No shell profile found — skipping")
     sys.exit(0)
-c = json.load(open(catalog_path))
+with open(catalog_path) as fh:
+    c = json.load(fh)
 env_vars = set(b.get('apiKeyEnvVar','') for b in c['backends'] if b.get('apiKeyEnvVar'))
-lines = open(profile).readlines()
+with open(profile) as fh:
+    lines = fh.readlines()
 kept = [l for l in lines if not any(re.search(rf'export\s+{v}\s*=', l) for v in env_vars)]
 removed = len(lines) - len(kept)
 if removed:
-    open(profile, 'w').writelines(kept)
+    with open(profile, 'w') as fh:
+        fh.writelines(kept)
     print(f"  [ok]  Removed {removed} API key export(s) from {profile}")
 else:
     print(f"  [..]  No TIAN API key exports found in {profile}")
@@ -1318,7 +1346,8 @@ for key in list(mcp.keys()):
 removed = before - set(mcp.keys())
 if removed:
     cfg["mcpServers"] = mcp
-    json.dump(cfg, open(cfg_path, "w"), indent=2)
+    with open(cfg_path, "w") as fh:
+        json.dump(cfg, fh, indent=2)
     print(f"  [ok]  {label}: removed {len(removed)} MCP server(s)")
 else:
     print(f"  [..]  {label}: no TIAN MCP entries found")

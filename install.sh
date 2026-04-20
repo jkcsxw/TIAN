@@ -66,8 +66,8 @@ EOF
 download_repo() {
     local tmp_dir archive extracted_dir
     tmp_dir="$(mktemp -d)"
-    archive="$tmp_dir/tian.tar.gz"
     trap 'rm -rf "$tmp_dir"' EXIT
+    archive="$tmp_dir/tian.tar.gz"
 
     info "Downloading TIAN..."
     curl -fsSL "$ARCHIVE_URL" -o "$archive"
