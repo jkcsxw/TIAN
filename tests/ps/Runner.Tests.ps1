@@ -6,6 +6,7 @@ BeforeAll {
     function global:Write-Info { param($t) }
     function global:Write-Warn { param($t) }
     function global:Write-Fail { param($t) throw $t }
+    function global:Write-Rule { }
     function global:Remove-Schedule { param($Name, $TianDir) }
 
     # Point runner storage to a temp dir
@@ -208,6 +209,7 @@ Describe "Invoke-Task" {
         Remove-Item $global:TIAN_JOBS_FILE -ErrorAction SilentlyContinue
         if (Test-Path $global:TIAN_TASKS_DIR) { Remove-Item $global:TIAN_TASKS_DIR -Recurse -Force }
         Ensure-TaskDirs
+        $global:LASTEXITCODE = 0
     }
 
     It "persists the spawned PID into the jobs registry for background tasks" {
@@ -230,6 +232,55 @@ Describe "Invoke-Task" {
 
         $savedMeta = Get-JobStatus -JobId $jobId
         $savedMeta.pid | Should -Be 2468
+    }
+
+    It "passes literal prompt text to the backend in foreground mode" {
+        function global:Invoke-TestBackend {
+            param([string]$Flag, [string]$Prompt)
+            $script:CapturedFlag = $Flag
+            $script:CapturedPrompt = $Prompt
+            "ok"
+        }
+
+        Mock Get-ActiveBackend {
+            [PSCustomObject]@{
+                id = "fake-backend"
+                displayName = "Fake Backend"
+                cliCommand = "Invoke-TestBackend"
+                nonInteractiveFlag = "--prompt"
+            }
+        }
+
+        $prompt = 'say "hello"; Write-Host hacked'
+        Invoke-Task -Prompt $prompt -TianDir (Get-TianRoot) | Out-Null
+
+        $script:CapturedFlag | Should -Be "--prompt"
+        $script:CapturedPrompt | Should -Be $prompt
+    }
+
+    It "marks foreground jobs as error when the backend exits non-zero" {
+        function global:Invoke-TestBackendFailure {
+            param([string]$Flag, [string]$Prompt)
+            $global:LASTEXITCODE = 7
+            "backend failed"
+        }
+
+        Mock Get-ActiveBackend {
+            [PSCustomObject]@{
+                id = "fake-backend"
+                displayName = "Fake Backend"
+                cliCommand = "Invoke-TestBackendFailure"
+                nonInteractiveFlag = "--prompt"
+            }
+        }
+
+        $jobId = Invoke-Task -Prompt "fail please" -TianDir (Get-TianRoot)
+
+        $job = @(Read-Jobs) | Where-Object { $_.id -eq $jobId } | Select-Object -First 1
+        $job.status | Should -Be "error"
+
+        $savedMeta = Get-JobStatus -JobId $jobId
+        $savedMeta.status | Should -Be "error"
     }
 }
 

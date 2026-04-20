@@ -56,6 +56,13 @@ it "status exits 0" _test_status_exits_ok
 
 suite "list command"
 
+_test_list_backends() {
+    local out
+    out=$(run_cli list backends 2>/dev/null || true)
+    assert_contains "$out" "claude-code"
+}
+it "list backends shows backend ids" _test_list_backends
+
 _test_list_mcp() {
     local out
     out=$(run_cli list mcp 2>/dev/null || true)
@@ -71,6 +78,34 @@ _test_list_skills() {
     true
 }
 it "list skills does not crash" _test_list_skills
+
+suite "add / remove commands"
+
+_test_add_skill() {
+    run_cli add skill email-assistant >/dev/null
+    assert_file_exists "$TEST_HOME/.tian/skills/email-assistant.md"
+}
+it "add skill installs builtin skills into ~/.tian/skills" _test_add_skill
+
+_test_add_mcp() {
+    run_cli add mcp memory --backend claude-code >/dev/null
+    local cfg="$TEST_HOME/.claude/settings.json"
+    assert_file_exists "$cfg"
+    local out
+    out=$(cat "$cfg")
+    assert_contains "$out" '"memory"'
+}
+it "add mcp writes backend config" _test_add_mcp
+
+_test_remove_mcp() {
+    run_cli add mcp memory --backend claude-code >/dev/null
+    run_cli remove mcp memory --backend claude-code >/dev/null
+    local cfg="$TEST_HOME/.claude/settings.json"
+    local out
+    out=$(cat "$cfg")
+    [[ "$out" != *'"memory"'* ]]
+}
+it "remove mcp removes configured servers" _test_remove_mcp
 
 suite "jobs command"
 
@@ -93,6 +128,49 @@ _test_sched_list() {
     [[ $? -eq 0 ]]
 }
 it "schedule list exits 0" _test_sched_list
+
+suite "multi-backend fallback helpers"
+
+_test_is_quota_error_matches() {
+    # Source the CLI so we can call is_quota_error directly
+    local cli_src="$TIAN_ROOT/mac/tian-cli-bash.sh"
+    # Extract and eval just the function (safe: no side effects)
+    local fn; fn=$(awk '/^is_quota_error\(\)/,/^}/' "$cli_src")
+    eval "$fn"
+    is_quota_error "Error: insufficient_quota — please add credits"
+}
+it "is_quota_error detects insufficient_quota" _test_is_quota_error_matches
+
+_test_is_quota_error_rate_limit() {
+    local cli_src="$TIAN_ROOT/mac/tian-cli-bash.sh"
+    local fn; fn=$(awk '/^is_quota_error\(\)/,/^}/' "$cli_src")
+    eval "$fn"
+    is_quota_error "HTTP 429: rate limit exceeded"
+}
+it "is_quota_error detects 429 rate limit" _test_is_quota_error_rate_limit
+
+_test_is_quota_error_negative() {
+    local cli_src="$TIAN_ROOT/mac/tian-cli-bash.sh"
+    local fn; fn=$(awk '/^is_quota_error\(\)/,/^}/' "$cli_src")
+    eval "$fn"
+    ! is_quota_error "Task completed successfully."
+}
+it "is_quota_error returns false for normal output" _test_is_quota_error_negative
+
+suite "doctor command"
+
+_test_doctor_exits_ok() {
+    run_cli doctor
+    [[ $? -eq 0 ]]
+}
+it "doctor exits 0" _test_doctor_exits_ok
+
+_test_doctor_checks_node() {
+    local out
+    out=$(run_cli doctor 2>/dev/null || true)
+    assert_contains "$out" "Node"
+}
+it "doctor output mentions Node.js" _test_doctor_checks_node
 
 suite "unknown command"
 

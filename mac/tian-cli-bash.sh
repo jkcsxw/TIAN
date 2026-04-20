@@ -44,10 +44,342 @@ for b in catalog['backends']:
 PYEOF
 }
 
+all_backends() {
+    python3 - "$CATALOG" <<'PYEOF'
+import json, sys, subprocess
+catalog = json.load(open(sys.argv[1]))
+for b in catalog['backends']:
+    cmd = b.get('cliCommand', '')
+    flag = b.get('nonInteractiveFlag', '') or ''
+    if cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0:
+        print(f"{cmd}|{flag}|{b['id']}|{b.get('displayName', b['id'])}")
+PYEOF
+}
+
+is_quota_error() {
+    echo "${1:-}" | grep -qiE \
+        "insufficient_quota|quota(_is_)?exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded"
+}
+
 ensure_dirs() {
     mkdir -p "$TASKS_DIR" "$HOME/.tian"
     [[ -f "$JOBS_FILE" ]] || echo '[]' > "$JOBS_FILE"
     [[ -f "$SCHEDULES_FILE" ]] || echo '[]' > "$SCHEDULES_FILE"
+}
+
+profile_file() {
+    if [[ -f "$HOME/.zshrc" ]]; then
+        echo "$HOME/.zshrc"
+    elif [[ -f "$HOME/.bashrc" ]]; then
+        echo "$HOME/.bashrc"
+    elif [[ -f "$HOME/.bash_profile" ]]; then
+        echo "$HOME/.bash_profile"
+    else
+        echo "$HOME/.bashrc"
+    fi
+}
+
+save_shell_env_var() {
+    local name="${1:-}" value="${2:-}"
+    [[ -n "$name" ]] || return 1
+    local profile; profile=$(profile_file)
+    mkdir -p "$(dirname "$profile")"
+    touch "$profile"
+    python3 - "$profile" "$name" "$value" <<'PYEOF'
+import os, re, sys
+
+profile, name, value = sys.argv[1], sys.argv[2], sys.argv[3]
+pattern = re.compile(rf'^\s*export\s+{re.escape(name)}=')
+lines = []
+if os.path.exists(profile):
+    with open(profile, encoding='utf-8', errors='ignore') as fh:
+        lines = fh.readlines()
+kept = [line for line in lines if not pattern.search(line)]
+kept.append(f'export {name}="{value}"\n')
+with open(profile, 'w', encoding='utf-8') as fh:
+    fh.writelines(kept)
+PYEOF
+    export "$name=$value"
+}
+
+prompt_secret() {
+    local label="${1:-Value}"
+    local value=""
+    read -rsp "  $label: " value
+    echo ""
+    printf '%s' "$value"
+}
+
+backend_supports_mcp() {
+    local backend_id="${1:-}"
+    [[ -n "$backend_id" ]] || return 1
+    python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+backend = next((b for b in catalog["backends"] if b.get("id") == sys.argv[2]), None)
+supports = backend is not None and backend.get("supportsMcp", True) and bool(backend.get("mcpConfigTarget") or backend.get("mcpConfigPath"))
+raise SystemExit(0 if supports else 1)
+PYEOF
+}
+
+find_backend_by_id() {
+    local backend_id="${1:-}"
+    python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+backend = next((b for b in catalog["backends"] if b.get("id") == sys.argv[2]), None)
+if not backend:
+    raise SystemExit(1)
+print("|".join([
+    backend.get("id", ""),
+    backend.get("displayName", ""),
+    backend.get("cliCommand", "") or "",
+    backend.get("mcpConfigTarget", "") or "",
+    backend.get("mcpConfigPath", "") or "",
+]))
+PYEOF
+}
+
+find_mcp_by_id() {
+    local server_id="${1:-}"
+    python3 - "$CATALOG" "$server_id" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+server = next((s for s in catalog["mcpServers"] if s.get("id") == sys.argv[2]), None)
+if not server:
+    raise SystemExit(1)
+reqs = ",".join((item.get("name") or "") for item in server.get("requiredEnvVars", []))
+print("|".join([
+    server.get("id", ""),
+    server.get("displayName", ""),
+    server.get("configKey", "") or "",
+    reqs,
+]))
+PYEOF
+}
+
+find_skill_by_id() {
+    local skill_id="${1:-}"
+    python3 - "$CATALOG" "$skill_id" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+skill = next((s for s in catalog["skills"] if s.get("id") == sys.argv[2]), None)
+if not skill:
+    raise SystemExit(1)
+print("|".join([
+    skill.get("id", ""),
+    skill.get("displayName", ""),
+    skill.get("source", ""),
+    skill.get("promptFile", "") or "",
+    skill.get("npmPackage", "") or "",
+    skill.get("gitUrl", "") or "",
+]))
+PYEOF
+}
+
+get_mcp_config_path_for_backend() {
+    local backend_id="${1:-}"
+    python3 - "$CATALOG" "$backend_id" "$(detect_platform)" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, backend_id, platform, home = sys.argv[1:5]
+catalog = json.load(open(catalog_path))
+backend = next((b for b in catalog["backends"] if b.get("id") == backend_id), None)
+if not backend:
+    raise SystemExit(1)
+target = backend.get("mcpConfigTarget") or ""
+custom = backend.get("mcpConfigPath") or ""
+
+def expand(path: str) -> str:
+    if platform == "macos":
+        path = path.replace("%APPDATA%", os.path.join(home, "Library", "Application Support"))
+    elif platform in ("linux", "wsl"):
+        path = path.replace("%APPDATA%", os.path.join(home, ".config"))
+    path = path.replace("%USERPROFILE%", home)
+    return path.replace("\\", "/")
+
+if target == "claude_desktop":
+    if platform == "macos":
+        print(os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"))
+    elif platform in ("linux", "wsl"):
+        print(os.path.join(home, ".config", "Claude", "claude_desktop_config.json"))
+    else:
+        print(expand(custom) if custom else os.path.join(home, ".tian", "mcp_config.json"))
+elif target == "claude_code":
+    print(os.path.join(home, ".claude", "settings.json"))
+elif custom:
+    print(expand(custom))
+else:
+    print(os.path.join(home, ".tian", "mcp_config.json"))
+PYEOF
+}
+
+select_backend_for_mcp() {
+    local explicit_backend="${1:-}"
+    if [[ -n "$explicit_backend" ]]; then
+        backend_supports_mcp "$explicit_backend" || fail "Backend '$explicit_backend' does not support MCP configuration."
+        printf '%s' "$explicit_backend"
+        return 0
+    fi
+
+    local active_row active_id
+    active_row=$(active_backend || true)
+    active_id=$(echo "$active_row" | cut -d'|' -f3)
+    if [[ -n "$active_id" ]] && backend_supports_mcp "$active_id"; then
+        printf '%s' "$active_id"
+        return 0
+    fi
+
+    python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+for backend in catalog["backends"]:
+    if backend.get("supportsMcp", True) and (backend.get("mcpConfigTarget") or backend.get("mcpConfigPath")):
+        print(backend["id"])
+        break
+PYEOF
+}
+
+ensure_required_env_vars() {
+    local server_id="${1:-}"
+    python3 - "$CATALOG" "$server_id" <<'PYEOF' | while IFS='|' read -r name label hint url; do
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+server = next((s for s in catalog["mcpServers"] if s.get("id") == sys.argv[2]), None)
+for env_var in (server or {}).get("requiredEnvVars", []):
+    print("|".join([
+        env_var.get("name", ""),
+        env_var.get("label", "") or env_var.get("name", ""),
+        env_var.get("hint", "") or "",
+        env_var.get("url", "") or "",
+    ]))
+PYEOF
+        [[ -n "$name" ]] || continue
+        if [[ -n "${!name:-}" ]]; then
+            continue
+        fi
+        info "$label${hint:+ — $hint}"
+        [[ -n "$url" ]] && info "Get it at: $url"
+        local value; value=$(prompt_secret "$label")
+        [[ -n "$value" ]] || fail "Missing required value for $name."
+        save_shell_env_var "$name" "$value"
+        ok "$name saved to $(profile_file)"
+    done
+}
+
+install_skill() {
+    local skill_id="${1:-}"
+    local row
+    row=$(find_skill_by_id "$skill_id") || fail "Unknown skill id '$skill_id'."
+    local _id display_name source prompt_file npm_package git_url
+    IFS='|' read -r _id display_name source prompt_file npm_package git_url <<< "$row"
+    local skills_dir="$HOME/.tian/skills"
+    mkdir -p "$skills_dir"
+
+    case "$source" in
+        builtin)
+            [[ -n "$prompt_file" ]] || fail "Skill '$skill_id' does not define a prompt file."
+            local src="$TIAN_DIR/$prompt_file"
+            [[ -f "$src" ]] || fail "Skill file not found: $prompt_file"
+            cp "$src" "$skills_dir/${skill_id}.md"
+            ;;
+        npm)
+            [[ -n "$npm_package" ]] || fail "Skill '$skill_id' does not define an npm package."
+            npm install -g "$npm_package"
+            ;;
+        git)
+            [[ -n "$git_url" ]] || fail "Skill '$skill_id' does not define a git URL."
+            git clone "$git_url" "$skills_dir/$skill_id"
+            ;;
+        *)
+            fail "Unsupported skill source '$source' for '$skill_id'."
+            ;;
+    esac
+
+    ok "$display_name installed."
+}
+
+add_mcp_server() {
+    local server_id="${1:-}" backend_id="${2:-}"
+    local server_row
+    server_row=$(find_mcp_by_id "$server_id") || fail "Unknown MCP id '$server_id'."
+    local _sid display_name config_key _
+    IFS='|' read -r _sid display_name config_key _ <<< "$server_row"
+
+    backend_id=$(select_backend_for_mcp "$backend_id")
+    [[ -n "$backend_id" ]] || fail "No MCP-capable backend found."
+    local backend_row backend_name config_path
+    backend_row=$(find_backend_by_id "$backend_id") || fail "Unknown backend id '$backend_id'."
+    IFS='|' read -r _ backend_name _ _ _ <<< "$backend_row"
+    config_path=$(get_mcp_config_path_for_backend "$backend_id")
+    mkdir -p "$(dirname "$config_path")"
+    ensure_required_env_vars "$server_id"
+
+    python3 - "$CATALOG" "$config_path" "$server_id" <<'PYEOF'
+import json, os, sys
+
+catalog_path, config_path, server_id = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+server = next((s for s in catalog["mcpServers"] if s.get("id") == server_id), None)
+if not server:
+    raise SystemExit(1)
+config = {}
+if os.path.exists(config_path):
+    try:
+        config = json.load(open(config_path))
+    except Exception:
+        config = {}
+if not isinstance(config, dict):
+    config = {}
+config.setdefault("mcpServers", {})
+config["mcpServers"][server["configKey"]] = server["configSchema"]
+with open(config_path, "w", encoding="utf-8") as fh:
+    json.dump(config, fh, indent=2)
+PYEOF
+    ok "$display_name added to $backend_name config."
+    info "Config written to: $config_path"
+}
+
+remove_mcp_server() {
+    local server_id="${1:-}" backend_id="${2:-}"
+    local server_row
+    server_row=$(find_mcp_by_id "$server_id") || fail "Unknown MCP id '$server_id'."
+    local _sid display_name config_key _
+    IFS='|' read -r _sid display_name config_key _ <<< "$server_row"
+
+    backend_id=$(select_backend_for_mcp "$backend_id")
+    [[ -n "$backend_id" ]] || fail "No MCP-capable backend found."
+    local backend_row backend_name config_path
+    backend_row=$(find_backend_by_id "$backend_id") || fail "Unknown backend id '$backend_id'."
+    IFS='|' read -r _ backend_name _ _ _ <<< "$backend_row"
+    config_path=$(get_mcp_config_path_for_backend "$backend_id")
+    [[ -f "$config_path" ]] || fail "Config file not found: $config_path"
+
+    local result
+    result=$(python3 - "$config_path" "$config_key" <<'PYEOF'
+import json, sys
+
+config_path, config_key = sys.argv[1], sys.argv[2]
+config = json.load(open(config_path))
+servers = config.get("mcpServers", {})
+if config_key in servers:
+    del servers[config_key]
+    config["mcpServers"] = servers
+    with open(config_path, "w", encoding="utf-8") as fh:
+        json.dump(config, fh, indent=2)
+    print("removed")
+else:
+    print("missing")
+PYEOF
+)
+    [[ "$result" == "missing" ]] && fail "$display_name is not configured in $backend_name."
+    ok "$display_name removed from $backend_name config."
 }
 
 resolve_schedule_name_by_prompt() {
@@ -179,12 +511,17 @@ $(rule)
 
   COMMANDS
     setup               Re-run the interactive setup wizard
+    repair              Re-run setup to repair the current install
     update              Upgrade installed AI backends to their latest versions
     doctor              Check your setup and diagnose common problems
     uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is installed
+    list backends       List available AI backends
     list mcp            List available MCP servers
     list skills         List available skills
+    add mcp <id>        Add an MCP server to backend config
+    add skill <id>      Install a skill
+    remove mcp <id>     Remove an MCP server from backend config
     run "prompt"        Run a task (foreground)
     run "prompt" -b     Run a task in the background
     jobs                List background jobs
@@ -201,6 +538,7 @@ $(rule)
   EXAMPLES
     bash tian-cli.sh run "Summarise today's AI news"
     bash tian-cli.sh run "Draft my weekly report" -b
+    bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
     bash tian-cli.sh schedule list
@@ -229,16 +567,32 @@ for b in c['backends']:
     status = '[ok]' if val else '[!!]'
     print(f'  {status}  {env}')
 PYEOF
-    # Bug fix: check platform-appropriate MCP config path
-    local platform; platform=$(detect_platform)
-    local mcp_config
-    if [[ "$platform" == "macos" ]]; then
-        mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
-    else
-        mcp_config="$HOME/.config/claude/claude_desktop_config.json"
-    fi
     echo ""
-    [[ -f "$mcp_config" ]] && ok "MCP config: $mcp_config" || warn "MCP config not found"
+    python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, platform, home = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+seen = set()
+for backend in catalog["backends"]:
+    if not backend.get("supportsMcp", True):
+        continue
+    key = backend.get("mcpConfigTarget") or backend.get("mcpConfigPath") or ""
+    if not key or key in seen:
+        continue
+    seen.add(key)
+    target = backend.get("mcpConfigTarget") or ""
+    custom = backend.get("mcpConfigPath") or ""
+    if target == "claude_desktop":
+        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    elif target == "claude_code":
+        path = os.path.join(home, ".claude", "settings.json")
+    else:
+        base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
+        path = custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/") if custom else os.path.join(home, ".tian", "mcp_config.json")
+    state = "[ok]" if os.path.isfile(path) else "[!!]"
+    print(f"  {state}  {target or backend.get('id', 'mcp')}: {path}")
+PYEOF
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh exists" || warn "launcher.sh not found — run setup.sh first"
     echo ""; rule
 }
@@ -317,10 +671,18 @@ PYEOF
         ok "Job started: $job_id"
         info "Check result with: bash tian-cli.sh jobs result $job_id"
     else
-        rule
-        # Bug fix: pass prompt as argument, not via eval string interpolation
-        "$cmd" "$flag" "$prompt" | tee "$out_file"
-        rule
+        local primary_cmd="$cmd"
+        while IFS='|' read -r r_cmd r_flag _bid r_name; do
+            [[ -z "$r_cmd" ]] && continue
+            [[ "$r_cmd" == "$primary_cmd" ]] || warn "Falling back to $r_name (quota/rate-limit on previous backend)..."
+            rule
+            # Bug fix: pass prompt as argument, not via eval string interpolation
+            "$r_cmd" "$r_flag" "$prompt" 2>&1 | tee "$out_file" || true
+            rule
+            local out_text; out_text=$(cat "$out_file" 2>/dev/null || true)
+            is_quota_error "$out_text" || break
+            warn "$r_name: quota or rate limit — trying next backend..."
+        done < <(all_backends)
     fi
 }
 
@@ -405,7 +767,7 @@ _schedule_add_linux() {
         hourly) cron_expr="0 * * * *" ;;
         daily)  cron_expr="$minute $hour * * *" ;;
         weekly) cron_expr="$minute $hour * * 1" ;;
-        once)   cron_expr="@reboot" ;;
+        once)   warn "Linux cron does not support one-time jobs directly. Falling back to daily at $time."; cron_expr="$minute $hour * * *" ;;
         *)      cron_expr="$minute $hour * * *" ;;
     esac
 
@@ -715,17 +1077,40 @@ PYEOF
     echo ""
 
     echo -e "${BOLD}  Config files${RESET}"
-    local mcp_config
-    [[ "$platform" == "macos" ]] \
-        && mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json" \
-        || mcp_config="$HOME/.config/claude/claude_desktop_config.json"
-    if [[ -f "$mcp_config" ]]; then
-        python3 -c "import json; json.load(open('$mcp_config'))" 2>/dev/null \
-            && ok "MCP config valid: $mcp_config" \
-            || { warn "MCP config has invalid JSON: $mcp_config"; ((issues++)) || true; }
-    else
-        info "MCP config not found (optional): $mcp_config"
-    fi
+    while IFS='|' read -r label path; do
+        [[ -n "$path" ]] || continue
+        if [[ -f "$path" ]]; then
+            python3 -c "import json; json.load(open('$path'))" 2>/dev/null \
+                && ok "$label config valid: $path" \
+                || { warn "$label config has invalid JSON: $path"; ((issues++)) || true; }
+        else
+            info "$label config not found (optional): $path"
+        fi
+    done < <(python3 - "$CATALOG" "$platform" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, platform, home = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+seen = set()
+for backend in catalog["backends"]:
+    if not backend.get("supportsMcp", True):
+        continue
+    key = backend.get("mcpConfigTarget") or backend.get("mcpConfigPath") or ""
+    if not key or key in seen:
+        continue
+    seen.add(key)
+    target = backend.get("mcpConfigTarget") or ""
+    custom = backend.get("mcpConfigPath") or ""
+    if target == "claude_desktop":
+        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    elif target == "claude_code":
+        path = os.path.join(home, ".claude", "settings.json")
+    else:
+        base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
+        path = custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/") if custom else os.path.join(home, ".tian", "mcp_config.json")
+    print(f"{target or backend.get('id', 'mcp')}|{path}")
+PYEOF
+)
     [[ -f "$CATALOG" ]] && ok "catalog.json found" || { warn "catalog.json missing — reinstall TIAN"; ((issues++)) || true; }
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh found" || { warn "launcher.sh missing — run setup"; ((issues++)) || true; }
     echo ""
@@ -742,6 +1127,16 @@ PYEOF
 cmd_list() {
     local sub="${1:-}"; shift || true
     case "$sub" in
+        backends)
+            hdr "Available AI Backends"
+            python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    install = b.get('npmPackage') or b.get('downloadUrl') or 'built-in'
+    print(f"  {b['id']:<20} {b['displayName']:<30} {install}")
+PYEOF
+            rule ;;
         mcp)
             hdr "Available MCP Servers"
             python3 - "$CATALOG" <<'PYEOF'
@@ -760,7 +1155,64 @@ for s in c['skills']:
     print(f"  {s['id']:<26} {s['displayName']:<30} {s['category']}")
 PYEOF
             rule ;;
-        *) fail "Usage: list mcp  |  list skills" ;;
+        *) fail "Usage: list backends  |  list mcp  |  list skills" ;;
+    esac
+}
+
+cmd_add() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        mcp)
+            local server_id="${1:-}" backend_id=""
+            shift || true
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    --backend)
+                        backend_id="${2:-}"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            [[ -n "$server_id" ]] || fail "Usage: add mcp <id> [--backend <backend-id>]"
+            add_mcp_server "$server_id" "$backend_id"
+            ;;
+        skill)
+            local skill_id="${1:-}"
+            [[ -n "$skill_id" ]] || fail "Usage: add skill <id>"
+            install_skill "$skill_id"
+            ;;
+        *)
+            fail "Usage: add mcp <id> [--backend <backend-id>]  |  add skill <id>"
+            ;;
+    esac
+}
+
+cmd_remove() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        mcp)
+            local server_id="${1:-}" backend_id=""
+            shift || true
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    --backend)
+                        backend_id="${2:-}"
+                        shift 2
+                        ;;
+                    *)
+                        shift
+                        ;;
+                esac
+            done
+            [[ -n "$server_id" ]] || fail "Usage: remove mcp <id> [--backend <backend-id>]"
+            remove_mcp_server "$server_id" "$backend_id"
+            ;;
+        *)
+            fail "Usage: remove mcp <id> [--backend <backend-id>]"
+            ;;
     esac
 }
 
@@ -784,7 +1236,6 @@ cmd_uninstall() {
         [[ "$answer" =~ ^[Yy]$ ]] || { echo "  Cancelled."; return 0; }
     fi
 
-    local platform; platform=$(detect_platform)
     local removed=0 skipped=0
 
     # ── 1. Uninstall npm packages ─────────────────────────────────────────────
@@ -849,34 +1300,57 @@ PYEOF
     # ── 3. Remove MCP config entries written by TIAN ─────────────────────────
     echo ""
     echo -e "${BOLD}  Cleaning MCP config${RESET}"
-    local mcp_config
-    [[ "$platform" == "macos" ]] \
-        && mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json" \
-        || mcp_config="$HOME/.config/claude/claude_desktop_config.json"
+    while IFS='|' read -r label cfg_path; do
+        [[ -n "$cfg_path" ]] || continue
+        if [[ -f "$cfg_path" ]]; then
+            python3 - "$CATALOG" "$cfg_path" "$label" <<'PYEOF'
+import json, sys
 
-    if [[ -f "$mcp_config" ]]; then
-        python3 - "$CATALOG" "$mcp_config" <<'PYEOF'
-import json, sys, os
-catalog_path, cfg_path = sys.argv[1], sys.argv[2]
-c     = json.load(open(catalog_path))
-tian_keys = set(s.get('configKey','') for s in c.get('mcpServers',[]) if s.get('configKey'))
-cfg   = json.load(open(cfg_path))
-mcp   = cfg.get('mcpServers', {})
+catalog_path, cfg_path, label = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+tian_keys = {s.get("configKey", "") for s in catalog.get("mcpServers", []) if s.get("configKey")}
+cfg = json.load(open(cfg_path))
+mcp = cfg.get("mcpServers", {})
 before = set(mcp.keys())
-for k in list(mcp.keys()):
-    if k in tian_keys:
-        del mcp[k]
-after = set(mcp.keys())
-removed = before - after
+for key in list(mcp.keys()):
+    if key in tian_keys:
+        del mcp[key]
+removed = before - set(mcp.keys())
 if removed:
-    json.dump(cfg, open(cfg_path, 'w'), indent=2)
-    print(f"  [ok]  Removed {len(removed)} MCP server(s) from config: {', '.join(removed)}")
+    cfg["mcpServers"] = mcp
+    json.dump(cfg, open(cfg_path, "w"), indent=2)
+    print(f"  [ok]  {label}: removed {len(removed)} MCP server(s)")
 else:
-    print(f"  [..]  No TIAN MCP entries found in config")
+    print(f"  [..]  {label}: no TIAN MCP entries found")
 PYEOF
-    else
-        info "MCP config not found — skipping"
-    fi
+        else
+            info "$label config not found — skipping"
+        fi
+    done < <(python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, platform, home = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+seen = set()
+for backend in catalog["backends"]:
+    if not backend.get("supportsMcp", True):
+        continue
+    key = backend.get("mcpConfigTarget") or backend.get("mcpConfigPath") or ""
+    if not key or key in seen:
+        continue
+    seen.add(key)
+    target = backend.get("mcpConfigTarget") or ""
+    custom = backend.get("mcpConfigPath") or ""
+    if target == "claude_desktop":
+        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    elif target == "claude_code":
+        path = os.path.join(home, ".claude", "settings.json")
+    else:
+        base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
+        path = custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/") if custom else os.path.join(home, ".tian", "mcp_config.json")
+    print(f"{target or backend.get('id', 'mcp')}|{path}")
+PYEOF
+)
 
     # ── 4. Remove launcher script ─────────────────────────────────────────────
     echo ""
@@ -911,14 +1385,22 @@ PYEOF
     echo ""
 }
 
+cmd_repair() {
+    info "Re-running setup to repair the current install."
+    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
     setup)     bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    repair)    cmd_repair ;;
     update)    cmd_update ;;
     doctor)    cmd_doctor ;;
     status)    cmd_status ;;
     uninstall) cmd_uninstall "$@" ;;
+    add)       cmd_add "$@" ;;
+    remove)    cmd_remove "$@" ;;
     run)       cmd_run "$@" ;;
     jobs)      cmd_jobs "$@" ;;
     schedule)  cmd_schedule "$@" ;;

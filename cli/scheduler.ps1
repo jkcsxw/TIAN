@@ -64,7 +64,7 @@ function Get-CrontabEntry {
     $hour   = [int]($Time -split ':')[0]
     $minute = [int]($Time -split ':')[1]
     $cronExpr = switch ($Repeat.ToLower()) {
-        "hourly" { "0 * * * *" }
+        "hourly" { "$minute * * * *" }
         "weekly" {
             $day = if ($DayOfWeek) { Convert-DayNameToInt ($DayOfWeek -split ',')[0] } else { 1 }
             "$minute $hour * * $day"
@@ -81,18 +81,36 @@ function Get-CrontabEntry {
 function Add-LinuxCrontabEntry {
     param([string]$Name, [string]$CrontabLine)
     $marker   = "# TIAN:$Name"
-    $existing = & crontab -l 2>/dev/null
+    $existing = & crontab -l 2>$null
     $lines    = if ($existing) { @($existing | Where-Object { $_ -notmatch [regex]::Escape($marker) }) } else { @() }
     $lines   += "$CrontabLine  $marker"
-    $lines | & crontab -
+    return Set-LinuxCrontabContent -Lines $lines
 }
 
 function Remove-LinuxCrontabEntry {
     param([string]$Name)
     $marker   = "# TIAN:$Name"
-    $existing = & crontab -l 2>/dev/null
+    $existing = & crontab -l 2>$null
     $lines    = if ($existing) { @($existing | Where-Object { $_ -notmatch [regex]::Escape($marker) }) } else { @() }
-    if ($lines.Count -eq 0) { "" | & crontab - } else { $lines | & crontab - }
+    return Set-LinuxCrontabContent -Lines $lines
+}
+
+function Set-LinuxCrontabContent {
+    param([string[]]$Lines)
+
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $content = if ($null -eq $Lines -or $Lines.Count -eq 0) {
+            ""
+        } else {
+            ($Lines -join [Environment]::NewLine) + [Environment]::NewLine
+        }
+        [System.IO.File]::WriteAllText($tempFile, $content)
+        & crontab $tempFile 2>$null | Out-Null
+        return ($LASTEXITCODE -eq 0)
+    } finally {
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-TaskName {
@@ -184,7 +202,10 @@ function Add-Schedule {
         $cliPath     = Join-Path $TianDir "tian-cli.sh"
         $cronCommand = "bash `"$cliPath`" schedule run --name `"$Name`""
         $cronLine    = Get-CrontabEntry -Repeat $Repeat -Time $Time -DayOfWeek $DayOfWeek -Command $cronCommand
-        Add-LinuxCrontabEntry -Name $Name -CrontabLine $cronLine
+        if (-not (Add-LinuxCrontabEntry -Name $Name -CrontabLine $cronLine)) {
+            Write-Fail "Failed to update crontab for schedule '$Name'. Check your cron permissions and try again."
+            return
+        }
         Write-Ok "定时任务 '$Name' 已添加到 crontab。/ Schedule '$Name' added to crontab."
 
         $entry = [PSCustomObject]@{
@@ -246,7 +267,10 @@ function Remove-Schedule {
         }
     } elseif ($runningOnLinux) {
         if (Get-Command crontab -ErrorAction SilentlyContinue) {
-            Remove-LinuxCrontabEntry -Name $Name
+            if (-not (Remove-LinuxCrontabEntry -Name $Name)) {
+                Write-Fail "Failed to update crontab while removing schedule '$Name'. Check your cron permissions and try again."
+                return
+            }
         }
     } else {
         $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
