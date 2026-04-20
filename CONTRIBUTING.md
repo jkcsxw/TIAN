@@ -323,7 +323,18 @@ If you have a Windows code-signing certificate:
 installer\build-installer.ps1 -Sign
 ```
 
-This runs `signtool sign` with a SHA-256 timestamp after compilation. Add your certificate thumbprint or PFX path to the `signtool` call in `build-installer.ps1` if you use a specific cert.
+This runs `signtool sign` with a SHA-256 timestamp after compilation. To use a specific PFX file locally:
+
+```powershell
+installer\build-installer.ps1 -Sign -CertificatePath .\codesign.pfx -CertificatePassword 'secret'
+```
+
+For GitHub Actions releases, add these repository secrets:
+
+- `WINDOWS_CERT_PFX_BASE64`: base64-encoded contents of your `.pfx`
+- `WINDOWS_CERT_PASSWORD`: password for that `.pfx`
+
+When those secrets are present, `.github/workflows/release.yml` automatically signs `tian-setup.exe` during release builds.
 
 ---
 

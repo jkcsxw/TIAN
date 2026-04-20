@@ -5,12 +5,18 @@
 #   powershell -ExecutionPolicy Bypass -File installer\build-installer.ps1
 #
 # Options:
-#   -Version "1.2.3"   Override the version embedded in the installer
-#   -Sign              Code-sign the output exe (requires signtool on PATH + cert)
+#   -Version "1.2.3"            Override the version embedded in the installer
+#   -Sign                       Code-sign the output exe
+#   -CertificatePath "cert.pfx" Path to a PFX file used by signtool
+#   -CertificatePassword "..."  Password for the PFX file
+#   -TimestampUrl "http://..."  RFC 3161 timestamp URL (defaults to DigiCert)
 
 param(
     [string]$Version,
-    [switch]$Sign
+    [switch]$Sign,
+    [string]$CertificatePath,
+    [string]$CertificatePassword,
+    [string]$TimestampUrl = 'http://timestamp.digicert.com'
 )
 
 Set-StrictMode -Version Latest
@@ -35,6 +41,24 @@ function Find-Iscc {
     return $null
 }
 
+function Find-SignTool {
+    $onPath = Get-Command signtool -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+
+    $candidates = @(
+        "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\signtool.exe",
+        "$env:ProgramFiles\Windows Kits\10\bin\x64\signtool.exe",
+        "$env:ProgramFiles(x86)\Windows Kits\10\bin\x64\signtool.exe",
+        "$env:ProgramFiles\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe",
+        "$env:ProgramFiles(x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+    )
+    foreach ($c in $candidates) {
+        if (Test-Path $c) { return $c }
+    }
+
+    return $null
+}
+
 # Extract version from .iss file
 
 function Get-IssVersion {
@@ -50,6 +74,9 @@ function Invoke-Build {
     param(
         [string]$BuildVersion,
         [switch]$BuildSign,
+        [string]$BuildCertificatePath,
+        [string]$BuildCertificatePassword,
+        [string]$BuildTimestampUrl = 'http://timestamp.digicert.com',
         [string]$ScriptRoot = $PSScriptRoot
     )
 
@@ -101,18 +128,41 @@ function Invoke-Build {
     }
 
     if ($BuildSign) {
-        $signtool = Get-Command signtool -ErrorAction SilentlyContinue
+        $signtool = Find-SignTool
         if (-not $signtool) {
-            Write-Host "signtool not found - skipping signing." -ForegroundColor Yellow
-        } else {
-            Write-Host "Signing $exePath ..." -ForegroundColor Cyan
-            & signtool sign /tr http://timestamp.digicert.com /td sha256 /fd sha256 /a $exePath
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "Signing failed (exit $LASTEXITCODE)." -ForegroundColor Red
-                exit $LASTEXITCODE
-            }
-            Write-Host "Signed successfully." -ForegroundColor Green
+            Write-Host "signtool not found - cannot sign installer." -ForegroundColor Red
+            exit 1
         }
+
+        $signArgs = @(
+            'sign',
+            '/tr', $BuildTimestampUrl,
+            '/td', 'sha256',
+            '/fd', 'sha256'
+        )
+
+        if ($BuildCertificatePath) {
+            if (-not (Test-Path $BuildCertificatePath)) {
+                Write-Host "Certificate file not found: $BuildCertificatePath" -ForegroundColor Red
+                exit 1
+            }
+            $signArgs += @('/f', $BuildCertificatePath)
+            if ($BuildCertificatePassword) {
+                $signArgs += @('/p', $BuildCertificatePassword)
+            }
+        } else {
+            $signArgs += '/a'
+        }
+
+        $signArgs += $exePath
+
+        Write-Host "Signing $exePath ..." -ForegroundColor Cyan
+        & $signtool @signArgs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Signing failed (exit $LASTEXITCODE)." -ForegroundColor Red
+            exit $LASTEXITCODE
+        }
+        Write-Host "Signed successfully." -ForegroundColor Green
     }
 
     Write-Host ""
@@ -124,5 +174,11 @@ function Invoke-Build {
 
 # Only execute when run directly - not when dot-sourced for testing
 if ($MyInvocation.InvocationName -ne '.') {
-    Invoke-Build -BuildVersion $Version -BuildSign:$Sign -ScriptRoot $PSScriptRoot
+    Invoke-Build `
+        -BuildVersion $Version `
+        -BuildSign:$Sign `
+        -BuildCertificatePath $CertificatePath `
+        -BuildCertificatePassword $CertificatePassword `
+        -BuildTimestampUrl $TimestampUrl `
+        -ScriptRoot $PSScriptRoot
 }
