@@ -24,6 +24,7 @@
   <meta name="twitter:description" content="Install an AI assistant on your own computer and let it help with your real files, everyday tasks, and apps.">
   <meta name="twitter:image" content="https://jkcsxw.github.io/TIAN/social-preview.svg">
   <link rel="stylesheet" href="styles.css">
+  <style id="lang-style">[data-copy-lang="zh"]{display:none!important}</style>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -717,64 +718,40 @@
     </footer>
   </div>
   <script>
-    /* ── debug panel ── remove once issue is diagnosed ── */
-    (function () {
-      var panel = document.createElement("div");
-      panel.id = "tian-dbg";
-      panel.style.cssText = "position:fixed;bottom:8px;left:8px;z-index:9999;background:#000;color:#0f0;font:12px/1.4 monospace;padding:8px 10px;border-radius:6px;max-width:320px;word-break:break-all;";
-      panel.innerHTML = "DBG: script reached";
-      document.body.appendChild(panel);
-
-      window.addEventListener("error", function (e) {
-        panel.innerHTML += "<br>ERR: " + e.message + " (" + e.filename + ":" + e.lineno + ")";
-        panel.style.color = "#f66";
-      });
-
-      window.__dbg = function (msg) { panel.innerHTML += "<br>" + msg; };
-    }());
-
     (function () {
       var root = document.documentElement;
+      var langStyle = document.getElementById("lang-style");
       var buttons = document.querySelectorAll("[data-set-lang]");
       var supported = ["en", "zh"];
       var storage = null;
 
-      window.__dbg("buttons found: " + buttons.length);
-
-      try {
-        storage = window.localStorage;
-      } catch (error) {
-        storage = null;
-      }
+      try { storage = window.localStorage; } catch (e) {}
 
       function pickInitialLanguage() {
         var stored = storage ? storage.getItem("tian-site-lang") : null;
-        if (supported.indexOf(stored) !== -1) {
-          return stored;
-        }
-        var browserLang = (navigator.language || "en").toLowerCase();
-        return browserLang.indexOf("zh") === 0 ? "zh" : "en";
+        if (supported.indexOf(stored) !== -1) { return stored; }
+        var nav = (navigator.language || navigator.userLanguage || "en").toLowerCase();
+        return nav.indexOf("zh") === 0 ? "zh" : "en";
       }
 
       function setLanguage(lang) {
-        window.__dbg("setLanguage(" + lang + ")");
+        var hide = lang === "zh" ? "en" : "zh";
+        if (langStyle) {
+          langStyle.textContent = "[data-copy-lang=\"" + hide + "\"]{display:none!important}";
+        }
         root.setAttribute("data-page-lang", lang);
         root.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
-        window.__dbg("data-page-lang now: " + root.getAttribute("data-page-lang"));
-        if (storage) {
-          storage.setItem("tian-site-lang", lang);
-        }
-        Array.prototype.forEach.call(buttons, function (button) {
-          var active = button.getAttribute("data-set-lang") === lang;
-          button.classList.toggle("is-active", active);
-          button.setAttribute("aria-pressed", active ? "true" : "false");
+        try { if (storage) { storage.setItem("tian-site-lang", lang); } } catch (e) {}
+        Array.prototype.forEach.call(buttons, function (btn) {
+          var active = btn.getAttribute("data-set-lang") === lang;
+          btn.classList.toggle("is-active", active);
+          btn.setAttribute("aria-pressed", String(active));
         });
       }
 
-      Array.prototype.forEach.call(buttons, function (button) {
-        button.addEventListener("click", function () {
-          window.__dbg("click: " + button.getAttribute("data-set-lang"));
-          setLanguage(button.getAttribute("data-set-lang"));
+      Array.prototype.forEach.call(buttons, function (btn) {
+        btn.addEventListener("click", function () {
+          setLanguage(btn.getAttribute("data-set-lang"));
         });
       });
 
