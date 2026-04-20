@@ -143,6 +143,7 @@ function Cmd-Help {
     install             使用参数快速安装
     doctor              诊断常见安装问题
     update              将已安装的AI后端更新到最新版本
+    uninstall           移除TIAN安装的组件（后端、密钥、数据）
     status              查看当前安装状态
     list backends       列出可用AI后端
     list mcp            列出可用MCP服务器
@@ -211,6 +212,7 @@ function Cmd-Help {
     install             Non-interactive install with flags
     doctor              Check your setup and diagnose common problems
     update              Upgrade installed AI backends to their latest versions
+    uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is currently installed
     list backends       List available AI backends
     list mcp            List available MCP servers
@@ -835,6 +837,140 @@ function Cmd-Repair {
     Cmd-Setup
 }
 
+function Cmd-Uninstall {
+    Write-Header "TIAN Uninstall — Remove Installed Components"
+    Write-Rule
+    Write-Color "`n  This will remove:" Yellow
+    Write-Color "    • npm-installed AI backends (claude, codex, etc.)" White
+    Write-Color "    • API keys saved in User environment variables" White
+    Write-Color "    • TIAN job data and schedules (~\.tian)" White
+    Write-Color "    • TIAN launcher script (launcher.bat)" White
+    Write-Color "`n  Note: Node.js itself will NOT be removed.`n" DarkGray
+
+    if (-not (Confirm-Action "Proceed with uninstall?")) {
+        Write-Warn "Cancelled."
+        return
+    }
+
+    $removed = 0
+    $skipped = 0
+
+    # ── 1. Uninstall npm-installed backends ───────────────────────────────────
+    Write-Host ""
+    Write-Color "  AI Backends" DarkGray
+    $npm = Get-Command npm -ErrorAction SilentlyContinue
+    foreach ($b in $catalog.backends) {
+        $name = (Get-DisplayName $b).PadRight(26)
+        if (-not $b.npmPackage) {
+            Write-Info "$name skipping (not npm-installed)"
+            $skipped++
+            continue
+        }
+        $cmd = Get-Command $b.cliCommand -ErrorAction SilentlyContinue
+        if (-not $cmd) {
+            Write-Info "$name not installed — skipping"
+            $skipped++
+            continue
+        }
+        if (-not $npm) {
+            Write-Warn "$name npm not found — cannot remove $($b.npmPackage)"
+            $skipped++
+            continue
+        }
+        $result = & npm uninstall -g $b.npmPackage 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Ok "$name removed ($($b.npmPackage))"
+            $removed++
+        } else {
+            Write-Warn "$name npm uninstall failed — try: npm uninstall -g $($b.npmPackage)"
+            $skipped++
+        }
+    }
+
+    # ── 2. Remove API key environment variables ───────────────────────────────
+    Write-Host ""
+    Write-Color "  API Keys" DarkGray
+    $seenVars = @{}
+    foreach ($b in $catalog.backends) {
+        $varName = $b.apiKeyEnvVar
+        if (-not $varName -or $seenVars.ContainsKey($varName)) { continue }
+        $seenVars[$varName] = $true
+        $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
+        if ($val) {
+            [System.Environment]::SetEnvironmentVariable($varName, $null, "User")
+            Write-Ok "$($varName.PadRight(30)) removed"
+            $removed++
+        } else {
+            Write-Info "$($varName.PadRight(30)) not set — skipping"
+        }
+    }
+
+    # ── 3. Remove TIAN MCP entries from config files ──────────────────────────
+    Write-Host ""
+    Write-Color "  MCP Config" DarkGray
+    $targets = $catalog.backends |
+        Where-Object { (Test-BackendSupportsMcp $_) -and $_.mcpConfigTarget } |
+        Select-Object -ExpandProperty mcpConfigTarget -Unique
+    foreach ($t in $targets) {
+        $fakeBackend = [PSCustomObject]@{ mcpConfigTarget = $t; mcpConfigPath = "" }
+        $path = Get-McpConfigPath $fakeBackend
+        if (-not (Test-Path $path)) { Write-Info "$t config not found — skipping"; continue }
+        try {
+            $cfg = Get-Content $path -Raw | ConvertFrom-Json
+            $ht  = ConvertTo-Hashtable $cfg
+            $tianKeys = $catalog.mcpServers | Where-Object { $_.configKey } | Select-Object -ExpandProperty configKey
+            $countBefore = if ($ht.mcpServers) { $ht.mcpServers.Count } else { 0 }
+            foreach ($k in $tianKeys) {
+                if ($ht.mcpServers -and $ht.mcpServers.ContainsKey($k)) { $ht.mcpServers.Remove($k) }
+            }
+            $countAfter = if ($ht.mcpServers) { $ht.mcpServers.Count } else { 0 }
+            $ht | ConvertTo-Json -Depth 10 | Set-Content $path -Encoding UTF8
+            $delta = $countBefore - $countAfter
+            if ($delta -gt 0) {
+                Write-Ok "$t — removed $delta MCP server(s) from config"
+                $removed++
+            } else {
+                Write-Info "$t — no TIAN MCP entries found"
+            }
+        } catch {
+            Write-Warn "$t — could not clean config: $($_.Exception.Message)"
+        }
+    }
+
+    # ── 4. Remove launcher ────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  Launcher" DarkGray
+    $launcherPath = Join-Path $TianDir "launcher.bat"
+    if (Test-Path $launcherPath) {
+        Remove-Item $launcherPath -Force
+        Write-Ok "launcher.bat removed"
+        $removed++
+    } else {
+        Write-Info "launcher.bat not found — skipping"
+    }
+
+    # ── 5. Remove ~/.tian data directory ─────────────────────────────────────
+    Write-Host ""
+    Write-Color "  Job Data" DarkGray
+    $tianHome = Join-Path $env:USERPROFILE ".tian"
+    if (Test-Path $tianHome) {
+        Remove-Item $tianHome -Recurse -Force
+        Write-Ok "~\.tian removed"
+        $removed++
+    } else {
+        Write-Info "~\.tian not found — skipping"
+    }
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    Write-Host ""
+    Write-Rule
+    Write-Ok "TIAN components removed.  Removed: $removed   Skipped: $skipped"
+    Write-Host ""
+    Write-Color "  The TIAN installation folder ($TianDir) was NOT deleted." DarkGray
+    Write-Color "  To fully remove it, delete that folder manually." DarkGray
+    Write-Host ""
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 switch ($Command.ToLower()) {
     "setup"   { Cmd-Setup }
@@ -892,9 +1028,10 @@ switch ($Command.ToLower()) {
             } else { Write-Warn (TF "cli.mcp_not_configured" (Get-DisplayName $server)) }
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
-    "doctor"  { Cmd-Doctor }
-    "update"  { Cmd-Update }
-    "repair"  { Cmd-Repair }
+    "doctor"    { Cmd-Doctor }
+    "update"    { Cmd-Update }
+    "repair"    { Cmd-Repair }
+    "uninstall" { Cmd-Uninstall }
 
     "run" {
         # tian-cli run "prompt"  or  tian-cli run "prompt" --background
