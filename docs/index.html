@@ -744,10 +744,6 @@
         if (storage) {
           storage.setItem("tian-site-lang", lang);
         }
-        var allCopyNodes = document.querySelectorAll("[data-copy-lang]");
-        Array.prototype.forEach.call(allCopyNodes, function (node) {
-          node.hidden = node.getAttribute("data-copy-lang") !== lang;
-        });
         Array.prototype.forEach.call(buttons, function (button) {
           var active = button.getAttribute("data-set-lang") === lang;
           button.classList.toggle("is-active", active);
@@ -781,22 +777,13 @@
             var label = btn.querySelector(".copy-label");
             var origHtml = label.innerHTML;
             label.innerHTML = '<span data-copy-lang="en">Copied!</span><span data-copy-lang="zh">已复制！</span>';
-            setLanguageOnNode(label);
             setTimeout(function () {
               btn.classList.remove("is-copied");
               label.innerHTML = origHtml;
-              setLanguageOnNode(label);
             }, 2000);
           }).catch(function () {});
         });
       });
-
-      function setLanguageOnNode(node) {
-        var lang = document.documentElement.getAttribute("data-page-lang") || "en";
-        Array.prototype.forEach.call(node.querySelectorAll("[data-copy-lang]"), function (el) {
-          el.hidden = el.getAttribute("data-copy-lang") !== lang;
-        });
-      }
     }());
 
     (function () {
@@ -843,13 +830,6 @@
         return tmpl.content.querySelector(selector).cloneNode(true);
       }
 
-      function setLanguageOnNode(node) {
-        var lang = document.documentElement.getAttribute(“data-page-lang”) || “en”;
-        Array.prototype.forEach.call(node.querySelectorAll(“[data-copy-lang]”), function (el) {
-          el.hidden = el.getAttribute(“data-copy-lang”) !== lang;
-        });
-      }
-
       function setStatus(state) {
         statusNode.className = “demo-status is-” + state;
         if (state === “running”) {
@@ -859,7 +839,6 @@
         } else {
           statusNode.innerHTML = '<span data-copy-lang=”en”>Ready</span><span data-copy-lang=”zh”>待运行</span>';
         }
-        setLanguageOnNode(statusNode);
       }
 
       function setProgress(fraction) {
@@ -935,7 +914,6 @@
 
         consoleNode.innerHTML = '<p class=”demo-placeholder”><span data-copy-lang=”en”>Click \u201cRun demo\u201d to simulate the workflow.</span><span data-copy-lang=”zh”>点击\u201c运行演示\u201d来模拟整个工作流。</span></p>';
         setStatus(“ready”);
-        setLanguageOnNode(stage);
         typewriterOnPrompt();
       }
 
@@ -980,7 +958,6 @@
             if (result) {
               var clone = result.cloneNode(true);
               consoleNode.appendChild(clone);
-              setLanguageOnNode(consoleNode);
               clone.scrollIntoView({ behavior: “smooth”, block: “nearest” });
             }
             if (index === steps.length - 1) {
