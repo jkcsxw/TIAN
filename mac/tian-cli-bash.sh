@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TIAN native bash CLI — used on Mac when PowerShell Core (pwsh) is not installed
+# TIAN native bash CLI — used on macOS/Linux when PowerShell Core (pwsh) is not installed
 set -euo pipefail
 TIAN_DIR="${1:-$(cd "$(dirname "$0")/.." && pwd)}"
 shift || true
@@ -17,19 +17,29 @@ fail() { echo -e "${RED}  [xx]${RESET} $*"; exit 1; }
 rule() { echo -e "${DIM}──────────────────────────────────────────────────────────${RESET}"; }
 hdr()  { echo ""; echo -e "${CYAN}${BOLD}$*${RESET}"; rule; }
 
-py3() { python3 -c "$1" 2>/dev/null; }
+# Bug fix: removed 2>/dev/null so Python errors are visible
+py3() { python3 -c "$1"; }
 
+detect_platform() {
+    case "$(uname -s)" in
+        Darwin) echo "macos" ;;
+        Linux)  echo "linux" ;;
+        *)      echo "unknown" ;;
+    esac
+}
+
+# Bug fix: check if command is actually installed, not just present in catalog
 active_backend() {
-    py3 "
-import json
-c = json.load(open('$CATALOG'))
-for b in c['backends']:
-    cmd = b.get('cliCommand','')
-    flag = b.get('nonInteractiveFlag','')
-    if cmd:
-        print(cmd+'|'+flag+'|'+b['id'])
+    python3 - "$CATALOG" <<'PYEOF'
+import json, sys, subprocess
+catalog = json.load(open(sys.argv[1]))
+for b in catalog['backends']:
+    cmd = b.get('cliCommand', '')
+    flag = b.get('nonInteractiveFlag', '')
+    if cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0:
+        print(cmd + '|' + flag + '|' + b['id'])
         break
-"
+PYEOF
 }
 
 ensure_dirs() {
@@ -44,7 +54,7 @@ new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
 cmd_help() {
 cat <<EOF
 
-  TIAN CLI  (macOS bash mode)
+  TIAN CLI
   Talk Is All you Need
 
 $(rule)
@@ -62,7 +72,7 @@ $(rule)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs clear          Clear completed jobs
-    schedule add        Create a recurring task (uses launchd)
+    schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
@@ -81,16 +91,16 @@ EOF
 cmd_status() {
     hdr "TIAN Status"
     command -v node &>/dev/null && ok "Node.js    $(node --version)" || warn "Node.js    not found"
-    py3 "
-import json, subprocess, os
-c = json.load(open('$CATALOG'))
+    python3 - "$CATALOG" <<'PYEOF'
+import json, subprocess, os, sys
+c = json.load(open(sys.argv[1]))
 print()
 for b in c['backends']:
     cmd = b.get('cliCommand','')
     if not cmd: continue
     found = subprocess.run(['which', cmd], capture_output=True).returncode == 0
     status = '[ok]' if found else '[!!]'
-    print(f'  {status}  {b[\"displayName\"]}'  )
+    print(f'  {status}  {b["displayName"]}')
 print()
 for b in c['backends']:
     env = b.get('apiKeyEnvVar','')
@@ -98,10 +108,17 @@ for b in c['backends']:
     val = os.environ.get(env,'')
     status = '[ok]' if val else '[!!]'
     print(f'  {status}  {env}')
-"
-    MCP_CONFIG="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+PYEOF
+    # Bug fix: check platform-appropriate MCP config path
+    local platform; platform=$(detect_platform)
+    local mcp_config
+    if [[ "$platform" == "macos" ]]; then
+        mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+    else
+        mcp_config="$HOME/.config/claude/claude_desktop_config.json"
+    fi
     echo ""
-    [[ -f "$MCP_CONFIG" ]] && ok "MCP config: $MCP_CONFIG" || warn "MCP config not found"
+    [[ -f "$mcp_config" ]] && ok "MCP config: $mcp_config" || warn "MCP config not found"
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh exists" || warn "launcher.sh not found — run setup.sh first"
     echo ""; rule
 }
@@ -123,11 +140,12 @@ cmd_run() {
 
     if $background; then
         info "Running in background (job: $job_id)..."
-        nohup bash -c "$cmd $flag \"$prompt\" > \"$out_file\" 2>&1" &>/dev/null &
+        # Bug fix: pass prompt as argument to avoid shell injection via eval/interpolation
+        nohup bash -c '"$1" "$2" "$3" >"$4" 2>&1' -- "$cmd" "$flag" "$prompt" "$out_file" &>/dev/null &
         python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" <<'PYEOF'
 import json, sys
-jobs_file, jid, prompt, cmd = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 from datetime import datetime
+jobs_file, jid, prompt, cmd = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 jobs = json.load(open(jobs_file))
 jobs.append({"id": jid, "name": jid, "prompt": prompt, "backend": cmd,
              "status": "running", "createdAt": datetime.now().isoformat()})
@@ -137,7 +155,8 @@ PYEOF
         info "Check result with: bash tian-cli.sh jobs result $job_id"
     else
         rule
-        eval "$cmd $flag \"$prompt\"" | tee "$out_file"
+        # Bug fix: pass prompt as argument, not via eval string interpolation
+        "$cmd" "$flag" "$prompt" | tee "$out_file"
         rule
     fi
 }
@@ -168,7 +187,6 @@ PYEOF
             ensure_dirs
             python3 - "$JOBS_FILE" <<'PYEOF'
 import json, sys
-from datetime import datetime
 jobs = json.load(open(sys.argv[1]))
 if not jobs:
     print("  No jobs yet. Run: bash tian-cli.sh run \"your task\"")
@@ -186,32 +204,61 @@ PYEOF
     esac
 }
 
-cmd_schedule() {
-    local sub="${1:-list}"; shift || true
-    case "$sub" in
-        add)
-            local name="${1:-}"; local prompt="${2:-}"; local time="${3:-08:00}"; local repeat="${4:-daily}"
-            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once]"
-            ensure_dirs
+# ── Schedule helpers ───────────────────────────────────────────────────────────
 
-            local plist_dir="$HOME/Library/LaunchAgents"
-            local plist_label="com.tian.$name"
-            local plist_file="$plist_dir/$plist_label.plist"
-            mkdir -p "$plist_dir"
+_schedule_add_linux() {
+    local name="$1" prompt="$2" time="$3" repeat="$4"
+    local hour minute cron_expr
+    hour=$(echo "$time" | cut -d: -f1)
+    minute=$(echo "$time" | cut -d: -f2)
 
-            local hour; hour=$(echo "$time" | cut -d: -f1 | sed 's/^0//')
-            local minute; minute=$(echo "$time" | cut -d: -f2 | sed 's/^0//')
+    case "$repeat" in
+        hourly) cron_expr="0 * * * *" ;;
+        daily)  cron_expr="$minute $hour * * *" ;;
+        weekly) cron_expr="$minute $hour * * 1" ;;
+        once)   cron_expr="@reboot" ;;
+        *)      cron_expr="$minute $hour * * *" ;;
+    esac
 
-            local interval_key interval_val
-            case "$repeat" in
-                hourly) interval_key="<key>StartInterval</key>"; interval_val="<integer>3600</integer>" ;;
-                daily)  interval_key="<key>StartCalendarInterval</key>"; interval_val="<dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-                weekly) interval_key="<key>StartCalendarInterval</key>"; interval_val="<dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-                once)   interval_key=""; interval_val="" ;;
-                *)      interval_key="<key>StartCalendarInterval</key>"; interval_val="<dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-            esac
+    local job_line="$cron_expr  bash '$TIAN_DIR/tian-cli.sh' run '$prompt' -b  # tian-$name"
 
-            cat > "$plist_file" <<PLIST
+    # Remove existing entry for this name then append new one
+    ( crontab -l 2>/dev/null | grep -v "# tian-$name" ; echo "$job_line" ) | crontab -
+
+    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "" <<'PYEOF'
+import json, sys
+from datetime import datetime
+sf, name, prompt, time, repeat, _ = sys.argv[1:]
+schedules = json.load(open(sf))
+schedules = [s for s in schedules if s.get('name') != name]
+schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat,
+                  "createdAt": datetime.now().isoformat()})
+json.dump(schedules, open(sf, 'w'), indent=2)
+PYEOF
+    ok "Schedule '$name' created ($repeat at $time) via crontab."
+    info "Results will appear in: bash tian-cli.sh jobs"
+}
+
+_schedule_add_macos() {
+    local name="$1" prompt="$2" time="$3" repeat="$4"
+    local plist_dir="$HOME/Library/LaunchAgents"
+    local plist_label="com.tian.$name"
+    local plist_file="$plist_dir/$plist_label.plist"
+    mkdir -p "$plist_dir"
+
+    local hour; hour=$(echo "$time" | cut -d: -f1 | sed 's/^0//')
+    local minute; minute=$(echo "$time" | cut -d: -f2 | sed 's/^0//')
+
+    local interval_block=""
+    case "$repeat" in
+        hourly) interval_block="<key>StartInterval</key><integer>3600</integer>" ;;
+        daily)  interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
+        weekly) interval_block="<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
+        once)   interval_block="" ;;
+        *)      interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
+    esac
+
+    cat > "$plist_file" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -230,15 +277,14 @@ cmd_schedule() {
     <string>$HOME/.tian/tasks/schedule-$name.log</string>
     <key>StandardErrorPath</key>
     <string>$HOME/.tian/tasks/schedule-$name.err</string>
-    $interval_key
-    $interval_val
+    $interval_block
 </dict>
 </plist>
 PLIST
 
-            launchctl load "$plist_file" 2>/dev/null || launchctl bootstrap "gui/$(id -u)" "$plist_file" 2>/dev/null || true
+    launchctl load "$plist_file" 2>/dev/null || launchctl bootstrap "gui/$(id -u)" "$plist_file" 2>/dev/null || true
 
-            python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "$plist_file" <<'PYEOF'
+    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "$plist_file" <<'PYEOF'
 import json, sys
 from datetime import datetime
 sf, name, prompt, time, repeat, plist = sys.argv[1:]
@@ -248,8 +294,37 @@ schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat
                   "plistFile": plist, "createdAt": datetime.now().isoformat()})
 json.dump(schedules, open(sf, 'w'), indent=2)
 PYEOF
-            ok "Schedule '$name' created ($repeat at $time)."
-            info "Results will appear in: bash tian-cli.sh jobs"
+    ok "Schedule '$name' created ($repeat at $time) via launchd."
+    info "Results will appear in: bash tian-cli.sh jobs"
+}
+
+_schedule_remove_linux() {
+    local name="$1"
+    ( crontab -l 2>/dev/null | grep -v "# tian-$name" ) | crontab - 2>/dev/null || true
+}
+
+_schedule_remove_macos() {
+    local plist_file="$1"
+    if [[ -n "$plist_file" && -f "$plist_file" ]]; then
+        launchctl unload "$plist_file" 2>/dev/null || launchctl bootout "gui/$(id -u)" "$plist_file" 2>/dev/null || true
+        rm -f "$plist_file"
+    fi
+}
+
+cmd_schedule() {
+    local sub="${1:-list}"; shift || true
+    local platform; platform=$(detect_platform)
+
+    case "$sub" in
+        add)
+            local name="${1:-}"; local prompt="${2:-}"; local time="${3:-08:00}"; local repeat="${4:-daily}"
+            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once]"
+            ensure_dirs
+            if [[ "$platform" == "linux" ]]; then
+                _schedule_add_linux "$name" "$prompt" "$time" "$repeat"
+            else
+                _schedule_add_macos "$name" "$prompt" "$time" "$repeat"
+            fi
             ;;
 
         list)
@@ -270,13 +345,15 @@ PYEOF
 
         run)
             local name="${1:-}"; [[ -z "$name" ]] && fail "Usage: schedule run <name>"
+            ensure_dirs
             local prompt
-            prompt=$(python3 -c "
+            prompt=$(python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
 import json, sys
-s = json.load(open('$SCHEDULES_FILE'))
-e = next((x for x in s if x['name'] == '$name'), None)
+s = json.load(open(sys.argv[1]))
+e = next((x for x in s if x['name'] == sys.argv[2]), None)
 print(e['prompt'] if e else '')
-")
+PYEOF
+)
             [[ -z "$prompt" ]] && fail "Schedule '$name' not found."
             info "Running '$name' now..."
             cmd_run "$prompt" -b
@@ -285,16 +362,18 @@ print(e['prompt'] if e else '')
         remove)
             local name="${1:-}"; [[ -z "$name" ]] && fail "Usage: schedule remove <name>"
             ensure_dirs
-            local plist_file
-            plist_file=$(python3 -c "
-import json
-s = json.load(open('$SCHEDULES_FILE'))
-e = next((x for x in s if x['name'] == '$name'), None)
-print(e.get('plistFile','') if e else '')
-")
-            if [[ -n "$plist_file" && -f "$plist_file" ]]; then
-                launchctl unload "$plist_file" 2>/dev/null || launchctl bootout "gui/$(id -u)" "$plist_file" 2>/dev/null || true
-                rm -f "$plist_file"
+            local plist_file=""
+            if [[ "$platform" == "macos" ]]; then
+                plist_file=$(python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
+import json, sys
+s = json.load(open(sys.argv[1]))
+e = next((x for x in s if x['name'] == sys.argv[2]), None)
+print(e.get('plistFile', '') if e else '')
+PYEOF
+)
+                _schedule_remove_macos "$plist_file"
+            else
+                _schedule_remove_linux "$name"
             fi
             python3 - "$SCHEDULES_FILE" "$name" <<'PYEOF'
 import json, sys
@@ -314,21 +393,21 @@ cmd_list() {
     case "$sub" in
         mcp)
             hdr "Available MCP Servers"
-            py3 "
-import json
-c = json.load(open('$CATALOG'))
+            python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
 for s in c['mcpServers']:
-    print(f\"  {s['id']:<22} {s['displayName']:<28} {s['category']}\")
-"
+    print(f"  {s['id']:<22} {s['displayName']:<28} {s['category']}")
+PYEOF
             rule ;;
         skills)
             hdr "Available Skills"
-            py3 "
-import json
-c = json.load(open('$CATALOG'))
+            python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
 for s in c['skills']:
-    print(f\"  {s['id']:<26} {s['displayName']:<30} {s['category']}\")
-"
+    print(f"  {s['id']:<26} {s['displayName']:<30} {s['category']}")
+PYEOF
             rule ;;
         *) fail "Usage: list mcp  |  list skills" ;;
     esac
