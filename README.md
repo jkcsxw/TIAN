@@ -4,7 +4,19 @@
 >
 > 几分钟内把 AI 助手装到自己的电脑上。无需编程。
 
+Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
+
 Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
+
+## Live Demo | 在线演示
+
+Open the GitHub Pages demo here:
+
+[Try the demo site](https://jkcsxw.github.io/TIAN/)
+
+这里可以直接打开 GitHub Pages 在线演示：
+
+[打开演示站点](https://jkcsxw.github.io/TIAN/)
 
 ## What TIAN Is | TIAN 是什么
 
@@ -186,10 +198,12 @@ You can ask TIAN things like:
 
 ## Need More Detail? | 想看更详细说明？
 
+- Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
 - Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 - Releases: [GitHub Releases](https://github.com/jkcsxw/TIAN/releases)
 - Source code: [GitHub repository](https://github.com/jkcsxw/TIAN)
 
+- 在线演示：[GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
 - 官网：[jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 - 发布页：[GitHub Releases](https://github.com/jkcsxw/TIAN/releases)
 - 源码仓库：[GitHub repository](https://github.com/jkcsxw/TIAN)
