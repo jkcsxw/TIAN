@@ -413,9 +413,16 @@
       var buttons = document.querySelectorAll("[data-set-lang]");
       var copyNodes = document.querySelectorAll("[data-copy-lang]");
       var supported = ["en", "zh"];
+      var storage = null;
+
+      try {
+        storage = window.localStorage;
+      } catch (error) {
+        storage = null;
+      }
 
       function pickInitialLanguage() {
-        var stored = window.localStorage.getItem("tian-site-lang");
+        var stored = storage ? storage.getItem("tian-site-lang") : null;
         if (supported.indexOf(stored) !== -1) {
           return stored;
         }
@@ -426,7 +433,9 @@
       function setLanguage(lang) {
         root.setAttribute("data-page-lang", lang);
         root.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
-        window.localStorage.setItem("tian-site-lang", lang);
+        if (storage) {
+          storage.setItem("tian-site-lang", lang);
+        }
         Array.prototype.forEach.call(copyNodes, function (node) {
           node.hidden = node.getAttribute("data-copy-lang") !== lang;
         });
@@ -452,7 +461,13 @@
       Array.prototype.forEach.call(copyButtons, function (btn) {
         btn.addEventListener("click", function () {
           var code = btn.closest(".code-block").querySelector("code");
-          navigator.clipboard.writeText(code.textContent.trim()).then(function () {
+          var clipboard = navigator.clipboard;
+
+          if (!clipboard || typeof clipboard.writeText !== "function") {
+            return;
+          }
+
+          clipboard.writeText(code.textContent.trim()).then(function () {
             btn.classList.add("is-copied");
             var label = btn.querySelector(".copy-label");
             var origHtml = label.innerHTML;
@@ -463,7 +478,7 @@
               label.innerHTML = origHtml;
               setLanguageOnNode(label);
             }, 2000);
-          });
+          }).catch(function () {});
         });
       });
 
