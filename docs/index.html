@@ -447,7 +447,9 @@
     }());
 
     (function () {
-      document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      var copyButtons = document.querySelectorAll(".copy-btn");
+
+      Array.prototype.forEach.call(copyButtons, function (btn) {
         btn.addEventListener("click", function () {
           var code = btn.closest(".code-block").querySelector("code");
           navigator.clipboard.writeText(code.textContent.trim()).then(function () {
@@ -467,7 +469,7 @@
 
       function setLanguageOnNode(node) {
         var lang = document.documentElement.getAttribute("data-page-lang") || "en";
-        node.querySelectorAll("[data-copy-lang]").forEach(function (el) {
+        Array.prototype.forEach.call(node.querySelectorAll("[data-copy-lang]"), function (el) {
           el.hidden = el.getAttribute("data-copy-lang") !== lang;
         });
       }
@@ -477,21 +479,25 @@
       var tabs = document.querySelectorAll("[data-demo-target]");
       var panels = document.querySelectorAll("[data-demo-panel]");
 
+      if (!tabs.length || !panels.length) {
+        return;
+      }
+
       function setDemo(target) {
-        tabs.forEach(function (tab) {
+        Array.prototype.forEach.call(tabs, function (tab) {
           var active = tab.getAttribute("data-demo-target") === target;
           tab.classList.toggle("is-active", active);
           tab.setAttribute("aria-selected", active ? "true" : "false");
         });
 
-        panels.forEach(function (panel) {
+        Array.prototype.forEach.call(panels, function (panel) {
           var active = panel.getAttribute("data-demo-panel") === target;
           panel.classList.toggle("is-active", active);
           panel.hidden = !active;
         });
       }
 
-      tabs.forEach(function (tab) {
+      Array.prototype.forEach.call(tabs, function (tab) {
         tab.addEventListener("click", function () {
           setDemo(tab.getAttribute("data-demo-target"));
         });
