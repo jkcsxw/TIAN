@@ -36,6 +36,65 @@ function Invoke-Launchctl {
     & launchctl $Action $PlistFile 2>&1
 }
 
+$script:DayNameMap = @{ SUN = 0; MON = 1; TUE = 2; WED = 3; THU = 4; FRI = 5; SAT = 6 }
+
+function Convert-DayNameToInt {
+    param([string]$Day)
+    $key = $Day.Trim().ToUpper().Substring(0, 3)
+    if ($script:DayNameMap.ContainsKey($key)) { return $script:DayNameMap[$key] }
+    throw "Unknown day name: '$Day'. Use SUN,MON,TUE,WED,THU,FRI,SAT."
+}
+
+function Build-LaunchdWeeklyXml {
+    param([string]$DayOfWeek, [int]$Hour, [int]$Minute)
+    $days  = @(if ($DayOfWeek) { $DayOfWeek -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ } } else { "MON" })
+    $dicts = @($days | ForEach-Object {
+        $wd = Convert-DayNameToInt $_
+        "        <dict>`n            <key>Weekday</key><integer>$wd</integer>`n            <key>Hour</key><integer>$Hour</integer>`n            <key>Minute</key><integer>$Minute</integer>`n        </dict>"
+    })
+    if ($dicts.Count -eq 1) {
+        $wd = Convert-DayNameToInt $days[0]
+        return "<key>StartCalendarInterval</key>`n    <dict>`n        <key>Weekday</key><integer>$wd</integer>`n        <key>Hour</key><integer>$Hour</integer>`n        <key>Minute</key><integer>$Minute</integer>`n    </dict>"
+    }
+    return "<key>StartCalendarInterval</key>`n    <array>`n" + ($dicts -join "`n") + "`n    </array>"
+}
+
+function Get-CrontabEntry {
+    param([string]$Repeat, [string]$Time, [string]$DayOfWeek, [string]$Command)
+    $hour   = [int]($Time -split ':')[0]
+    $minute = [int]($Time -split ':')[1]
+    $cronExpr = switch ($Repeat.ToLower()) {
+        "hourly" { "0 * * * *" }
+        "weekly" {
+            $day = if ($DayOfWeek) { Convert-DayNameToInt ($DayOfWeek -split ',')[0] } else { 1 }
+            "$minute $hour * * $day"
+        }
+        "once"   {
+            Write-Warn "Linux crontab does not support 'once' natively. Task will run daily at $Time. Use 'tian-cli run' for one-off tasks."
+            "$minute $hour * * *"
+        }
+        default  { "$minute $hour * * *" }
+    }
+    return "$cronExpr  $Command"
+}
+
+function Add-LinuxCrontabEntry {
+    param([string]$Name, [string]$CrontabLine)
+    $marker   = "# TIAN:$Name"
+    $existing = & crontab -l 2>/dev/null
+    $lines    = if ($existing) { @($existing | Where-Object { $_ -notmatch [regex]::Escape($marker) }) } else { @() }
+    $lines   += "$CrontabLine  $marker"
+    $lines | & crontab -
+}
+
+function Remove-LinuxCrontabEntry {
+    param([string]$Name)
+    $marker   = "# TIAN:$Name"
+    $existing = & crontab -l 2>/dev/null
+    $lines    = if ($existing) { @($existing | Where-Object { $_ -notmatch [regex]::Escape($marker) }) } else { @() }
+    if ($lines.Count -eq 0) { "" | & crontab - } else { $lines | & crontab - }
+}
+
 function Get-TaskName {
     param([string]$Name)
     return "TIAN_$($Name -replace '[^a-zA-Z0-9_-]','_')"
@@ -79,7 +138,7 @@ function Add-Schedule {
 
         $intervalXml = switch ($Repeat.ToLower()) {
             "hourly" { "<key>StartInterval</key>`n    <integer>3600</integer>" }
-            "weekly" { "<key>StartCalendarInterval</key>`n    <dict>`n        <key>Weekday</key><integer>1</integer>`n        <key>Hour</key><integer>$hour</integer>`n        <key>Minute</key><integer>$minute</integer>`n    </dict>" }
+            "weekly" { Build-LaunchdWeeklyXml -DayOfWeek $DayOfWeek -Hour $hour -Minute $minute }
             default  { "<key>StartCalendarInterval</key>`n    <dict>`n        <key>Hour</key><integer>$hour</integer>`n        <key>Minute</key><integer>$minute</integer>`n    </dict>" }
         }
 
@@ -116,8 +175,22 @@ function Add-Schedule {
             createdAt = [System.DateTime]::Now.ToString("o")
         }
     } elseif ($runningOnLinux) {
-        Write-Fail "Linux scheduling is not available in the built-in CLI yet. Use 'tian-cli run' directly, or install PowerShell Core only after Linux scheduler support lands."
-        return
+        # ── crontab (Linux) ──────────────────────────────────────────────────
+        if (-not (Get-Command crontab -ErrorAction SilentlyContinue)) {
+            Write-Fail "crontab not found. Install cron (e.g. 'sudo apt install cron') and try again."
+            return
+        }
+        $cliPath     = Join-Path $TianDir "tian-cli.sh"
+        $cronCommand = "bash `"$cliPath`" run `"$($Prompt -replace '"','\"')`" --background"
+        $cronLine    = Get-CrontabEntry -Repeat $Repeat -Time $Time -DayOfWeek $DayOfWeek -Command $cronCommand
+        Add-LinuxCrontabEntry -Name $Name -CrontabLine $cronLine
+        Write-Ok "定时任务 '$Name' 已添加到 crontab。/ Schedule '$Name' added to crontab."
+
+        $entry = [PSCustomObject]@{
+            name      = $Name; prompt = $Prompt; time = $Time
+            repeat    = $Repeat; dayOfWeek = $DayOfWeek; cronLine = $cronLine
+            createdAt = [System.DateTime]::Now.ToString("o")
+        }
     } else {
         # ── Windows Task Scheduler ────────────────────────────────────────────
         $taskName = Get-TaskName $Name
@@ -171,7 +244,9 @@ function Remove-Schedule {
             Remove-Item $entry.plistFile -ErrorAction SilentlyContinue
         }
     } elseif ($runningOnLinux) {
-        # Linux does not have a scheduler integration yet, but stale entries can still be cleaned up.
+        if (Get-Command crontab -ErrorAction SilentlyContinue) {
+            Remove-LinuxCrontabEntry -Name $Name
+        }
     } else {
         $result = Start-Process schtasks -ArgumentList "/Delete", "/F", "/TN", $entry.taskName -Wait -PassThru -NoNewWindow
         if ($result.ExitCode -ne 0) { Write-Warn "无法删除Windows定时任务（可能已被删除）。/ Could not remove Windows task (may have already been deleted)." }

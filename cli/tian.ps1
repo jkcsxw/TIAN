@@ -53,7 +53,13 @@ function Append-Log {
 . "$libDir\McpConfigurator.ps1"
 . "$libDir\SkillInstaller.ps1"
 
-$catalog = Get-Catalog -TianDir $TianDir
+try {
+    $catalog = Get-Catalog -TianDir $TianDir
+} catch {
+    Write-Fail "TIAN catalog not found or corrupted. Reinstall TIAN or restore config/catalog.json."
+    Write-Fail $_.Exception.Message
+    exit 1
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 function Get-BackendById($id) { $catalog.backends | Where-Object { $_.id -eq $id } | Select-Object -First 1 }
