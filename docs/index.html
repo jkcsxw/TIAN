@@ -717,11 +717,29 @@
     </footer>
   </div>
   <script>
+    /* ── debug panel ── remove once issue is diagnosed ── */
+    (function () {
+      var panel = document.createElement("div");
+      panel.id = "tian-dbg";
+      panel.style.cssText = "position:fixed;bottom:8px;left:8px;z-index:9999;background:#000;color:#0f0;font:12px/1.4 monospace;padding:8px 10px;border-radius:6px;max-width:320px;word-break:break-all;";
+      panel.innerHTML = "DBG: script reached";
+      document.body.appendChild(panel);
+
+      window.addEventListener("error", function (e) {
+        panel.innerHTML += "<br>ERR: " + e.message + " (" + e.filename + ":" + e.lineno + ")";
+        panel.style.color = "#f66";
+      });
+
+      window.__dbg = function (msg) { panel.innerHTML += "<br>" + msg; };
+    }());
+
     (function () {
       var root = document.documentElement;
       var buttons = document.querySelectorAll("[data-set-lang]");
       var supported = ["en", "zh"];
       var storage = null;
+
+      window.__dbg("buttons found: " + buttons.length);
 
       try {
         storage = window.localStorage;
@@ -739,8 +757,10 @@
       }
 
       function setLanguage(lang) {
+        window.__dbg("setLanguage(" + lang + ")");
         root.setAttribute("data-page-lang", lang);
         root.setAttribute("lang", lang === "zh" ? "zh-CN" : "en");
+        window.__dbg("data-page-lang now: " + root.getAttribute("data-page-lang"));
         if (storage) {
           storage.setItem("tian-site-lang", lang);
         }
@@ -753,6 +773,7 @@
 
       Array.prototype.forEach.call(buttons, function (button) {
         button.addEventListener("click", function () {
+          window.__dbg("click: " + button.getAttribute("data-set-lang"));
           setLanguage(button.getAttribute("data-set-lang"));
         });
       });
