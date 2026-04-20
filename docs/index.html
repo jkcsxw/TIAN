@@ -257,6 +257,9 @@
               <button class="demo-tab" type="button" role="tab" aria-selected="false" data-demo-scenario="schedule">
                 <span data-copy-lang="en">Scheduled task</span><span data-copy-lang="zh">定时任务</span>
               </button>
+              <button class="demo-tab" type="button" role="tab" aria-selected="false" data-demo-scenario="meeting">
+                <span data-copy-lang="en">Meeting recap</span><span data-copy-lang="zh">会议总结</span>
+              </button>
             </div>
 
             <div class="demo-playground">
@@ -307,6 +310,7 @@
                     <h3 class="demo-output-title"><span data-copy-lang="en">Watch the response assemble step by step.</span><span data-copy-lang="zh">点击后查看响应如何逐步生成。</span></h3>
                   </div>
                 </div>
+                <div class="demo-progress-wrap"><div class="demo-progress-fill" data-demo-progress></div></div>
                 <div class="demo-console" data-demo-console aria-live="polite"></div>
               </div>
             </div>
@@ -359,11 +363,17 @@
                 </article>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Draft reply</span><span data-copy-lang="zh">回复草稿</span></p>
-                  <p><span data-copy-lang="en">Thanks for the update. To keep things moving, we can start with the onboarding-only package this month, keep current pricing through Friday, and expand once procurement is cleared...</span><span data-copy-lang="zh">感谢您的更新。为了继续推进，我们可以本月先从仅包含上线支持的套餐开始，当前报价保留到本周五，等采购审批通过后再扩展范围……</span></p>
+                  <div class="demo-email-card">
+                    <div class="demo-email-header">
+                      <div class="demo-email-row"><strong>To:</strong> <span>sarah.kim@acme.com, procurement@acme.com</span></div>
+                      <div class="demo-email-row"><strong>Subject:</strong> <span><span data-copy-lang="en">Re: Contract renewal — lower-risk rollout option</span><span data-copy-lang="zh">回复：合同续约——风险更低的上线方案</span></span></div>
+                    </div>
+                    <p class="demo-email-body"><span data-copy-lang="en">Thanks for the update. To keep things moving, we can start with the onboarding-only package this month — current pricing stays through Friday — and expand scope once procurement clears. Happy to walk through the details on Tuesday if that works for you.</span><span data-copy-lang="zh">感谢您的更新。为了继续推进，我们可以本月先从仅包含上线支持的套餐开始，当前报价保留到本周五，等采购审批通过后再扩展范围。如方便，我们可以在周二通话详细说明，您觉得可以吗？</span></p>
+                  </div>
                 </article>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Artifacts created</span><span data-copy-lang="zh">已生成内容</span></p>
-                  <p><span data-copy-lang="en">Email draft, Tuesday call suggestion, and `pricing-faq-q2.pdf` attached.</span><span data-copy-lang="zh">已生成邮件草稿、周二电话建议，并附上 `pricing-faq-q2.pdf`。</span></p>
+                  <p><span data-copy-lang="en">Gmail draft saved, Tuesday call invite created, `pricing-faq-q2.pdf` queued as attachment.</span><span data-copy-lang="zh">Gmail 草稿已保存，已创建周二通话日历邀请，`pricing-faq-q2.pdf` 已设为附件。</span></p>
                 </article>
               </div>
             </template>
@@ -412,7 +422,14 @@
               <div data-demo-result-template>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Slide structure</span><span data-copy-lang="zh">页结构</span></p>
-                  <p><span data-copy-lang="en">Slide 1: quarter headline. Slide 2: key metrics. Slide 3: shipped product impact. Slide 4: customer proof. Slide 5: risks and responses. Slide 6: next-quarter focus.</span><span data-copy-lang="zh">第 1 页：季度结论。第 2 页：关键指标。第 3 页：产品发布带来的影响。第 4 页：客户证据。第 5 页：风险与应对。第 6 页：下季度重点。</span></p>
+                  <ul class="demo-slide-outline">
+                    <li><span class="demo-slide-num">1</span><span><span data-copy-lang="en">Quarter headline and KPI summary</span><span data-copy-lang="zh">季度结论与 KPI 摘要</span></span></li>
+                    <li><span class="demo-slide-num">2</span><span><span data-copy-lang="en">Key metrics: activation, expansion, retention</span><span data-copy-lang="zh">关键指标：激活、扩展、留存</span></span></li>
+                    <li><span class="demo-slide-num">3</span><span><span data-copy-lang="en">Shipped product impact with evidence</span><span data-copy-lang="zh">产品发布带来的可量化影响</span></span></li>
+                    <li><span class="demo-slide-num">4</span><span><span data-copy-lang="en">Customer proof: 3 supporting quotes</span><span data-copy-lang="zh">客户证据：3 条支持性评价</span></span></li>
+                    <li><span class="demo-slide-num">5</span><span><span data-copy-lang="en">Risks and mitigation responses</span><span data-copy-lang="zh">风险与应对方案</span></span></li>
+                    <li><span class="demo-slide-num">6</span><span><span data-copy-lang="en">Next-quarter priorities and asks</span><span data-copy-lang="zh">下季度重点与诉求</span></span></li>
+                  </ul>
                 </article>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Evidence used</span><span data-copy-lang="zh">使用的证据</span></p>
@@ -473,7 +490,30 @@
                 </article>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Comparison table</span><span data-copy-lang="zh">对比表</span></p>
-                  <p><span data-copy-lang="en">Summarized pricing, integrations, proof points, gaps, and launch risk in one team-readable matrix.</span><span data-copy-lang="zh">已将价格、集成能力、证明材料、短板和上线风险整理成一张团队可直接阅读的矩阵表。</span></p>
+                  <div data-copy-lang="en">
+                    <div class="demo-table-wrap">
+                      <table class="demo-compare-table">
+                        <thead><tr><th>Competitor</th><th>New move</th><th>vs. TIAN</th></tr></thead>
+                        <tbody>
+                          <tr><td>Rival A</td><td>AI assistant launch, no local files</td><td class="demo-win">✓ Local access advantage</td></tr>
+                          <tr><td>Rival B</td><td>Workflow integrations, weak scheduling</td><td class="demo-win">✓ Scheduling advantage</td></tr>
+                          <tr><td>Rival C</td><td>Price cut, limited Windows support</td><td class="demo-gap">↗ Monitor pricing</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div data-copy-lang="zh">
+                    <div class="demo-table-wrap">
+                      <table class="demo-compare-table">
+                        <thead><tr><th>竞品</th><th>新动态</th><th>对比 TIAN</th></tr></thead>
+                        <tbody>
+                          <tr><td>竞品 A</td><td>AI 助手发布，不支持本地文件</td><td class="demo-win">✓ 本地访问更强</td></tr>
+                          <tr><td>竞品 B</td><td>工作流集成，定时排程弱</td><td class="demo-win">✓ 排程能力更强</td></tr>
+                          <tr><td>竞品 C</td><td>降价，Windows 支持有限</td><td class="demo-gap">↗ 关注定价动态</td></tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </article>
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Recommended response</span><span data-copy-lang="zh">建议动作</span></p>
@@ -535,6 +575,89 @@
                 <article class="demo-output-block">
                   <p class="demo-output-kicker"><span data-copy-lang="en">Why it matters</span><span data-copy-lang="zh">价值</span></p>
                   <p><span data-copy-lang="en">The workflow runs on its own, so you do not have to repeat the same prompt every morning.</span><span data-copy-lang="zh">整个流程会自动运行，因此您不必每天早上重复输入同一段提示词。</span></p>
+                </article>
+              </div>
+            </template>
+
+            <template data-demo-template="meeting">
+              <div data-demo-context-template>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Apps</span><span data-copy-lang="zh">应用</span></p>
+                  <strong>Calendar, Slack, Notion, Drive</strong>
+                  <p><span data-copy-lang="en">Meeting recordings and transcripts are automatically indexed.</span><span data-copy-lang="zh">会议录音和文字记录已自动完成索引。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Recording</span><span data-copy-lang="zh">录音文件</span></p>
+                  <strong><span data-copy-lang="en">`product-sync-2026-04-19.mp4` + transcript</span><span data-copy-lang="zh">`product-sync-2026-04-19.mp4` + 文字记录</span></strong>
+                  <p><span data-copy-lang="en">29-minute sync with 6 attendees.</span><span data-copy-lang="zh">29 分钟同步会议，6 名参与者。</span></p>
+                </article>
+                <article class="demo-context-card">
+                  <p class="demo-context-label"><span data-copy-lang="en">Delivery</span><span data-copy-lang="zh">发送位置</span></p>
+                  <strong><span data-copy-lang="en">Slack #product + Notion note</span><span data-copy-lang="zh">Slack #product 频道 + Notion 笔记</span></strong>
+                  <p><span data-copy-lang="en">Team can read it where they already work.</span><span data-copy-lang="zh">发送到团队已在使用的位置。</span></p>
+                </article>
+              </div>
+              <div data-demo-prompt-template>
+                <span data-copy-lang="en">"Review today's product sync transcript, pull out the key decisions and action items with owners, and post a clean summary to #product Slack."</span>
+                <span data-copy-lang="zh">"阅读今天产品同步会议的文字记录，提取关键决策和带负责人的行动项，然后将清晰的总结发送到 Slack #product 频道。"</span>
+              </div>
+              <div data-demo-sources-template>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Meeting transcript</span><span data-copy-lang="zh">会议文字记录</span></strong>
+                  <p><span data-copy-lang="en">Auto-generated from the product sync recording.</span><span data-copy-lang="zh">从产品同步会议录音自动生成。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Calendar invite</span><span data-copy-lang="zh">日历邀请</span></strong>
+                  <p><span data-copy-lang="en">Attendee list and roles for ownership assignment.</span><span data-copy-lang="zh">参与者名单及职能，用于分配负责人。</span></p>
+                </article>
+                <article class="demo-source-card">
+                  <strong><span data-copy-lang="en">Recap template in Notion</span><span data-copy-lang="zh">Notion 中的总结模板</span></strong>
+                  <p><span data-copy-lang="en">Keeps all meeting summaries in a consistent format.</span><span data-copy-lang="zh">保持所有会议总结格式统一。</span></p>
+                </article>
+              </div>
+              <ol data-demo-steps-template>
+                <li><span data-copy-lang="en">Parse the transcript, identify decisions, commitments, and blockers raised in the meeting.</span><span data-copy-lang="zh">解析文字记录，识别会议中提出的决策、承诺和阻碍点。</span></li>
+                <li><span data-copy-lang="en">Cross-reference attendee roles and assign ownership to each action item.</span><span data-copy-lang="zh">对照参与者职能，为每条行动项分配负责人。</span></li>
+                <li><span data-copy-lang="en">Post a concise summary to Slack and save the full note to Notion.</span><span data-copy-lang="zh">将简洁总结发送到 Slack，并将完整内容保存至 Notion。</span></li>
+              </ol>
+              <div data-demo-result-template>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Key decisions</span><span data-copy-lang="zh">关键决策</span></p>
+                  <ul class="demo-checklist">
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+                      <span><span data-copy-lang="en">Launch date moved to May 15 — announced company-wide.</span><span data-copy-lang="zh">发布日期调整至 5 月 15 日——已全公司通知。</span></span>
+                    </li>
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+                      <span><span data-copy-lang="en">Mobile analytics module deferred to Q3 to keep the schedule.</span><span data-copy-lang="zh">移动端分析模块推迟至 Q3 以保住当前节奏。</span></span>
+                    </li>
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,5 4,7.5 8,2.5"/></svg></span>
+                      <span><span data-copy-lang="en">API rate limits to be revisited after load-test results are in.</span><span data-copy-lang="zh">API 速率限制将在压测结果出来后再行评估。</span></span>
+                    </li>
+                  </ul>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Action items</span><span data-copy-lang="zh">行动项</span></p>
+                  <ul class="demo-checklist">
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"></span>
+                      <span><span data-copy-lang="en">Alex — update the release calendar and notify marketing by EOD.</span><span data-copy-lang="zh">Alex——今日下班前更新发布日历并通知市场团队。</span></span>
+                    </li>
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"></span>
+                      <span><span data-copy-lang="en">Priya — document the analytics deferral decision in Notion.</span><span data-copy-lang="zh">Priya——将分析模块延期决策整理并归档至 Notion。</span></span>
+                    </li>
+                    <li class="demo-checklist-item">
+                      <span class="demo-check"></span>
+                      <span><span data-copy-lang="en">Sam — schedule load test and share results with team by Friday.</span><span data-copy-lang="zh">Sam——安排压力测试并于周五前将结果分享给团队。</span></span>
+                    </li>
+                  </ul>
+                </article>
+                <article class="demo-output-block">
+                  <p class="demo-output-kicker"><span data-copy-lang="en">Delivered</span><span data-copy-lang="zh">已发送</span></p>
+                  <p><span data-copy-lang="en">Summary posted to Slack #product. Full meeting note saved to Notion under "2026-04-19 Product Sync".</span><span data-copy-lang="zh">摘要已发送至 Slack #product 频道，完整会议记录已保存至 Notion "2026-04-19 Product Sync" 文档。</span></p>
                 </article>
               </div>
             </template>
@@ -677,75 +800,120 @@
     }());
 
     (function () {
-      var stage = document.querySelector(".demo-stage");
-      if (!stage) {
-        return;
-      }
+      var stage = document.querySelector(“.demo-stage”);
+      if (!stage) { return; }
 
-      var tabs = stage.querySelectorAll("[data-demo-scenario]");
-      var contextNode = stage.querySelector("[data-demo-context]");
-      var promptNode = stage.querySelector("[data-demo-prompt]");
-      var sourcesNode = stage.querySelector("[data-demo-sources]");
-      var stepsNode = stage.querySelector("[data-demo-steps]");
-      var consoleNode = stage.querySelector("[data-demo-console]");
-      var statusNode = stage.querySelector("[data-demo-status]");
-      var runButton = stage.querySelector("[data-demo-run]");
-      var resetButton = stage.querySelector("[data-demo-reset]");
-      var timers = [];
-      var activeScenario = "email";
+      var tabs        = stage.querySelectorAll(“[data-demo-scenario]”);
+      var contextNode = stage.querySelector(“[data-demo-context]”);
+      var promptNode  = stage.querySelector(“[data-demo-prompt]”);
+      var sourcesNode = stage.querySelector(“[data-demo-sources]”);
+      var stepsNode   = stage.querySelector(“[data-demo-steps]”);
+      var consoleNode = stage.querySelector(“[data-demo-console]”);
+      var statusNode  = stage.querySelector(“[data-demo-status]”);
+      var progressFill = stage.querySelector(“[data-demo-progress]”);
+      var runButton   = stage.querySelector(“[data-demo-run]”);
+      var resetButton = stage.querySelector(“[data-demo-reset]”);
+      var timers        = [];
+      var typingTimers  = [];
+      var activeScenario = “email”;
+      var hasAutoPlayed  = false;
+
+      var scenarioOrder = [“email”, “slides”, “research”, “schedule”, “meeting”];
+      var stepTimings   = [
+        [1.1, 1.4, 0.9],
+        [1.3, 1.8, 1.0],
+        [1.2, 1.6, 0.8],
+        [1.0, 1.5, 1.2],
+        [0.9, 1.7, 1.1]
+      ];
 
       function clearTimers() {
-        while (timers.length) {
-          window.clearTimeout(timers.pop());
-        }
+        while (timers.length) { window.clearTimeout(timers.pop()); }
+      }
+
+      function clearTypingTimers() {
+        while (typingTimers.length) { clearInterval(typingTimers.pop()); }
+        var cursor = promptNode.querySelector(“.typing-cursor”);
+        if (cursor) { cursor.remove(); }
       }
 
       function cloneTemplatePart(scenario, selector) {
-        var template = stage.querySelector('[data-demo-template="' + scenario + '"]');
-        if (!template) {
-          return null;
-        }
-        return template.content.querySelector(selector).cloneNode(true);
+        var tmpl = stage.querySelector('[data-demo-template=”' + scenario + '”]');
+        if (!tmpl) { return null; }
+        return tmpl.content.querySelector(selector).cloneNode(true);
       }
 
       function setLanguageOnNode(node) {
-        var lang = document.documentElement.getAttribute("data-page-lang") || "en";
-        Array.prototype.forEach.call(node.querySelectorAll("[data-copy-lang]"), function (el) {
-          el.hidden = el.getAttribute("data-copy-lang") !== lang;
+        var lang = document.documentElement.getAttribute(“data-page-lang”) || “en”;
+        Array.prototype.forEach.call(node.querySelectorAll(“[data-copy-lang]”), function (el) {
+          el.hidden = el.getAttribute(“data-copy-lang”) !== lang;
         });
       }
 
       function setStatus(state) {
-        statusNode.className = "demo-status is-" + state;
-        if (state === "running") {
-          statusNode.innerHTML = '<span data-copy-lang="en">Running</span><span data-copy-lang="zh">运行中</span>';
-        } else if (state === "done") {
-          statusNode.innerHTML = '<span data-copy-lang="en">Complete</span><span data-copy-lang="zh">已完成</span>';
+        statusNode.className = “demo-status is-” + state;
+        if (state === “running”) {
+          statusNode.innerHTML = '<span data-copy-lang=”en”>Running\u2026</span><span data-copy-lang=”zh”>运行中\u2026</span>';
+        } else if (state === “done”) {
+          statusNode.innerHTML = '<span data-copy-lang=”en”>Complete</span><span data-copy-lang=”zh”>已完成</span>';
         } else {
-          statusNode.innerHTML = '<span data-copy-lang="en">Ready</span><span data-copy-lang="zh">待运行</span>';
+          statusNode.innerHTML = '<span data-copy-lang=”en”>Ready</span><span data-copy-lang=”zh”>待运行</span>';
         }
         setLanguageOnNode(statusNode);
+      }
+
+      function setProgress(fraction) {
+        if (progressFill) {
+          progressFill.style.width = Math.round(fraction * 100) + “%”;
+        }
+      }
+
+      function typewriterOnPrompt() {
+        clearTypingTimers();
+        var lang = document.documentElement.getAttribute(“data-page-lang”) || “en”;
+        var visibleSpan = promptNode.querySelector('[data-copy-lang=”' + lang + '”]');
+        if (!visibleSpan) { return; }
+        var fullText = visibleSpan.textContent;
+        visibleSpan.textContent = “”;
+        var cursor = document.createElement(“span”);
+        cursor.className = “typing-cursor”;
+        cursor.setAttribute(“aria-hidden”, “true”);
+        promptNode.appendChild(cursor);
+        var i = 0;
+        var tid = setInterval(function () {
+          if (i < fullText.length) {
+            visibleSpan.textContent += fullText[i];
+            i++;
+          } else {
+            clearInterval(tid);
+            cursor.remove();
+          }
+        }, 18);
+        typingTimers.push(tid);
       }
 
       function renderScenario(scenario) {
         activeScenario = scenario;
         clearTimers();
+        clearTypingTimers();
+        setProgress(0);
+
         Array.prototype.forEach.call(tabs, function (tab) {
-          var active = tab.getAttribute("data-demo-scenario") === scenario;
-          tab.classList.toggle("is-active", active);
-          tab.setAttribute("aria-selected", active ? "true" : "false");
+          var active = tab.getAttribute(“data-demo-scenario”) === scenario;
+          tab.classList.toggle(“is-active”, active);
+          tab.setAttribute(“aria-selected”, active ? “true” : “false”);
         });
 
-        var promptTemplate = cloneTemplatePart(scenario, "[data-demo-prompt-template]");
-        var contextTemplate = cloneTemplatePart(scenario, "[data-demo-context-template]");
-        var sourcesTemplate = cloneTemplatePart(scenario, "[data-demo-sources-template]");
-        var stepsTemplate = cloneTemplatePart(scenario, "[data-demo-steps-template]");
+        var promptTemplate  = cloneTemplatePart(scenario, “[data-demo-prompt-template]”);
+        var contextTemplate = cloneTemplatePart(scenario, “[data-demo-context-template]”);
+        var sourcesTemplate = cloneTemplatePart(scenario, “[data-demo-sources-template]”);
+        var stepsTemplate   = cloneTemplatePart(scenario, “[data-demo-steps-template]”);
 
-        contextNode.innerHTML = "";
-        promptNode.innerHTML = "";
-        sourcesNode.innerHTML = "";
-        stepsNode.innerHTML = "";
-        consoleNode.innerHTML = "";
+        contextNode.innerHTML = “”;
+        promptNode.innerHTML  = “”;
+        sourcesNode.innerHTML = “”;
+        stepsNode.innerHTML   = “”;
+        consoleNode.innerHTML = “”;
 
         Array.prototype.forEach.call(contextTemplate.childNodes, function (node) {
           contextNode.appendChild(node.cloneNode(true));
@@ -758,70 +926,135 @@
         });
         Array.prototype.forEach.call(stepsTemplate.children, function (step, index) {
           var item = step.cloneNode(true);
-          item.className = "demo-step";
-          item.setAttribute("data-step-state", "idle");
-          item.insertAdjacentHTML("afterbegin", '<span class="demo-step-index">0' + (index + 1) + '</span>');
+          item.className = “demo-step”;
+          item.setAttribute(“data-step-state”, “idle”);
+          item.insertAdjacentHTML(“afterbegin”, '<span class=”demo-step-index”>0' + (index + 1) + '</span>');
+          item.insertAdjacentHTML(“beforeend”,  '<span class=”demo-step-timing”></span>');
           stepsNode.appendChild(item);
         });
 
-        consoleNode.innerHTML = '<p class="demo-placeholder"><span data-copy-lang="en">Click "Run demo" to simulate the workflow.</span><span data-copy-lang="zh">点击“运行演示”来模拟整个工作流。</span></p>';
-        setStatus("ready");
+        consoleNode.innerHTML = '<p class=”demo-placeholder”><span data-copy-lang=”en”>Click \u201cRun demo\u201d to simulate the workflow.</span><span data-copy-lang=”zh”>点击\u201c运行演示\u201d来模拟整个工作流。</span></p>';
+        setStatus(“ready”);
         setLanguageOnNode(stage);
+        typewriterOnPrompt();
       }
 
       function runScenario() {
         clearTimers();
-        renderScenario(activeScenario);
-        setStatus("running");
-        runButton.disabled = true;
+        clearTypingTimers();
+        setProgress(0);
+
+        // Reset step states without re-rendering context/prompt
+        var allSteps = stepsNode.querySelectorAll(“.demo-step”);
+        Array.prototype.forEach.call(allSteps, function (step) {
+          step.setAttribute(“data-step-state”, “idle”);
+          var timing = step.querySelector(“.demo-step-timing”);
+          if (timing) { timing.textContent = “”; }
+        });
+        consoleNode.innerHTML = “”;
+
+        setStatus(“running”);
+        runButton.disabled  = true;
         resetButton.disabled = true;
 
-        var steps = stepsNode.querySelectorAll(".demo-step");
-        var resultTemplate = cloneTemplatePart(activeScenario, "[data-demo-result-template]");
-        var results = Array.prototype.slice.call(resultTemplate.children);
-
-        consoleNode.innerHTML = "";
+        var steps          = stepsNode.querySelectorAll(“.demo-step”);
+        var resultTemplate = cloneTemplatePart(activeScenario, “[data-demo-result-template]”);
+        var results        = Array.prototype.slice.call(resultTemplate.children);
+        var sIdx           = scenarioOrder.indexOf(activeScenario);
+        var timingRow      = stepTimings[sIdx >= 0 ? sIdx : 0];
 
         Array.prototype.forEach.call(steps, function (step, index) {
           timers.push(window.setTimeout(function () {
-            step.setAttribute("data-step-state", "active");
+            step.setAttribute(“data-step-state”, “active”);
             if (index > 0) {
-              steps[index - 1].setAttribute("data-step-state", "done");
+              var prev = steps[index - 1];
+              prev.setAttribute(“data-step-state”, “done”);
+              var prevT = prev.querySelector(“.demo-step-timing”);
+              if (prevT) { prevT.textContent = (timingRow[index - 1] || 1.0).toFixed(1) + “s”; }
+              setProgress(index / steps.length);
             }
-          }, 600 * index));
+          }, 700 * index));
 
           timers.push(window.setTimeout(function () {
             var result = results[index];
             if (result) {
-              consoleNode.appendChild(result.cloneNode(true));
+              var clone = result.cloneNode(true);
+              consoleNode.appendChild(clone);
               setLanguageOnNode(consoleNode);
+              clone.scrollIntoView({ behavior: “smooth”, block: “nearest” });
             }
             if (index === steps.length - 1) {
-              step.setAttribute("data-step-state", "done");
-              setStatus("done");
-              runButton.disabled = false;
+              step.setAttribute(“data-step-state”, “done”);
+              var lastT = step.querySelector(“.demo-step-timing”);
+              if (lastT) { lastT.textContent = (timingRow[index] || 1.0).toFixed(1) + “s”; }
+              setProgress(1);
+              setStatus(“done”);
+              runButton.disabled  = false;
               resetButton.disabled = false;
             }
-          }, (600 * index) + 500));
+          }, (700 * index) + 550));
         });
       }
 
       Array.prototype.forEach.call(tabs, function (tab) {
-        tab.addEventListener("click", function () {
-          runButton.disabled = false;
+        tab.addEventListener(“click”, function () {
+          runButton.disabled  = false;
           resetButton.disabled = false;
-          renderScenario(tab.getAttribute("data-demo-scenario"));
+          renderScenario(tab.getAttribute(“data-demo-scenario”));
         });
       });
 
-      runButton.addEventListener("click", runScenario);
-      resetButton.addEventListener("click", function () {
-        runButton.disabled = false;
+      runButton.addEventListener(“click”, runScenario);
+      resetButton.addEventListener(“click”, function () {
+        runButton.disabled  = false;
         resetButton.disabled = false;
         renderScenario(activeScenario);
       });
 
       renderScenario(activeScenario);
+
+      // Auto-play once when the demo section enters the viewport
+      var demoSection = document.querySelector(“#demo”);
+      if (demoSection && “IntersectionObserver” in window) {
+        var autoObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting && !hasAutoPlayed) {
+              hasAutoPlayed = true;
+              timers.push(window.setTimeout(function () {
+                if (!runButton.disabled) { runScenario(); }
+              }, 1000));
+              autoObserver.disconnect();
+            }
+          });
+        }, { threshold: 0.35 });
+        autoObserver.observe(demoSection);
+      }
+    }());
+
+    // Section scroll entrance animations
+    (function () {
+      if (!(“IntersectionObserver” in window)) { return; }
+      var sections = document.querySelectorAll(“.section”);
+      var vh = window.innerHeight || document.documentElement.clientHeight;
+      Array.prototype.forEach.call(sections, function (section) {
+        if (section.getBoundingClientRect().top >= vh) {
+          section.classList.add(“is-offscreen”);
+        }
+      });
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.remove(“is-offscreen”);
+            entry.target.classList.add(“is-visible”);
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.07, rootMargin: “0px 0px -30px 0px” });
+      Array.prototype.forEach.call(sections, function (section) {
+        if (section.classList.contains(“is-offscreen”)) {
+          observer.observe(section);
+        }
+      });
     }());
 
   </script>

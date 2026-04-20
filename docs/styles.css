@@ -692,6 +692,228 @@ a {
   }
 }
 
+/* ── Demo enhancements ──────────────────────────────── */
+
+/* Progress bar */
+.demo-progress-wrap {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(24, 33, 29, 0.08);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.demo-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--warm));
+  border-radius: 999px;
+  transition: width 0.45s ease;
+}
+
+/* Typing cursor */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 0.88em;
+  background: var(--accent);
+  vertical-align: text-bottom;
+  margin-left: 1px;
+  animation: cursor-blink 0.7s step-end infinite;
+}
+
+/* Result card slide-in */
+@keyframes result-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.demo-output-block {
+  animation: result-in 0.35s ease both;
+}
+
+/* Step timing badge */
+.demo-step-timing {
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.74rem;
+  color: var(--accent);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.3s 0.1s;
+}
+
+.demo-step[data-step-state="done"] .demo-step-timing {
+  opacity: 1;
+}
+
+/* Section scroll entrance */
+@keyframes section-fade-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.section.is-offscreen {
+  opacity: 0;
+}
+
+.section.is-visible {
+  animation: section-fade-up 0.5s ease both;
+}
+
+/* Action item checklist */
+.demo-checklist {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.demo-checklist-item {
+  display: flex;
+  gap: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.demo-check {
+  flex-shrink: 0;
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  background: rgba(29, 107, 87, 0.12);
+  border: 1.5px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.demo-check svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+  color: var(--accent);
+}
+
+/* Formatted email card */
+.demo-email-card {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(24, 33, 29, 0.1);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.88rem;
+}
+
+.demo-email-header {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.demo-email-row {
+  display: flex;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.demo-email-row strong {
+  color: var(--text);
+  min-width: 52px;
+}
+
+.demo-email-body {
+  line-height: 1.65;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Comparison table */
+.demo-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.demo-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+
+.demo-compare-table th,
+.demo-compare-table td {
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(24, 33, 29, 0.07);
+  line-height: 1.4;
+}
+
+.demo-compare-table th {
+  background: rgba(29, 107, 87, 0.07);
+  color: var(--accent-strong);
+  font-weight: 700;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.demo-compare-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.demo-compare-table td:first-child {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.demo-win { color: var(--accent-strong); font-weight: 700; }
+.demo-gap { color: #9a620f; font-weight: 700; }
+
+/* Slide outline */
+.demo-slide-outline {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.demo-slide-outline li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.demo-slide-num {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: rgba(29, 107, 87, 0.12);
+  color: var(--accent-strong);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+
 @media (max-width: 680px) {
   .page-shell {
     width: min(100% - 20px, 1120px);
