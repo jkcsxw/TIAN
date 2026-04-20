@@ -67,6 +67,7 @@ $(rule)
     setup               Re-run the interactive setup wizard
     update              Upgrade installed AI backends to their latest versions
     doctor              Check your setup and diagnose common problems
+    uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is installed
     list mcp            List available MCP servers
     list skills         List available skills
@@ -612,17 +613,165 @@ PYEOF
     esac
 }
 
+cmd_uninstall() {
+    local yes_flag=false
+    [[ "${1:-}" == "-y" || "${1:-}" == "--yes" ]] && yes_flag=true
+
+    hdr "TIAN Uninstall"
+    echo -e "${YELLOW}  This will remove TIAN's installed components:${RESET}"
+    echo "    • npm-installed AI backends (claude, codex, etc.)"
+    echo "    • API keys written to shell profile (~/.bashrc / ~/.zshrc)"
+    echo "    • TIAN job data and schedules (~/.tian)"
+    echo "    • TIAN launcher script"
+    echo ""
+    echo -e "${DIM}  Note: Node.js itself will NOT be removed.${RESET}"
+    echo ""
+
+    if ! $yes_flag; then
+        printf "${YELLOW}  Proceed with uninstall? [y/N]: ${RESET}"
+        read -r answer
+        [[ "$answer" =~ ^[Yy]$ ]] || { echo "  Cancelled."; return 0; }
+    fi
+
+    local platform; platform=$(detect_platform)
+    local removed=0 skipped=0
+
+    # ── 1. Uninstall npm packages ─────────────────────────────────────────────
+    echo ""
+    echo -e "${BOLD}  Removing AI backends${RESET}"
+    if command -v npm &>/dev/null; then
+        while IFS='|' read -r bname bcmd bnpm; do
+            if [[ -z "$bnpm" || -z "$bcmd" ]]; then
+                [[ -n "$bname" ]] && info "$(printf '%-26s' "$bname") skipping (not npm-installed)"
+                ((skipped++)) || true
+                continue
+            fi
+            if command -v "$bcmd" &>/dev/null; then
+                if npm uninstall -g "$bnpm" >/dev/null 2>&1; then
+                    ok "$(printf '%-26s' "$bname") removed ($bnpm)"
+                    ((removed++)) || true
+                else
+                    warn "$(printf '%-26s' "$bname") npm uninstall failed — try: npm uninstall -g $bnpm"
+                    ((skipped++)) || true
+                fi
+            else
+                info "$(printf '%-26s' "$bname") not installed — skipping"
+                ((skipped++)) || true
+            fi
+        done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    print('|'.join([b.get('displayName',''), b.get('cliCommand',''), b.get('npmPackage','')]))
+PYEOF
+)
+    else
+        warn "npm not found — skipping backend removal"
+    fi
+
+    # ── 2. Remove API key entries from shell profile ──────────────────────────
+    echo ""
+    echo -e "${BOLD}  Removing API key exports from shell profile${RESET}"
+    local profile_file=""
+    [[ -f "$HOME/.zshrc" ]]  && profile_file="$HOME/.zshrc"
+    [[ -f "$HOME/.bashrc" ]] && profile_file="${profile_file:-$HOME/.bashrc}"
+
+    python3 - "$CATALOG" "$profile_file" <<'PYEOF'
+import json, sys, re, os
+catalog_path, profile = sys.argv[1], sys.argv[2]
+if not profile or not os.path.isfile(profile):
+    print("  [!!]  No shell profile found — skipping")
+    sys.exit(0)
+c = json.load(open(catalog_path))
+env_vars = set(b.get('apiKeyEnvVar','') for b in c['backends'] if b.get('apiKeyEnvVar'))
+lines = open(profile).readlines()
+kept = [l for l in lines if not any(re.search(rf'export\s+{v}\s*=', l) for v in env_vars)]
+removed = len(lines) - len(kept)
+if removed:
+    open(profile, 'w').writelines(kept)
+    print(f"  [ok]  Removed {removed} API key export(s) from {profile}")
+else:
+    print(f"  [..]  No TIAN API key exports found in {profile}")
+PYEOF
+    ((removed++)) || true
+
+    # ── 3. Remove MCP config entries written by TIAN ─────────────────────────
+    echo ""
+    echo -e "${BOLD}  Cleaning MCP config${RESET}"
+    local mcp_config
+    [[ "$platform" == "macos" ]] \
+        && mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json" \
+        || mcp_config="$HOME/.config/claude/claude_desktop_config.json"
+
+    if [[ -f "$mcp_config" ]]; then
+        python3 - "$CATALOG" "$mcp_config" <<'PYEOF'
+import json, sys, os
+catalog_path, cfg_path = sys.argv[1], sys.argv[2]
+c     = json.load(open(catalog_path))
+tian_keys = set(s.get('configKey','') for s in c.get('mcpServers',[]) if s.get('configKey'))
+cfg   = json.load(open(cfg_path))
+mcp   = cfg.get('mcpServers', {})
+before = set(mcp.keys())
+for k in list(mcp.keys()):
+    if k in tian_keys:
+        del mcp[k]
+after = set(mcp.keys())
+removed = before - after
+if removed:
+    json.dump(cfg, open(cfg_path, 'w'), indent=2)
+    print(f"  [ok]  Removed {len(removed)} MCP server(s) from config: {', '.join(removed)}")
+else:
+    print(f"  [..]  No TIAN MCP entries found in config")
+PYEOF
+    else
+        info "MCP config not found — skipping"
+    fi
+
+    # ── 4. Remove launcher script ─────────────────────────────────────────────
+    echo ""
+    echo -e "${BOLD}  Removing launcher${RESET}"
+    local launcher="$TIAN_DIR/launcher.sh"
+    if [[ -f "$launcher" ]]; then
+        rm -f "$launcher"
+        ok "launcher.sh removed"
+        ((removed++)) || true
+    else
+        info "launcher.sh not found — skipping"
+    fi
+
+    # ── 5. Remove ~/.tian data directory ─────────────────────────────────────
+    echo ""
+    echo -e "${BOLD}  Removing job data (~/.tian)${RESET}"
+    if [[ -d "$HOME/.tian" ]]; then
+        rm -rf "$HOME/.tian"
+        ok "~/.tian removed"
+        ((removed++)) || true
+    else
+        info "~/.tian not found — skipping"
+    fi
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    echo ""
+    rule
+    ok "TIAN components removed. Removed: $removed  Skipped: $skipped"
+    echo ""
+    echo -e "${DIM}  TIAN installation directory ($TIAN_DIR) was NOT deleted.${RESET}"
+    echo -e "${DIM}  To fully remove it: rm -rf \"$TIAN_DIR\"${RESET}"
+    echo ""
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
-    setup)    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
-    update)   cmd_update ;;
-    doctor)   cmd_doctor ;;
-    status)   cmd_status ;;
-    run)      cmd_run "$@" ;;
-    jobs)     cmd_jobs "$@" ;;
-    schedule) cmd_schedule "$@" ;;
-    list)     cmd_list "$@" ;;
+    setup)     bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    update)    cmd_update ;;
+    doctor)    cmd_doctor ;;
+    status)    cmd_status ;;
+    uninstall) cmd_uninstall "$@" ;;
+    run)       cmd_run "$@" ;;
+    jobs)      cmd_jobs "$@" ;;
+    schedule)  cmd_schedule "$@" ;;
+    list)      cmd_list "$@" ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
 esac
