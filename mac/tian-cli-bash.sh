@@ -646,7 +646,7 @@ cmd_run() {
         info "Running in background (job: $job_id)..."
         # Run AI command, then classify quota exhaustion so scheduled jobs can be disabled.
         nohup bash -c '
-"$1" "$2" "$3" >"$4" 2>&1
+"$1" $2 "$3" >"$4" 2>&1
 _ec=$?
 python3 -c "
 import json, os, re, subprocess, sys
@@ -688,8 +688,8 @@ PYEOF
             [[ -z "$r_cmd" ]] && continue
             [[ "$r_cmd" == "$primary_cmd" ]] || warn "Falling back to $r_name (quota/rate-limit on previous backend)..."
             rule
-            # Bug fix: pass prompt as argument, not via eval string interpolation
-            "$r_cmd" "$r_flag" "$prompt" 2>&1 | tee "$out_file" || true
+            # r_flag may be empty or multi-word; unquoted expansion handles both correctly
+            "$r_cmd" $r_flag "$prompt" 2>&1 | tee "$out_file" || true
             rule
             local out_text; out_text=$(cat "$out_file" 2>/dev/null || true)
             is_quota_error "$out_text" || break
@@ -760,11 +760,21 @@ if not jobs:
 else:
     print(f"\n  {'ID':<30} {'STATUS':<10} PROMPT")
     print("  " + "─"*70)
+    STATUS_COLORS = {
+        'running': '\033[0;36m',
+        'done':    '\033[0;32m',
+        'failed':  '\033[0;31m',
+        'stopped': '\033[1;33m',
+    }
+    RESET = '\033[0m'
     for j in reversed(jobs[-20:]):
-        jid    = j.get('id','?')[:28]
-        status = j.get('status','?').upper()
-        prompt = j.get('prompt','')[:50]
-        print(f"  {jid:<30} {status:<10} {prompt}...")
+        jid       = j.get('id','?')[:28]
+        status_raw = j.get('status','?')
+        status_pad = f"{status_raw.upper():<10}"
+        color      = STATUS_COLORS.get(status_raw, '')
+        status_str = f"{color}{status_pad}{RESET}" if color else status_pad
+        prompt    = j.get('prompt','')[:50]
+        print(f"  {jid:<30} {status_str} {prompt}...")
     print()
 PYEOF
             ;;
