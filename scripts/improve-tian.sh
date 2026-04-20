@@ -10,10 +10,11 @@ TASKS_DIR="$HOME/.tian/tasks"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 DIM='\033[2m'; RESET='\033[0m'
-log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"; }
-ok()   { echo -e "${GREEN}[ok]${RESET} $*"; log "[ok] $*"; }
-warn() { echo -e "${YELLOW}[!!]${RESET} $*"; log "[!!] $*"; }
-info() { echo -e "${DIM}[..]${RESET} $*"; log "[..] $*"; }
+# All logging goes to stderr so command-substitution callers get clean stdout
+log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE" >&2; }
+ok()   { echo -e "${GREEN}[ok]${RESET} $*" >&2; log "[ok] $*"; }
+warn() { echo -e "${YELLOW}[!!]${RESET} $*" >&2; log "[!!] $*"; }
+info() { echo -e "${DIM}[..]${RESET} $*" >&2; log "[..] $*"; }
 
 IMPROVE_PROMPT='You are an AI assistant improving the TIAN project — a shell-based installer that helps non-technical users set up AI tools on their computers. The project lives at /home/zxk1995/code/TIAN. Your job: inspect the codebase, pick ONE concrete improvement (new feature, bug fix, documentation, or UX improvement), implement it by editing the relevant file(s), and write a brief summary of what you changed and why. Focus on high-impact, low-risk changes. Do not break existing functionality.'
 
@@ -49,7 +50,21 @@ run_improvement() {
 
     info "Launching improvement with $backend (job: $job_id)..."
 
-    nohup bash -c '"$1" "$2" "$3" >"$4" 2>&1' -- "$backend" "$flag" "$IMPROVE_PROMPT" "$out_file" &>/dev/null &
+    # Run the AI command, then update job status to done/failed when it finishes
+    nohup bash -c '
+"$1" "$2" "$3" >"$4" 2>&1
+_ec=$?
+python3 -c "
+import json, sys
+jf, jid, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
+jobs = json.load(open(jf))
+for j in jobs:
+    if j[\"id\"] == jid:
+        j[\"status\"] = \"done\" if code == 0 else \"failed\"
+        break
+json.dump(jobs, open(jf, \"w\"), indent=2)
+" "$5" "$6" "$_ec"
+' -- "$backend" "$flag" "$IMPROVE_PROMPT" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
 
     python3 - "$JOBS_FILE" "$job_id" "$IMPROVE_PROMPT" "$backend" <<'PYEOF'
 import json, sys

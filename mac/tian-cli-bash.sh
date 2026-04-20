@@ -71,6 +71,7 @@ $(rule)
     run "prompt" -b     Run a task in the background
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
+    jobs tail <id>      Stream live output of a running job (or show result if done)
     jobs clear          Clear completed jobs
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
     schedule list       List scheduled tasks
@@ -140,8 +141,21 @@ cmd_run() {
 
     if $background; then
         info "Running in background (job: $job_id)..."
-        # Bug fix: pass prompt as argument to avoid shell injection via eval/interpolation
-        nohup bash -c '"$1" "$2" "$3" >"$4" 2>&1' -- "$cmd" "$flag" "$prompt" "$out_file" &>/dev/null &
+        # Run AI command, then update job status to done/failed when it exits
+        nohup bash -c '
+"$1" "$2" "$3" >"$4" 2>&1
+_ec=$?
+python3 -c "
+import json, sys
+jf, jid, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
+jobs = json.load(open(jf))
+for j in jobs:
+    if j[\"id\"] == jid:
+        j[\"status\"] = \"done\" if code == 0 else \"failed\"
+        break
+json.dump(jobs, open(jf, \"w\"), indent=2)
+" "$5" "$6" "$_ec"
+' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
         python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" <<'PYEOF'
 import json, sys
 from datetime import datetime
@@ -169,6 +183,26 @@ cmd_jobs() {
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs result <job-id>"
             local f="$TASKS_DIR/$id.txt"
             [[ -f "$f" ]] && cat "$f" || fail "Job '$id' not found."
+            ;;
+        tail)
+            local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs tail <job-id>"
+            local f="$TASKS_DIR/$id.txt"
+            [[ -f "$f" ]] || fail "Job '$id' not found."
+            local status
+            status=$(python3 - "$JOBS_FILE" "$id" <<'PYEOF'
+import json, sys
+jobs = json.load(open(sys.argv[1]))
+j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
+print(j.get('status', 'unknown') if j else 'unknown')
+PYEOF
+)
+            if [[ "$status" == "running" ]]; then
+                info "Job $id is still running — streaming output (Ctrl+C to stop)..."
+                tail -f "$f"
+            else
+                info "Job $id status: $status"
+                cat "$f"
+            fi
             ;;
         clear)
             python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
