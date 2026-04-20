@@ -65,6 +65,7 @@ $(rule)
 
   COMMANDS
     setup               Re-run the interactive setup wizard
+    update              Upgrade installed AI backends to their latest versions
     doctor              Check your setup and diagnose common problems
     status              Show what is installed
     list mcp            List available MCP servers
@@ -426,6 +427,77 @@ PYEOF
     esac
 }
 
+cmd_update() {
+    hdr "TIAN Update — Upgrade AI Backends"
+
+    if ! command -v npm &>/dev/null; then
+        warn "npm not found. Install Node.js first: https://nodejs.org"
+        return 1
+    fi
+
+    local updated=0 skipped=0 failed=0
+
+    # Read backends from catalog and update npm-installed ones
+    while IFS='|' read -r bid bname bcmd bnpm binstall; do
+        if [[ -z "$bnpm" ]]; then
+            if [[ "$binstall" == "desktop-app" ]]; then
+                info "$(printf '%-28s' "$bname") desktop app — check for updates in the app itself"
+                ((skipped++)) || true
+            elif [[ "$binstall" == "local-cli" ]]; then
+                info "$(printf '%-28s' "$bname") local install — update manually"
+                ((skipped++)) || true
+            fi
+            continue
+        fi
+
+        if [[ -z "$bcmd" ]] || ! command -v "$bcmd" &>/dev/null; then
+            info "$(printf '%-28s' "$bname") not installed — skipping"
+            ((skipped++)) || true
+            continue
+        fi
+
+        local ver_before=""
+        ver_before=$("$bcmd" --version 2>/dev/null || true)
+
+        info "Updating $bname ($bnpm)..."
+
+        if npm install -g "${bnpm}@latest" >/dev/null 2>&1; then
+            local ver_after=""
+            ver_after=$("$bcmd" --version 2>/dev/null || true)
+            if [[ -n "$ver_before" && -n "$ver_after" && "$ver_before" != "$ver_after" ]]; then
+                ok "$(printf '%-28s' "$bname") $ver_before  →  $ver_after"
+            else
+                ok "$(printf '%-28s' "$bname") already up to date ($ver_after)"
+            fi
+            ((updated++)) || true
+        else
+            warn "$(printf '%-28s' "$bname") update failed — try: npm install -g ${bnpm}@latest"
+            ((failed++)) || true
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    print('|'.join([
+        b.get('id',''),
+        b.get('displayName',''),
+        b.get('cliCommand',''),
+        b.get('npmPackage',''),
+        b.get('installType','cli'),
+    ]))
+PYEOF
+)
+
+    echo ""
+    rule
+    if [[ $failed -gt 0 ]]; then
+        warn "Updated: $updated   Skipped: $skipped   Failed: $failed"
+    else
+        ok "Updated: $updated   Skipped: $skipped   Failed: $failed"
+    fi
+    echo ""
+}
+
 cmd_doctor() {
     hdr "TIAN Doctor — Setup Diagnostics"
     local platform; platform=$(detect_platform)
@@ -544,6 +616,7 @@ PYEOF
 CMD="${1:-help}"; shift || true
 case "$CMD" in
     setup)    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    update)   cmd_update ;;
     doctor)   cmd_doctor ;;
     status)   cmd_status ;;
     run)      cmd_run "$@" ;;

@@ -142,6 +142,7 @@ function Cmd-Help {
     setup               交互式引导安装（首次使用推荐）
     install             使用参数快速安装
     doctor              诊断常见安装问题
+    update              将已安装的AI后端更新到最新版本
     status              查看当前安装状态
     list backends       列出可用AI后端
     list mcp            列出可用MCP服务器
@@ -185,6 +186,7 @@ function Cmd-Help {
     tian-cli list mcp
     tian-cli add mcp github
     tian-cli status
+    tian-cli update
     tian-cli lang en
 
     tian-cli run "总结今日AI领域最新动态"
@@ -208,6 +210,7 @@ function Cmd-Help {
     setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
     doctor              Check your setup and diagnose common problems
+    update              Upgrade installed AI backends to their latest versions
     status              Show what is currently installed
     list backends       List available AI backends
     list mcp            List available MCP servers
@@ -251,6 +254,7 @@ function Cmd-Help {
     tian-cli list mcp
     tian-cli add mcp github
     tian-cli status
+    tian-cli update
     tian-cli lang zh
 
     tian-cli run "Summarise today's AI news"
@@ -761,6 +765,69 @@ function Cmd-Doctor {
     Write-Host ""
 }
 
+function Cmd-Update {
+    Write-Header "TIAN Update — Upgrade AI Backends"
+    Write-Rule
+
+    $npm = Get-Command npm -ErrorAction SilentlyContinue
+    if (-not $npm) {
+        Write-Fail "npm not found. Install Node.js first: https://nodejs.org"
+        return
+    }
+
+    $updated  = 0
+    $skipped  = 0
+    $failed   = 0
+
+    foreach ($b in $catalog.backends) {
+        if (-not $b.npmPackage) {
+            if ($b.installType -eq "desktop-app") {
+                Write-Info "$($b.displayName.PadRight(26)) desktop app — check for updates in the app itself"
+                $skipped++
+            } elseif ($b.installType -eq "local-cli") {
+                Write-Info "$($b.displayName.PadRight(26)) local install — update manually"
+                $skipped++
+            }
+            continue
+        }
+
+        $cmd = Get-Command $b.cliCommand -ErrorAction SilentlyContinue
+        if (-not $cmd) {
+            Write-Info "$($b.displayName.PadRight(26)) not installed — skipping (run 'tian-cli setup' to install)"
+            $skipped++
+            continue
+        }
+
+        # Capture version before update
+        $verBefore = ""
+        try { $verBefore = (& $b.cliCommand --version 2>&1) -join "" } catch {}
+
+        Write-Info "Updating $($b.displayName) ($($b.npmPackage))..."
+
+        $result = & npm install -g "$($b.npmPackage)@latest" 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $verAfter = ""
+            try { $verAfter = (& $b.cliCommand --version 2>&1) -join "" } catch {}
+
+            if ($verBefore -and $verAfter -and ($verBefore.Trim() -ne $verAfter.Trim())) {
+                Write-Ok "$($b.displayName.PadRight(26)) $verBefore  →  $verAfter"
+            } else {
+                Write-Ok "$($b.displayName.PadRight(26)) already up to date ($verAfter)"
+            }
+            $updated++
+        } else {
+            Write-Fail "$($b.displayName.PadRight(26)) update failed:"
+            $result | Select-Object -Last 5 | ForEach-Object { Write-Color "    $_" DarkGray }
+            $failed++
+        }
+    }
+
+    Write-Host ""
+    Write-Rule
+    Write-Color "  Updated: $updated   Skipped: $skipped   Failed: $failed" $(if ($failed -gt 0) { "Yellow" } else { "Green" })
+    Write-Host ""
+}
+
 function Cmd-Repair {
     Write-Header (T "cli.repair_header")
     Write-Info (T "cli.repair_info")
@@ -826,6 +893,7 @@ switch ($Command.ToLower()) {
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
     "doctor"  { Cmd-Doctor }
+    "update"  { Cmd-Update }
     "repair"  { Cmd-Repair }
 
     "run" {
