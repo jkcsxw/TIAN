@@ -720,7 +720,6 @@
     (function () {
       var root = document.documentElement;
       var buttons = document.querySelectorAll("[data-set-lang]");
-      var copyNodes = document.querySelectorAll("[data-copy-lang]");
       var supported = ["en", "zh"];
       var storage = null;
 
@@ -745,7 +744,8 @@
         if (storage) {
           storage.setItem("tian-site-lang", lang);
         }
-        Array.prototype.forEach.call(copyNodes, function (node) {
+        var allCopyNodes = document.querySelectorAll("[data-copy-lang]");
+        Array.prototype.forEach.call(allCopyNodes, function (node) {
           node.hidden = node.getAttribute("data-copy-lang") !== lang;
         });
         Array.prototype.forEach.call(buttons, function (button) {
