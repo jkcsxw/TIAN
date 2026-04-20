@@ -15,7 +15,8 @@ param(
     [switch]$Background,
     [switch]$Yes,
     [switch]$All,
-    [switch]$List
+    [switch]$List,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$RemainingArgs
 )
 
 # ── Colour helpers ────────────────────────────────────────────────────────────
@@ -1048,12 +1049,12 @@ switch ($Command.ToLower()) {
     "jobs" {
         switch ($Subcommand.ToLower()) {
             "result" {
-                $jobId = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $jobId) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
                 Show-JobResult -JobId $jobId
             }
             "stop"   {
-                $jobId = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $All -and -not $jobId) { Write-Fail "Usage: tian-cli jobs stop <job-id> [--all]"; exit 1 }
                 Stop-Jobs -JobId $jobId -All:$All
             }
@@ -1070,12 +1071,12 @@ switch ($Command.ToLower()) {
             }
             "list"   { Show-Schedules }
             "run"    {
-                $scheduleName = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                $scheduleName = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $scheduleName) { Write-Fail "Usage: tian-cli schedule run <name>"; exit 1 }
                 Invoke-ScheduleNow -Name $scheduleName -TianDir $TianDir
             }
             "remove" {
-                $scheduleName = if ($Name) { $Name } elseif ($args.Count -gt 0) { [string]$args[0] } else { "" }
+                $scheduleName = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $scheduleName) { Write-Fail "Usage: tian-cli schedule remove --name <name>"; exit 1 }
                 Remove-Schedule -Name $scheduleName -TianDir $TianDir
             }
