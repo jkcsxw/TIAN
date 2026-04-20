@@ -4,15 +4,15 @@
 >
 > 几分钟内把 AI 助手装到自己的电脑上。无需编程。
 
-Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
+Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/#demo)
 
 Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 
 ## Live Demo | 在线演示
 
-Open the GitHub Pages interactive demo here:
+Open the GitHub Pages interactive demo directly here:
 
-[Try the demo site](https://jkcsxw.github.io/TIAN/)
+[Try the live demo](https://jkcsxw.github.io/TIAN/#demo)
 
 The demo now shows concrete workflows like:
 
@@ -23,7 +23,7 @@ The demo now shows concrete workflows like:
 
 这里可以直接打开 GitHub Pages 交互演示：
 
-[打开演示站点](https://jkcsxw.github.io/TIAN/)
+[直接打开在线演示](https://jkcsxw.github.io/TIAN/#demo)
 
 演示中可以直接看到这些真实使用场景：
 
@@ -212,12 +212,12 @@ You can ask TIAN things like:
 
 ## Need More Detail? | 想看更详细说明？
 
-- Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
+- Demo: [GitHub Pages live demo](https://jkcsxw.github.io/TIAN/#demo)
 - Website: [jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 - Releases: [GitHub Releases](https://github.com/jkcsxw/TIAN/releases)
 - Source code: [GitHub repository](https://github.com/jkcsxw/TIAN)
 
-- 在线演示：[GitHub Pages live demo](https://jkcsxw.github.io/TIAN/)
+- 在线演示：[GitHub Pages live demo](https://jkcsxw.github.io/TIAN/#demo)
 - 官网：[jkcsxw.github.io/TIAN](https://jkcsxw.github.io/TIAN/)
 - 发布页：[GitHub Releases](https://github.com/jkcsxw/TIAN/releases)
 - 源码仓库：[GitHub repository](https://github.com/jkcsxw/TIAN)
