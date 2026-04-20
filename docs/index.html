@@ -237,23 +237,28 @@
             </div>
           </div>
 
-          <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
-            <button type="button" class="demo-tab is-active" data-demo-target="email" role="tab" aria-selected="true">
-              <span data-copy-lang="en">Email reply</span><span data-copy-lang="zh">邮件回复</span>
-            </button>
-            <button type="button" class="demo-tab" data-demo-target="slides" role="tab" aria-selected="false">
-              <span data-copy-lang="en">Slides from files</span><span data-copy-lang="zh">根据文件做演示稿</span>
-            </button>
-            <button type="button" class="demo-tab" data-demo-target="research" role="tab" aria-selected="false">
-              <span data-copy-lang="en">Research brief</span><span data-copy-lang="zh">调研简报</span>
-            </button>
-            <button type="button" class="demo-tab" data-demo-target="schedule" role="tab" aria-selected="false">
-              <span data-copy-lang="en">Scheduled task</span><span data-copy-lang="zh">定时任务</span>
-            </button>
-          </div>
-
           <div class="demo-stage">
-            <article class="demo-flow is-active" data-demo-panel="email">
+            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-email" checked>
+            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-slides">
+            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-research">
+            <input class="demo-radio" type="radio" name="demo-scenario" id="demo-schedule">
+
+            <div class="demo-tabs" role="tablist" aria-label="Demo scenarios">
+              <label class="demo-tab" for="demo-email" role="tab">
+                <span data-copy-lang="en">Email reply</span><span data-copy-lang="zh">邮件回复</span>
+              </label>
+              <label class="demo-tab" for="demo-slides" role="tab">
+                <span data-copy-lang="en">Slides from files</span><span data-copy-lang="zh">根据文件做演示稿</span>
+              </label>
+              <label class="demo-tab" for="demo-research" role="tab">
+                <span data-copy-lang="en">Research brief</span><span data-copy-lang="zh">调研简报</span>
+              </label>
+              <label class="demo-tab" for="demo-schedule" role="tab">
+                <span data-copy-lang="en">Scheduled task</span><span data-copy-lang="zh">定时任务</span>
+              </label>
+            </div>
+
+            <article class="demo-flow demo-flow-email">
               <div class="demo-prompt">
                 <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
                 <p><span data-copy-lang="en">"Read the customer thread, check our pricing notes, and draft a calm reply that offers next steps."</span><span data-copy-lang="zh">“读取客户邮件往来，查看我们的报价说明，并起草一封语气平和、包含下一步安排的回复。”</span></p>
@@ -278,7 +283,7 @@
               </div>
             </article>
 
-            <article class="demo-flow" data-demo-panel="slides" hidden>
+            <article class="demo-flow demo-flow-slides">
               <div class="demo-prompt">
                 <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
                 <p><span data-copy-lang="en">"Use last quarter's report, product notes, and customer quotes to prepare a 6-slide presentation outline."</span><span data-copy-lang="zh">“使用上季度报告、产品说明和客户评价，整理出一个 6 页的演示文稿提纲。”</span></p>
@@ -303,7 +308,7 @@
               </div>
             </article>
 
-            <article class="demo-flow" data-demo-panel="research" hidden>
+            <article class="demo-flow demo-flow-research">
               <div class="demo-prompt">
                 <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
                 <p><span data-copy-lang="en">"Search the web, compare three competitors, and write a brief I can send to the team before noon."</span><span data-copy-lang="zh">“搜索网页，比较三个竞争对手，并整理一份中午前可以发给团队的简报。”</span></p>
@@ -328,7 +333,7 @@
               </div>
             </article>
 
-            <article class="demo-flow" data-demo-panel="schedule" hidden>
+            <article class="demo-flow demo-flow-schedule">
               <div class="demo-prompt">
                 <p class="demo-label"><span data-copy-lang="en">User asks</span><span data-copy-lang="zh">用户提出</span></p>
                 <p><span data-copy-lang="en">"Every weekday at 8am, check the latest updates from my workspace and prepare a morning brief."</span><span data-copy-lang="zh">“每个工作日上午 8 点，检查我工作区里的最新更新并生成一份晨间简报。”</span></p>
@@ -490,36 +495,6 @@
       }
     }());
 
-    (function () {
-      var tabs = document.querySelectorAll("[data-demo-target]");
-      var panels = document.querySelectorAll("[data-demo-panel]");
-
-      if (!tabs.length || !panels.length) {
-        return;
-      }
-
-      function setDemo(target) {
-        Array.prototype.forEach.call(tabs, function (tab) {
-          var active = tab.getAttribute("data-demo-target") === target;
-          tab.classList.toggle("is-active", active);
-          tab.setAttribute("aria-selected", active ? "true" : "false");
-        });
-
-        Array.prototype.forEach.call(panels, function (panel) {
-          var active = panel.getAttribute("data-demo-panel") === target;
-          panel.classList.toggle("is-active", active);
-          panel.hidden = !active;
-        });
-      }
-
-      Array.prototype.forEach.call(tabs, function (tab) {
-        tab.addEventListener("click", function () {
-          setDemo(tab.getAttribute("data-demo-target"));
-        });
-      });
-
-      setDemo("email");
-    }());
   </script>
 </body>
 </html>

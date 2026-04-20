@@ -297,7 +297,15 @@ a {
   gap: 12px;
 }
 
+.demo-radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .demo-tab {
+  display: inline-flex;
+  align-items: center;
   border: 1px solid rgba(24, 33, 29, 0.12);
   border-radius: 999px;
   padding: 10px 14px;
@@ -309,8 +317,7 @@ a {
   transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
 }
 
-.demo-tab:hover,
-.demo-tab.is-active {
+.demo-tab:hover {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -319,11 +326,30 @@ a {
 
 .demo-stage {
   position: relative;
+  display: grid;
+  gap: 18px;
 }
 
 .demo-flow {
-  display: grid;
+  display: none;
   gap: 18px;
+}
+
+#demo-email:checked ~ .demo-tabs label[for="demo-email"],
+#demo-slides:checked ~ .demo-tabs label[for="demo-slides"],
+#demo-research:checked ~ .demo-tabs label[for="demo-research"],
+#demo-schedule:checked ~ .demo-tabs label[for="demo-schedule"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+#demo-email:checked ~ .demo-flow-email,
+#demo-slides:checked ~ .demo-flow-slides,
+#demo-research:checked ~ .demo-flow-research,
+#demo-schedule:checked ~ .demo-flow-schedule {
+  display: grid;
 }
 
 .demo-prompt,
