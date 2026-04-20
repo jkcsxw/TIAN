@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Periodically checks Claude and Codex quota, then uses whichever has quota
-# to improve the TIAN project. Runs as a background loop.
+# to improve the TIAN project. Commits and pushes changes after each job.
 set -euo pipefail
 
 TIAN_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -37,36 +37,53 @@ mkdir -p "$TASKS_DIR" "$HOME/.tian"
 
 new_job_id() { date '+%Y%m%d-%H%M%S'-$(openssl rand -hex 3); }
 
-# Returns 0 if command has quota (exit 0 on a trivial probe), 1 if rate-limited
+# Returns 0 if the backend has quota, 1 if rate-limited or unavailable
 check_claude_quota() {
+    command -v claude &>/dev/null || return 1
     local out
     out=$(claude --print "Reply with the single word: ok" 2>&1) || true
-    if echo "$out" | grep -qi "rate.limit\|quota\|429\|too many"; then
-        return 1
-    fi
+    echo "$out" | grep -qi "rate.limit\|quota\|429\|too many\|overloaded" && return 1
     return 0
 }
 
 check_codex_quota() {
+    command -v codex &>/dev/null || return 1
     local out
     out=$(codex --quiet "Reply with the single word: ok" 2>&1) || true
-    if echo "$out" | grep -qi "rate.limit\|quota\|429\|too many\|insufficient_quota"; then
-        return 1
-    fi
+    echo "$out" | grep -qi "rate.limit\|quota\|429\|too many\|insufficient_quota" && return 1
     return 0
+}
+
+# Commit and push any changes the AI made in TIAN_DIR
+push_changes() {
+    local job_id="$1" backend="$2"
+    cd "$TIAN_DIR"
+    if git diff --quiet && git diff --cached --quiet && [[ -z "$(git ls-files --others --exclude-standard)" ]]; then
+        info "No file changes to commit for job $job_id."
+        return 0
+    fi
+    git add -A
+    git commit -m "Auto-improvement by $backend [job $job_id]
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>" \
+        --author="TIAN Bot <tian-bot@localhost>" 2>&1 | tee -a "$LOG_FILE" >&2
+    git push 2>&1 | tee -a "$LOG_FILE" >&2 && ok "Changes pushed (job $job_id)." || warn "git push failed — changes committed locally only."
 }
 
 run_improvement() {
     local backend="$1"   # "claude" or "codex"
-    local flag="$2"      # --print or --quiet
+    local flag="$2"      # flags for the backend
     local job_id; job_id=$(new_job_id)
     local out_file="$TASKS_DIR/$job_id.txt"
 
     info "Launching improvement with $backend (job: $job_id)..."
 
-    # Run the AI command, then update job status to done/failed when it finishes
-    nohup bash -c '
-"$1" "$2" "$3" >"$4" 2>&1
+    # --dangerously-skip-permissions lets Claude edit files without interactive prompts.
+    # Run AI command, then update job status to done/failed when it finishes.
+    if [[ "$backend" == "claude" ]]; then
+        nohup bash -c '
+cd "$1"
+"$2" --print --dangerously-skip-permissions "$3" >"$4" 2>&1
 _ec=$?
 python3 -c "
 import json, sys
@@ -78,7 +95,24 @@ for j in jobs:
         break
 json.dump(jobs, open(jf, \"w\"), indent=2)
 " "$5" "$6" "$_ec"
-' -- "$backend" "$flag" "$IMPROVE_PROMPT" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
+' -- "$TIAN_DIR" "$backend" "$IMPROVE_PROMPT" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
+    else
+        nohup bash -c '
+cd "$1"
+"$2" "$3" "$4" >"$5" 2>&1
+_ec=$?
+python3 -c "
+import json, sys
+jf, jid, code = sys.argv[1], sys.argv[2], int(sys.argv[3])
+jobs = json.load(open(jf))
+for j in jobs:
+    if j[\"id\"] == jid:
+        j[\"status\"] = \"done\" if code == 0 else \"failed\"
+        break
+json.dump(jobs, open(jf, \"w\"), indent=2)
+" "$6" "$7" "$_ec"
+' -- "$TIAN_DIR" "$backend" "$flag" "$IMPROVE_PROMPT" "$out_file" "$JOBS_FILE" "$job_id" &>/dev/null &
+    fi
 
     python3 - "$JOBS_FILE" "$job_id" "$IMPROVE_PROMPT" "$backend" <<'PYEOF'
 import json, sys
@@ -96,27 +130,21 @@ PYEOF
 wait_for_job() {
     local job_id="$1"
     local out_file="$TASKS_DIR/$job_id.txt"
-    local max_wait=600   # 10 min max
+    local max_wait=900   # 15 min max (features take longer than bug fixes)
     local waited=0
     while [[ $waited -lt $max_wait ]]; do
         sleep 15
         waited=$((waited + 15))
-        # Job is done when the process writing to it has exited (file stops growing)
-        local size1; size1=$(wc -c < "$out_file" 2>/dev/null || echo 0)
-        sleep 5
-        local size2; size2=$(wc -c < "$out_file" 2>/dev/null || echo 0)
-        if [[ "$size1" == "$size2" && "$size1" -gt 0 ]]; then
-            # Mark completed in jobs.json
-            python3 - "$JOBS_FILE" "$job_id" <<'PYEOF'
+        # Job is done when the nohup wrapper has updated status (or file stopped growing)
+        local status
+        status=$(python3 -c "
 import json, sys
-jobs_file, jid = sys.argv[1], sys.argv[2]
-jobs = json.load(open(jobs_file))
-for j in jobs:
-    if j.get('id') == jid:
-        j['status'] = 'completed'
-json.dump(jobs, open(jobs_file, 'w'), indent=2)
-PYEOF
-            return 0
+jobs = json.load(open(sys.argv[1]))
+j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
+print(j.get('status','running') if j else 'running')
+" "$JOBS_FILE" "$job_id" 2>/dev/null || echo "running")
+        if [[ "$status" == "done" || "$status" == "failed" ]]; then
+            [[ "$status" == "done" ]] && return 0 || return 1
         fi
     done
     warn "Job $job_id timed out after ${max_wait}s"
@@ -137,7 +165,7 @@ while true; do
 
     log "--- Iteration $iteration ---"
 
-    # Try Claude first, then Codex
+    # Pick backend: Claude first, Codex as fallback
     backend=""
     flag=""
     if check_claude_quota; then
@@ -155,18 +183,20 @@ while true; do
     fi
 
     job_id=$(run_improvement "$backend" "$flag")
+
     if wait_for_job "$job_id"; then
         ok "Improvement complete. See: tian-cli jobs result $job_id"
-        # Re-check quota immediately — if still available, only pause briefly
-        if check_claude_quota || check_codex_quota; then
-            info "Quota still available. Waiting ${CYCLE_WAIT_MINUTES} minutes before next cycle..."
-            sleep $(( CYCLE_WAIT_MINUTES * 60 ))
-        else
-            warn "Quota exhausted after job. Waiting ${QUOTA_WAIT_MINUTES} minutes..."
-            sleep $(( QUOTA_WAIT_MINUTES * 60 ))
-        fi
+        push_changes "$job_id" "$backend"
     else
-        warn "Improvement job timed out or failed. Waiting ${CYCLE_WAIT_MINUTES} minutes..."
+        warn "Job $job_id failed or timed out — skipping push."
+    fi
+
+    # Re-check quota: short wait if available, long wait if exhausted
+    if check_claude_quota || check_codex_quota; then
+        info "Quota still available. Waiting ${CYCLE_WAIT_MINUTES} minutes before next cycle..."
         sleep $(( CYCLE_WAIT_MINUTES * 60 ))
+    else
+        warn "Quota exhausted. Waiting ${QUOTA_WAIT_MINUTES} minutes..."
+        sleep $(( QUOTA_WAIT_MINUTES * 60 ))
     fi
 done
