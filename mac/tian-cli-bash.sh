@@ -23,8 +23,9 @@ py3() { python3 -c "$1"; }
 detect_platform() {
     case "$(uname -s)" in
         Darwin) echo "macos" ;;
-        Linux)  echo "linux" ;;
-        *)      echo "unknown" ;;
+        Linux)
+            grep -qi microsoft /proc/version 2>/dev/null && echo "wsl" || echo "linux" ;;
+        *) echo "unknown" ;;
     esac
 }
 
@@ -64,6 +65,7 @@ $(rule)
 
   COMMANDS
     setup               Re-run the interactive setup wizard
+    doctor              Check your setup and diagnose common problems
     status              Show what is installed
     list mcp            List available MCP servers
     list skills         List available skills
@@ -424,6 +426,95 @@ PYEOF
     esac
 }
 
+cmd_doctor() {
+    hdr "TIAN Doctor — Setup Diagnostics"
+    local platform; platform=$(detect_platform)
+    case "$platform" in
+        macos) info "Platform: macOS" ;;
+        wsl)   info "Platform: Linux (WSL)" ;;
+        linux) info "Platform: Linux" ;;
+        *)     warn "Platform: unknown ($(uname -s))" ;;
+    esac
+    echo ""
+    local issues=0
+
+    echo -e "${BOLD}  Core dependencies${RESET}"
+    if command -v node &>/dev/null; then
+        local node_ver; node_ver=$(node --version)
+        local node_major; node_major=$(echo "$node_ver" | sed 's/v\([0-9]*\).*/\1/')
+        if [[ "$node_major" -ge 18 ]]; then
+            ok "Node.js $node_ver"
+        else
+            warn "Node.js $node_ver — v18+ recommended"; info "  Fix: https://nodejs.org/en/download"
+            ((issues++)) || true
+        fi
+    else
+        warn "Node.js not found — required for MCP servers"; info "  Fix: https://nodejs.org/en/download"
+        ((issues++)) || true
+    fi
+    command -v python3 &>/dev/null && ok "Python3 $(python3 --version 2>&1 | awk '{print $2}')" || { warn "Python3 not found"; ((issues++)) || true; }
+    command -v npx    &>/dev/null && ok "npx $(npx --version 2>/dev/null || echo '?')" || { warn "npx not found — install Node.js"; ((issues++)) || true; }
+    echo ""
+
+    echo -e "${BOLD}  AI backends${RESET}"
+    python3 - "$CATALOG" <<'PYEOF'
+import json, subprocess, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    cmd = b.get('cliCommand', '')
+    if not cmd: continue
+    ok = subprocess.run(['which', cmd], capture_output=True).returncode == 0
+    sym = '[ok]' if ok else '[!!]'
+    npm = b.get('npmPackage', b.get('downloadUrl', 'see docs'))
+    hint = f" (install: npm install -g {npm})" if not ok else ''
+    print(f"  {sym}  {b['displayName']}{hint}")
+PYEOF
+    echo ""
+
+    echo -e "${BOLD}  API keys${RESET}"
+    python3 - "$CATALOG" <<'PYEOF'
+import json, os, subprocess, sys
+c, seen = json.load(open(sys.argv[1])), set()
+for b in c['backends']:
+    env = b.get('apiKeyEnvVar', ''); cmd = b.get('cliCommand', '')
+    if not env or env in seen: continue
+    seen.add(env)
+    installed = cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0
+    val = os.environ.get(env, '')
+    if val:
+        print(f"  [ok]  {env} is set ({val[:8]}...)")
+    elif installed:
+        print(f"  [!!]  {env} not set — get key: {b.get('apiKeyUrl', 'see docs')}")
+    else:
+        print(f"  [..]  {env} (backend not installed)")
+PYEOF
+    echo ""
+
+    echo -e "${BOLD}  Config files${RESET}"
+    local mcp_config
+    [[ "$platform" == "macos" ]] \
+        && mcp_config="$HOME/Library/Application Support/Claude/claude_desktop_config.json" \
+        || mcp_config="$HOME/.config/claude/claude_desktop_config.json"
+    if [[ -f "$mcp_config" ]]; then
+        python3 -c "import json; json.load(open('$mcp_config'))" 2>/dev/null \
+            && ok "MCP config valid: $mcp_config" \
+            || { warn "MCP config has invalid JSON: $mcp_config"; ((issues++)) || true; }
+    else
+        info "MCP config not found (optional): $mcp_config"
+    fi
+    [[ -f "$CATALOG" ]] && ok "catalog.json found" || { warn "catalog.json missing — reinstall TIAN"; ((issues++)) || true; }
+    [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh found" || { warn "launcher.sh missing — run setup"; ((issues++)) || true; }
+    echo ""
+
+    rule
+    if [[ $issues -eq 0 ]]; then
+        ok "All checks passed — TIAN looks healthy!"
+    else
+        warn "$issues problem(s) found. Follow the hints above, then re-run: tian-cli doctor"
+    fi
+    echo ""
+}
+
 cmd_list() {
     local sub="${1:-}"; shift || true
     case "$sub" in
@@ -453,6 +544,7 @@ PYEOF
 CMD="${1:-help}"; shift || true
 case "$CMD" in
     setup)    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    doctor)   cmd_doctor ;;
     status)   cmd_status ;;
     run)      cmd_run "$@" ;;
     jobs)     cmd_jobs "$@" ;;
