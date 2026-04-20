@@ -29,6 +29,25 @@ function Start-RunnerBackgroundProcess {
     return [System.Diagnostics.Process]::Start($psi)
 }
 
+function Invoke-BackendCommand {
+    param(
+        [string]$BackendCommand,
+        [string]$BackendFlag,
+        [string]$Prompt
+    )
+
+    $argsList = @()
+    if ($BackendFlag) { $argsList += $BackendFlag }
+    $argsList += $Prompt
+
+    $output = & $BackendCommand @argsList 2>&1
+    $exitCode = if ($LASTEXITCODE -is [int]) { [int]$LASTEXITCODE } else { 0 }
+    return [PSCustomObject]@{
+        Output   = $output
+        ExitCode = $exitCode
+    }
+}
+
 function Ensure-TaskDirs {
     if (-not (Test-Path $global:TIAN_TASKS_DIR)) { New-Item -ItemType Directory -Path $global:TIAN_TASKS_DIR -Force | Out-Null }
     if (-not (Test-Path $global:TIAN_JOBS_FILE))  { '[]' | Set-Content $global:TIAN_JOBS_FILE -Encoding UTF8 }
@@ -140,8 +159,6 @@ function Invoke-Task {
     $jobs = Read-Jobs
     $jobs += [PSCustomObject]$meta
     Save-Jobs $jobs
-
-    $cmdLine = "$($backend.cliCommand) $($backend.nonInteractiveFlag) `"$($Prompt -replace '"','\"')`""
 
     if ($Background) {
         # Launch detached process; capture output so quota exhaustion can disable schedules automatically.
@@ -257,19 +274,27 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
         # Foreground — stream output directly, also save to file
         Write-Info "正在使用 $($backend.displayName) 执行任务... / Running task with $($backend.displayName)..."
         Write-Rule
-        $output = Invoke-Expression $cmdLine 2>&1
+        $result = Invoke-BackendCommand -BackendCommand $backend.cliCommand -BackendFlag $backend.nonInteractiveFlag -Prompt $Prompt
+        $output = $result.Output
         $output | Out-File -FilePath $outputFile -Encoding UTF8
         $output | ForEach-Object { Write-Host $_ }
         Write-Rule
 
         # Mark complete
-        $status = if (Test-QuotaExhaustedText -Text ($output | Out-String)) { "stopped" } else { "done" }
+        $outputText = if ($output) { ($output | Out-String) } else { "" }
+        $status = if (Test-QuotaExhaustedText -Text $outputText) {
+            "stopped"
+        } elseif ($result.ExitCode -eq 0) {
+            "done"
+        } else {
+            "error"
+        }
         $meta.status    = $status
         $meta.finishedAt = [System.DateTime]::Now.ToString("o")
         if ($status -eq "stopped") { $meta.stopReason = "quota_exhausted" }
         $meta | ConvertTo-Json | Set-Content $metaFile -Encoding UTF8
 
-        $jobs = Read-Jobs
+        $jobs = @([array](Read-Jobs))
         for ($i = 0; $i -lt $jobs.Count; $i++) {
             if ($jobs[$i].id -eq $jobId) {
                 $jobs[$i] = [PSCustomObject]$meta

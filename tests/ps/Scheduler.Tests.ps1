@@ -94,7 +94,7 @@ Describe "Add-Schedule" {
     It "creates schedule on Linux via crontab when crontab is available" {
         if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
         Mock Get-Command { param($Name) if ($Name -eq "crontab") { return [PSCustomObject]@{ Name = "crontab" } } } -ParameterFilter { $Name -eq "crontab" }
-        Mock Add-LinuxCrontabEntry { }
+        Mock Add-LinuxCrontabEntry { $true }
         Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
         $s = Read-Schedules | Where-Object { $_.name -eq "linux-test" }
         $s | Should -Not -BeNullOrEmpty
@@ -103,9 +103,18 @@ Describe "Add-Schedule" {
     It "uses schedule run indirection on Linux so schedules carry their own names" {
         if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
         Mock Get-Command { param($Name) if ($Name -eq "crontab") { return [PSCustomObject]@{ Name = "crontab" } } } -ParameterFilter { $Name -eq "crontab" }
-        Mock Add-LinuxCrontabEntry { param($Name, $CrontabLine) $script:CapturedCronLine = $CrontabLine }
+        Mock Add-LinuxCrontabEntry { param($Name, $CrontabLine) $script:CapturedCronLine = $CrontabLine; $true }
         Add-Schedule -Name "linux-test" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot)
         $script:CapturedCronLine | Should -Match 'schedule run --name "linux-test"'
+    }
+
+    It "fails on Linux when crontab update cannot be written" {
+        if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
+        Mock Get-Command { param($Name) if ($Name -eq "crontab") { return [PSCustomObject]@{ Name = "crontab" } } } -ParameterFilter { $Name -eq "crontab" }
+        Mock Add-LinuxCrontabEntry { $false }
+
+        { Add-Schedule -Name "linux-fail" -Prompt "p" -Time "08:00" -Repeat "daily" -TianDir (Get-TianRoot) } | Should -Throw
+        (Read-Schedules | Where-Object { $_.name -eq "linux-fail" }) | Should -BeNullOrEmpty
     }
 
     Context "Windows schtasks argument construction" {
@@ -149,6 +158,7 @@ Describe "Remove-Schedule" {
         Remove-Item $global:TIAN_SCHEDULES_FILE -ErrorAction SilentlyContinue
         Mock Start-Process     { [PSCustomObject]@{ ExitCode = 0 } }
         Mock Invoke-Launchctl  { }
+        Mock Remove-LinuxCrontabEntry { $true }
         # Pre-populate two schedules
         Save-Schedules @(
             [PSCustomObject]@{ name = "keep";   taskName = "TIAN_keep";   prompt = "p1"; time = "08:00"; repeat = "daily" },
@@ -167,6 +177,16 @@ Describe "Remove-Schedule" {
     }
     It "fails when Name is empty" {
         { Remove-Schedule -Name "" -TianDir (Get-TianRoot) } | Should -Throw
+    }
+
+    It "keeps the schedule when Linux crontab removal fails" {
+        if (-not $IsLinux) { Set-ItResult -Skipped -Because "Linux only" }
+        Mock Remove-LinuxCrontabEntry { $false }
+
+        { Remove-Schedule -Name "remove" -TianDir (Get-TianRoot) } | Should -Throw
+
+        $remaining = Read-Schedules
+        ($remaining | Where-Object { $_.name -eq "remove" }) | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -205,8 +225,8 @@ Describe "Get-CrontabEntry" {
         $line | Should -Match "^30 8 \* \* \*"
     }
     It "returns hourly cron expression" {
-        $line = Get-CrontabEntry -Repeat "hourly" -Time "00:00" -DayOfWeek "" -Command "echo hi"
-        $line | Should -Match "^0 \* \* \* \*"
+        $line = Get-CrontabEntry -Repeat "hourly" -Time "00:30" -DayOfWeek "" -Command "echo hi"
+        $line | Should -Match "^30 \* \* \* \*"
     }
     It "uses first day for weekly" {
         $line = Get-CrontabEntry -Repeat "weekly" -Time "09:00" -DayOfWeek "FRI" -Command "echo hi"
