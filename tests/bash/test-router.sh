@@ -182,4 +182,75 @@ _test_unknown() {
 }
 it "unknown command prints output and does not hang" _test_unknown
 
+suite "run --watch flag"
+
+_test_help_mentions_watch() {
+    local out
+    out=$(run_cli help)
+    assert_contains "$out" "-w"
+}
+it "help text mentions -w / --watch flag" _test_help_mentions_watch
+
+_test_help_mentions_auto_exits() {
+    local out
+    out=$(run_cli help)
+    assert_contains "$out" "auto-exits"
+}
+it "help text describes auto-exit behaviour for jobs tail" _test_help_mentions_auto_exits
+
+# Verify _watch_job exits cleanly when the underlying job transitions to "done".
+# We avoid invoking a real backend by directly sourcing the helper, then having
+# a background process flip the job status mid-watch.
+_test_watch_job_exits_when_done() {
+    local cli="$TIAN_ROOT/mac/tian-cli-bash.sh"
+    local sandbox; sandbox=$(make_temp_dir)
+    export TASKS_DIR="$sandbox/tasks"
+    export JOBS_FILE="$sandbox/jobs.json"
+    mkdir -p "$TASKS_DIR"
+    local jid="watch-test-job"
+    echo "[{\"id\":\"$jid\",\"status\":\"running\"}]" > "$JOBS_FILE"
+    printf 'partial output\n' > "$TASKS_DIR/$jid.txt"
+
+    # Define stubs so _watch_job's helpers operate against the sandbox.
+    info() { :; }
+    warn() { :; }
+    ok()   { :; }
+    fail() { return 1; }
+    rule() { :; }
+    sync_job_statuses() { :; }
+
+    # Extract the three helper functions we want to test.
+    local fn
+    fn=$(awk '/^_get_job_status\(\)/,/^}/' "$cli")
+    eval "$fn"
+    fn=$(awk '/^_get_job_stop_reason\(\)/,/^}/' "$cli")
+    eval "$fn"
+    fn=$(awk '/^_watch_job\(\)/,/^}/' "$cli")
+    eval "$fn"
+
+    # Flip the job to "done" after a short delay so _watch_job's loop exits.
+    ( sleep 2
+      python3 -c "
+import json, sys
+with open('$JOBS_FILE') as fh:
+    jobs = json.load(fh)
+for j in jobs:
+    if j['id'] == '$jid':
+        j['status'] = 'done'
+with open('$JOBS_FILE', 'w') as fh:
+    json.dump(jobs, fh)
+"
+      echo 'final output' >> "$TASKS_DIR/$jid.txt"
+    ) &
+    local flipper_pid=$!
+
+    # _watch_job should return within ~5 seconds (poll interval is 1s).
+    local rc=0
+    _watch_job "$jid" >/dev/null 2>&1 || rc=$?
+    wait $flipper_pid 2>/dev/null || true
+    rm -rf "$sandbox"
+    [[ $rc -eq 0 ]]
+}
+it "_watch_job auto-exits when job transitions to done" _test_watch_job_exits_when_done
+
 finish
