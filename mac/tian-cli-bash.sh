@@ -61,6 +61,38 @@ is_quota_error() {
         "insufficient_quota|quota(_is_)?exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded"
 }
 
+# Detect whether a cron daemon is currently running. macOS uses launchd
+# (always available), so this only matters on Linux/WSL where cron may
+# need to be started manually — particularly on WSL, where it's off by
+# default and `schedule add` would otherwise silently never fire.
+cron_running() {
+    if command -v pgrep &>/dev/null; then
+        pgrep -x cron &>/dev/null && return 0
+        pgrep -x crond &>/dev/null && return 0
+    fi
+    # Fallback: scan /proc for a cron/crond process
+    if [[ -d /proc ]]; then
+        for pid_dir in /proc/[0-9]*; do
+            local comm
+            comm=$(cat "$pid_dir/comm" 2>/dev/null || true)
+            [[ "$comm" == "cron" || "$comm" == "crond" ]] && return 0
+        done
+    fi
+    return 1
+}
+
+cron_fix_hint() {
+    local platform="${1:-}"
+    if [[ "$platform" == "wsl" ]]; then
+        echo "Cron is off by default on WSL. Start it with: sudo service cron start"
+        echo "  To start cron automatically on every WSL launch, add this to ~/.bashrc:"
+        echo "    (pgrep -x cron >/dev/null) || sudo service cron start >/dev/null 2>&1"
+    else
+        echo "Start cron with:  sudo systemctl start cron   (or: sudo service cron start)"
+        echo "  Enable on boot:   sudo systemctl enable cron"
+    fi
+}
+
 ensure_dirs() {
     mkdir -p "$TASKS_DIR" "$HOME/.tian"
     [[ -f "$JOBS_FILE" ]] || echo '[]' > "$JOBS_FILE"
@@ -816,6 +848,15 @@ with open(sf, 'w') as fh:
 PYEOF
     ok "Schedule '$name' created ($repeat at $time) via crontab."
     info "Results will appear in: bash tian-cli.sh jobs"
+
+    if ! cron_running; then
+        local platform; platform=$(detect_platform)
+        echo ""
+        warn "Cron daemon is NOT running — this schedule will not fire until you start it."
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && info "$line"
+        done < <(cron_fix_hint "$platform")
+    fi
 }
 
 _schedule_add_macos() {
@@ -903,15 +944,26 @@ cmd_schedule() {
             [[ ! "$time" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] && fail "Invalid time '$time'. Use HH:MM format (e.g. 08:30)."
             [[ ! "$repeat" =~ ^(daily|weekly|hourly|once)$ ]] && fail "Invalid repeat '$repeat'. Choose: daily, weekly, hourly, once."
             ensure_dirs
-            if [[ "$platform" == "linux" ]]; then
+            if [[ "$platform" == "linux" || "$platform" == "wsl" ]]; then
                 _schedule_add_linux "$name" "$prompt" "$time" "$repeat"
-            else
+            elif [[ "$platform" == "macos" ]]; then
                 _schedule_add_macos "$name" "$prompt" "$time" "$repeat"
+            else
+                fail "schedule add is not supported on this platform ($platform)."
             fi
             ;;
 
         list)
             ensure_dirs
+            local sched_count=0
+            sched_count=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))))" "$SCHEDULES_FILE" 2>/dev/null || echo 0)
+            if [[ "$sched_count" -gt 0 && ( "$platform" == "linux" || "$platform" == "wsl" ) ]] && ! cron_running; then
+                warn "cron daemon is not running — none of these schedules will fire until you start it."
+                while IFS= read -r line; do
+                    [[ -n "$line" ]] && info "$line"
+                done < <(cron_fix_hint "$platform")
+                echo ""
+            fi
             python3 - "$SCHEDULES_FILE" <<'PYEOF'
 import json, sys
 with open(sys.argv[1]) as fh:
@@ -1148,6 +1200,37 @@ PYEOF
 )
     [[ -f "$CATALOG" ]] && ok "catalog.json found" || { warn "catalog.json missing — reinstall TIAN"; ((issues++)) || true; }
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh found" || { warn "launcher.sh missing — run setup"; ((issues++)) || true; }
+    echo ""
+
+    echo -e "${BOLD}  Background scheduler${RESET}"
+    local sched_count=0
+    [[ -f "$SCHEDULES_FILE" ]] && sched_count=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))))" "$SCHEDULES_FILE" 2>/dev/null || echo 0)
+    case "$platform" in
+        macos)
+            if command -v launchctl &>/dev/null; then
+                ok "launchd available (macOS scheduler)"
+            else
+                warn "launchctl not found — scheduled tasks cannot run"; ((issues++)) || true
+            fi
+            ;;
+        linux|wsl)
+            if cron_running; then
+                ok "cron daemon is running"
+            elif [[ "$sched_count" -gt 0 ]]; then
+                warn "cron daemon is NOT running — your $sched_count schedule(s) will not fire"
+                while IFS= read -r line; do
+                    [[ -n "$line" ]] && info "$line"
+                done < <(cron_fix_hint "$platform")
+                ((issues++)) || true
+            else
+                info "cron daemon is not running (no schedules defined — fine for now)"
+                [[ "$platform" == "wsl" ]] && info "  Note: cron is off by default on WSL; start it before using 'schedule add'."
+            fi
+            ;;
+        *)
+            warn "Unknown platform — scheduler status cannot be verified"
+            ;;
+    esac
     echo ""
 
     rule

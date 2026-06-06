@@ -1,0 +1,19 @@
+{
+  "name": "tian",
+  "version": "1.0.0",
+  "description": "> Set up an AI assistant on your computer in minutes. No coding required. > > 几分钟内把 AI 助手装到自己的电脑上。无需编程。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jsdom": "^29.0.2"
+  }
+}
