@@ -157,6 +157,100 @@ _test_is_quota_error_negative() {
 }
 it "is_quota_error returns false for normal output" _test_is_quota_error_negative
 
+suite "install command"
+
+_test_install_help() {
+    local out
+    out=$(run_cli install --help 2>&1 || true)
+    assert_contains "$out" "--backend"
+}
+it "install --help describes flags" _test_install_help
+
+_test_install_missing_backend() {
+    local out
+    out=$(run_cli install 2>&1 || true)
+    assert_contains "$out" "Missing --backend"
+}
+it "install without --backend errors helpfully" _test_install_missing_backend
+
+_test_install_unknown_backend() {
+    local out
+    out=$(run_cli install --backend not-a-real-backend --yes 2>&1 || true)
+    assert_contains "$out" "Unknown backend id"
+}
+it "install with bad --backend errors" _test_install_unknown_backend
+
+# Verify install can configure MCP + skills without prompting. We target
+# claude-code (config lands at ~/.claude/settings.json on every platform) and
+# rely on the backend already being present on the test host so npm install
+# is a no-op.
+_test_install_yes_configures_mcp_and_skill() {
+    local fresh_home; fresh_home=$(make_temp_dir)
+    mkdir -p "$fresh_home/.tian" "$fresh_home/.claude"
+    HOME="$fresh_home" bash "$CLI" "$TIAN_ROOT" install \
+        --backend claude-code --mcp memory --skills email-assistant --yes >/dev/null 2>&1 || true
+
+    local mcp_cfg="$fresh_home/.claude/settings.json"
+    local rc=0
+    if [[ -f "$mcp_cfg" ]]; then
+        local cfg; cfg=$(cat "$mcp_cfg")
+        [[ "$cfg" == *'"memory"'* ]] || rc=1
+    else
+        rc=1
+    fi
+    [[ -f "$fresh_home/.tian/skills/email-assistant.md" ]] || rc=1
+    rm -rf "$fresh_home"
+    return $rc
+}
+it "install --yes configures MCP servers and skills non-interactively" _test_install_yes_configures_mcp_and_skill
+
+_test_install_default_mcp() {
+    local fresh_home; fresh_home=$(make_temp_dir)
+    mkdir -p "$fresh_home/.tian" "$fresh_home/.claude"
+    HOME="$fresh_home" bash "$CLI" "$TIAN_ROOT" install \
+        --backend claude-code --mcp default --yes >/dev/null 2>&1 || true
+    local mcp_cfg="$fresh_home/.claude/settings.json"
+    local rc=0
+    if [[ -f "$mcp_cfg" ]]; then
+        local cfg; cfg=$(cat "$mcp_cfg")
+        # claude-code's defaultMcpServers is ["filesystem","web-search"]
+        [[ "$cfg" == *'"filesystem"'* ]] || rc=1
+    else
+        rc=1
+    fi
+    rm -rf "$fresh_home"
+    return $rc
+}
+it "install --mcp default expands to backend's defaultMcpServers" _test_install_default_mcp
+
+_test_install_creates_launcher() {
+    local fresh_home; fresh_home=$(make_temp_dir)
+    local launcher_sandbox; launcher_sandbox=$(make_temp_dir)
+    # Snapshot/clean launcher so we know if install created it
+    rm -f "$launcher_sandbox/launcher.sh"
+    # Copy minimal TIAN_DIR structure into sandbox so we don't mutate the real repo
+    mkdir -p "$launcher_sandbox/config" "$launcher_sandbox/mac" "$launcher_sandbox/skills"
+    cp "$TIAN_ROOT/config/catalog.json" "$launcher_sandbox/config/"
+    cp "$TIAN_ROOT/mac/tian-cli-bash.sh" "$launcher_sandbox/mac/"
+    cp -r "$TIAN_ROOT/skills/." "$launcher_sandbox/skills/" 2>/dev/null || true
+
+    HOME="$fresh_home" bash "$launcher_sandbox/mac/tian-cli-bash.sh" "$launcher_sandbox" install \
+        --backend claude-code --yes >/dev/null 2>&1 || true
+
+    local rc=0
+    [[ -f "$launcher_sandbox/launcher.sh" ]] || rc=1
+    rm -rf "$fresh_home" "$launcher_sandbox"
+    return $rc
+}
+it "install creates launcher.sh" _test_install_creates_launcher
+
+_test_help_mentions_install() {
+    local out
+    out=$(run_cli help)
+    assert_contains "$out" "install"
+}
+it "help text mentions install command" _test_help_mentions_install
+
 suite "doctor command"
 
 _test_doctor_exits_ok() {
