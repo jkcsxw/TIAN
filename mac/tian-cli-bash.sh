@@ -480,6 +480,106 @@ if changed:
 PYEOF
 }
 
+_get_job_status() {
+    python3 - "$JOBS_FILE" "$1" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        jobs = json.load(fh)
+except Exception:
+    jobs = []
+j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
+print(j.get('status', 'unknown') if j else 'unknown')
+PYEOF
+}
+
+_get_job_stop_reason() {
+    python3 - "$JOBS_FILE" "$1" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as fh:
+        jobs = json.load(fh)
+except Exception:
+    jobs = []
+j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
+print((j or {}).get('stopReason', ''))
+PYEOF
+}
+
+# Stream a job's output to the terminal and return when the job is no longer
+# running. Ctrl+C during streaming stops watching but leaves the job alive.
+# Exit code: 0 if job ended as "done", non-zero otherwise.
+_watch_job() {
+    local job_id="$1"
+    local out_file="$TASKS_DIR/$job_id.txt"
+
+    # Output file is created when the background redirect starts; wait briefly.
+    local waited=0
+    while [[ ! -f "$out_file" && $waited -lt 20 ]]; do
+        sleep 0.25
+        waited=$((waited + 1))
+    done
+    if [[ ! -f "$out_file" ]]; then
+        warn "Output file did not appear: $out_file"
+        return 1
+    fi
+
+    tail -n +1 -f "$out_file" &
+    local tail_pid=$!
+
+    local interrupted=0
+    # Stop tail on Ctrl+C or shell exit; flag the loop so it breaks cleanly.
+    trap 'interrupted=1; kill '"$tail_pid"' 2>/dev/null || true' INT
+    trap 'kill '"$tail_pid"' 2>/dev/null || true' EXIT
+
+    local status="running"
+    while :; do
+        sleep 1
+        [[ $interrupted -eq 1 ]] && break
+        sync_job_statuses
+        status=$(_get_job_status "$job_id")
+        [[ "$status" != "running" ]] && break
+    done
+
+    if [[ $interrupted -eq 0 ]]; then
+        # Allow tail a moment to flush any trailing output.
+        sleep 1
+    fi
+    kill "$tail_pid" 2>/dev/null || true
+    wait "$tail_pid" 2>/dev/null || true
+    trap - INT EXIT
+
+    echo ""
+    rule
+    if [[ $interrupted -eq 1 ]]; then
+        info "Stopped watching — job $job_id is still running in the background."
+        info "Resume with: bash tian-cli.sh jobs tail $job_id"
+        return 130
+    fi
+
+    case "$status" in
+        done)
+            ok "Job $job_id finished."
+            ;;
+        failed)
+            warn "Job $job_id failed. See output above or: bash tian-cli.sh jobs result $job_id"
+            ;;
+        stopped)
+            local reason
+            reason=$(_get_job_stop_reason "$job_id")
+            if [[ "$reason" == "quota_exhausted" ]]; then
+                warn "Job $job_id stopped — quota or rate limit exhausted."
+            else
+                warn "Job $job_id was stopped."
+            fi
+            ;;
+        *)
+            info "Job $job_id status: $status"
+            ;;
+    esac
+    [[ "$status" == "done" ]]
+}
+
 terminate_pid_tree() {
     local pid="${1:-}"
     [[ -z "$pid" ]] && return 0
@@ -564,9 +664,10 @@ $(rule)
     remove mcp <id>     Remove an MCP server from backend config
     run "prompt"        Run a task (foreground)
     run "prompt" -b     Run a task in the background
+    run "prompt" -w     Run in background and stream live output (auto-exits when done)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
-    jobs tail <id>      Stream live output of a running job (or show result if done)
+    jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
     jobs stop <id>      Stop a running job (--all stops every running job)
     jobs clear          Clear completed jobs
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
@@ -578,6 +679,7 @@ $(rule)
   EXAMPLES
     bash tian-cli.sh run "Summarise today's AI news"
     bash tian-cli.sh run "Draft my weekly report" -b
+    bash tian-cli.sh run "Research the latest LLM papers" -w
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
@@ -640,11 +742,17 @@ PYEOF
 cmd_run() {
     local prompt="$1"; shift || true
     local background=false
+    local watch=false
     local job_name=""
     local schedule_name=""
     while [[ $# -gt 0 ]]; do
         case "${1:-}" in
             -b|--background)
+                background=true
+                shift
+                ;;
+            -w|--watch)
+                watch=true
                 background=true
                 shift
                 ;;
@@ -714,6 +822,13 @@ with open(jobs_file, 'w') as fh:
 PYEOF
         ok "Job started: $job_id"
         info "Check result with: bash tian-cli.sh jobs result $job_id"
+        if $watch; then
+            echo ""
+            info "Watching live output (Ctrl+C to stop watching; job continues)..."
+            rule
+            _watch_job "$job_id"
+            return $?
+        fi
     else
         local primary_cmd="$cmd"
         while IFS='|' read -r r_cmd r_flag _bid r_name; do
@@ -744,18 +859,11 @@ cmd_jobs() {
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs tail <job-id>"
             local f="$TASKS_DIR/$id.txt"
             [[ -f "$f" ]] || fail "Job '$id' not found."
-            local status
-            status=$(python3 - "$JOBS_FILE" "$id" <<'PYEOF'
-import json, sys
-with open(sys.argv[1]) as fh:
-    jobs = json.load(fh)
-j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
-print(j.get('status', 'unknown') if j else 'unknown')
-PYEOF
-)
+            local status; status=$(_get_job_status "$id")
             if [[ "$status" == "running" ]]; then
-                info "Job $id is still running — streaming output (Ctrl+C to stop)..."
-                tail -f "$f"
+                info "Job $id is still running — streaming output (auto-stops when finished; Ctrl+C to stop watching)..."
+                rule
+                _watch_job "$id"
             else
                 info "Job $id status: $status"
                 cat "$f"
