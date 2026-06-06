@@ -174,6 +174,33 @@ print("|".join([
 PYEOF
 }
 
+find_backend_install_by_id() {
+    local backend_id="${1:-}"
+    python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+
+catalog = json.load(open(sys.argv[1]))
+backend = next((b for b in catalog["backends"] if b.get("id") == sys.argv[2]), None)
+if not backend:
+    raise SystemExit(1)
+default_mcp = ",".join(backend.get("defaultMcpServers", []) or [])
+print("|".join([
+    backend.get("id", ""),
+    backend.get("displayName", ""),
+    backend.get("cliCommand", "") or "",
+    backend.get("npmPackage", "") or "",
+    backend.get("apiKeyEnvVar", "") or "",
+    backend.get("apiKeyHint", "") or "",
+    backend.get("apiKeyUrl", "") or "",
+    backend.get("installType", "") or "",
+    backend.get("launchCommand", "") or "",
+    backend.get("setupNote", "") or "",
+    "1" if backend.get("supportsMcp", True) else "0",
+    default_mcp,
+]))
+PYEOF
+}
+
 find_mcp_by_id() {
     local server_id="${1:-}"
     python3 - "$CATALOG" "$server_id" <<'PYEOF'
@@ -651,6 +678,7 @@ $(rule)
 
   COMMANDS
     setup               Re-run the interactive setup wizard
+    install             Non-interactive install (flag-driven, scriptable)
     repair              Re-run setup to repair the current install
     update              Upgrade installed AI backends to their latest versions
     doctor              Check your setup and diagnose common problems
@@ -676,7 +704,17 @@ $(rule)
     schedule remove <n> Delete a scheduled task
     help                Show this help
 
+  INSTALL FLAGS (non-interactive)
+    --backend <id>      AI backend (required, e.g. claude-code)
+    --key     <key>     API key (saved to your shell profile)
+    --mcp     <ids>     Comma-separated MCP server ids, or 'default'
+    --skills  <ids>     Comma-separated skill ids
+    --yes               Skip prompts; missing required env vars cause that
+                        MCP server to be skipped (not a hard failure)
+
   EXAMPLES
+    bash tian-cli.sh install --backend claude-code --key sk-ant-xxx --mcp default --yes
+    bash tian-cli.sh install --backend claude-code --key sk-ant-xxx --mcp filesystem,memory --skills email-assistant
     bash tian-cli.sh run "Summarise today's AI news"
     bash tian-cli.sh run "Draft my weekly report" -b
     bash tian-cli.sh run "Research the latest LLM papers" -w
@@ -1207,6 +1245,187 @@ PYEOF
     echo ""
 }
 
+# Configure an MCP server for a known backend, without prompting when --yes is set.
+# Returns 0 on success, 1 if a required env var is missing in --yes mode (so we can warn).
+install_mcp_for_backend() {
+    local server_id="${1:-}" backend_id="${2:-}" assume_yes="${3:-false}"
+    local server_row
+    server_row=$(find_mcp_by_id "$server_id") || { warn "Unknown MCP id '$server_id' — skipping."; return 1; }
+    local _sid display_name _ reqs
+    IFS='|' read -r _sid display_name _ reqs <<< "$server_row"
+
+    if [[ -n "$reqs" ]]; then
+        local missing=()
+        IFS=',' read -ra req_names <<< "$reqs"
+        for rn in "${req_names[@]}"; do
+            [[ -n "$rn" && -z "${!rn:-}" ]] && missing+=("$rn")
+        done
+        if [[ ${#missing[@]} -gt 0 ]]; then
+            if [[ "$assume_yes" == "true" ]]; then
+                warn "$display_name needs env var(s): ${missing[*]} — skipping. Add later with: tian-cli add mcp $server_id"
+                return 1
+            fi
+        fi
+    fi
+    add_mcp_server "$server_id" "$backend_id"
+}
+
+write_bash_launcher() {
+    local backend_name="${1:-}" launch_cmd="${2:-}"
+    local launcher="$TIAN_DIR/launcher.sh"
+    cat > "$launcher" <<LAUNCHEOF
+#!/usr/bin/env bash
+source "\$HOME/.zshrc" 2>/dev/null || source "\$HOME/.bashrc" 2>/dev/null || source "\$HOME/.bash_profile" 2>/dev/null || true
+echo "Starting $backend_name..."
+$launch_cmd
+LAUNCHEOF
+    chmod +x "$launcher"
+    ok "Launcher created: $launcher"
+}
+
+cmd_install() {
+    local backend_id="" api_key="" mcp_csv="" skills_csv=""
+    local assume_yes="false"
+    while [[ $# -gt 0 ]]; do
+        case "${1:-}" in
+            --backend) backend_id="${2:-}"; shift 2 ;;
+            --key)     api_key="${2:-}";    shift 2 ;;
+            --mcp)     mcp_csv="${2:-}";    shift 2 ;;
+            --skills)  skills_csv="${2:-}"; shift 2 ;;
+            -y|--yes)  assume_yes="true";   shift ;;
+            -h|--help)
+                cat <<EOF
+Usage: tian-cli install --backend <id> [--key <api-key>] [--mcp <ids>] [--skills <ids>] [--yes]
+
+Flags:
+  --backend <id>     Required. AI backend id (run 'list backends' to see options).
+  --key     <key>    API key. Saved to your shell profile. Omit to use --mcp 'default' or rely on an existing env var.
+  --mcp     <ids>    Comma-separated MCP server ids. Use 'default' to use the backend's recommended set.
+  --skills  <ids>    Comma-separated skill ids.
+  --yes              Skip prompts. Missing required MCP env vars cause the MCP to be skipped (with a warning).
+EOF
+                return 0
+                ;;
+            *) shift ;;
+        esac
+    done
+
+    [[ -n "$backend_id" ]] || fail "Missing --backend. Run: tian-cli list backends"
+
+    local row
+    row=$(find_backend_install_by_id "$backend_id") || fail "Unknown backend id '$backend_id'. Run: tian-cli list backends"
+    local b_id b_name b_cmd b_npm b_envkey b_keyhint b_keyurl b_install b_launch b_setupnote b_supports_mcp b_default_mcp
+    IFS='|' read -r b_id b_name b_cmd b_npm b_envkey b_keyhint b_keyurl b_install b_launch b_setupnote b_supports_mcp b_default_mcp <<< "$row"
+
+    hdr "TIAN Install — $b_name"
+
+    # ── Node.js / npm prerequisite (only required for npm-installed backends) ────
+    if [[ -n "$b_npm" ]]; then
+        if ! command -v node &>/dev/null; then
+            fail "Node.js not found. Install it from https://nodejs.org or run: tian-cli setup"
+        fi
+        if ! command -v npm &>/dev/null; then
+            fail "npm not found. Install Node.js first: https://nodejs.org"
+        fi
+        ok "Node.js $(node --version)"
+    fi
+
+    # ── API key ─────────────────────────────────────────────────────────────────
+    if [[ -n "$b_envkey" ]]; then
+        if [[ -z "$api_key" ]]; then
+            local existing="${!b_envkey:-}"
+            if [[ -n "$existing" ]]; then
+                info "$b_envkey already set in environment — keeping existing value."
+            elif [[ "$assume_yes" == "true" ]]; then
+                if [[ "$b_install" == "desktop-app" ]]; then
+                    info "No --key provided. $b_name can sign in via the desktop app instead."
+                else
+                    warn "No --key provided and $b_envkey not set. You can set it later with: export $b_envkey=..."
+                fi
+            else
+                [[ -n "$b_keyhint" ]] && info "$b_envkey ($b_keyhint)"
+                [[ -n "$b_keyurl" ]]  && info "Get it at: $b_keyurl"
+                api_key=$(prompt_secret "$b_envkey")
+            fi
+        fi
+        if [[ -n "$api_key" ]]; then
+            save_shell_env_var "$b_envkey" "$api_key"
+            ok "$b_envkey saved to $(profile_file)"
+        fi
+    elif [[ -n "$b_setupnote" ]]; then
+        info "$b_setupnote"
+    fi
+
+    # ── Install backend ─────────────────────────────────────────────────────────
+    if [[ -n "$b_npm" ]]; then
+        if [[ -n "$b_cmd" ]] && command -v "$b_cmd" &>/dev/null; then
+            ok "$b_name already installed ($(command -v "$b_cmd"))"
+        else
+            info "Installing $b_name ($b_npm)..."
+            if npm install -g "$b_npm"; then
+                ok "$b_name installed."
+            else
+                fail "npm install -g $b_npm failed. Re-run with sudo, or fix npm permissions."
+            fi
+        fi
+    elif [[ "$b_install" == "desktop-app" ]]; then
+        info "$b_name is a desktop app — please install it manually if you haven't already."
+    elif [[ "$b_install" == "local-cli" ]]; then
+        info "$b_name uses a local CLI ($b_cmd). Install separately if not yet on PATH."
+    fi
+
+    # ── MCP servers ─────────────────────────────────────────────────────────────
+    if [[ "$b_supports_mcp" == "1" ]]; then
+        # 'default' expands to backend's defaultMcpServers
+        if [[ "$mcp_csv" == "default" ]]; then
+            mcp_csv="$b_default_mcp"
+            [[ -n "$mcp_csv" ]] && info "Using default MCP set for $b_name: $mcp_csv"
+        fi
+        if [[ -n "$mcp_csv" ]]; then
+            local mcp_ok=0 mcp_skipped=0
+            IFS=',' read -ra MCP_IDS <<< "$mcp_csv"
+            for mid in "${MCP_IDS[@]}"; do
+                mid="$(echo "$mid" | tr -d '[:space:]')"
+                [[ -z "$mid" ]] && continue
+                if install_mcp_for_backend "$mid" "$b_id" "$assume_yes"; then
+                    ((mcp_ok++)) || true
+                else
+                    ((mcp_skipped++)) || true
+                fi
+            done
+            info "MCP servers configured: $mcp_ok, skipped: $mcp_skipped"
+        fi
+    elif [[ -n "$mcp_csv" ]]; then
+        warn "$b_name does not support MCP — ignoring --mcp."
+    fi
+
+    # ── Skills ──────────────────────────────────────────────────────────────────
+    if [[ -n "$skills_csv" ]]; then
+        IFS=',' read -ra SKILL_IDS <<< "$skills_csv"
+        for sid in "${SKILL_IDS[@]}"; do
+            sid="$(echo "$sid" | tr -d '[:space:]')"
+            [[ -z "$sid" ]] && continue
+            install_skill "$sid" || warn "Skill '$sid' could not be installed."
+        done
+    fi
+
+    # ── Launcher ────────────────────────────────────────────────────────────────
+    if [[ -n "$b_cmd" ]]; then
+        local launch="${b_launch:-$b_cmd}"
+        write_bash_launcher "$b_name" "$launch"
+    fi
+
+    echo ""
+    rule
+    ok "Install complete for $b_name."
+    if [[ -n "$b_cmd" ]]; then
+        echo ""
+        echo "  Verify with: $b_cmd  (or: bash launcher.sh)"
+    fi
+    echo "  Open a new terminal so the saved env vars are loaded."
+    echo ""
+}
+
 cmd_doctor() {
     hdr "TIAN Doctor — Setup Diagnostics"
     local platform; platform=$(detect_platform)
@@ -1624,6 +1843,7 @@ cmd_repair() {
 CMD="${1:-help}"; shift || true
 case "$CMD" in
     setup)     bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    install)   cmd_install "$@" ;;
     repair)    cmd_repair ;;
     update)    cmd_update ;;
     doctor)    cmd_doctor ;;
