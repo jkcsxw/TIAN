@@ -680,7 +680,7 @@ $(rule)
     setup               Re-run the interactive setup wizard
     install             Non-interactive install (flag-driven, scriptable)
     repair              Re-run setup to repair the current install
-    update              Upgrade installed AI backends to their latest versions
+    update              Upgrade TIAN scripts and installed AI backends to their latest versions
     doctor [--fix]      Check your setup and diagnose common problems; --fix auto-resolves fixable issues
     uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is installed
@@ -1423,9 +1423,63 @@ PYEOF
     esac
 }
 
-cmd_update() {
-    hdr "TIAN Update — Upgrade AI Backends"
+_update_tian_self() {
+    # Only self-update when running from the standard install location created by install.sh.
+    # Development checkouts (e.g. /home/.../code/TIAN) are left untouched.
+    local default_install="$HOME/.tian/repo"
+    [[ "$TIAN_DIR" != "$default_install" ]] && return 0
 
+    info "Checking for TIAN script updates..."
+
+    if ! command -v curl &>/dev/null; then
+        info "curl not available — skipping TIAN self-update"
+        return 0
+    fi
+
+    local tmp_dir; tmp_dir="$(mktemp -d)"
+    local archive="$tmp_dir/tian.tar.gz"
+
+    if ! curl -fsSL "https://github.com/jkcsxw/TIAN/archive/refs/heads/main.tar.gz" \
+               -o "$archive" 2>/dev/null; then
+        info "TIAN self-update: could not reach GitHub — skipping"
+        rm -rf "$tmp_dir"
+        return 0
+    fi
+
+    mkdir -p "$tmp_dir/extracted"
+    if ! tar -xzf "$archive" -C "$tmp_dir/extracted" 2>/dev/null; then
+        warn "TIAN self-update: failed to extract archive — skipping"
+        rm -rf "$tmp_dir"
+        return 0
+    fi
+
+    local extracted_dir
+    extracted_dir="$(find "$tmp_dir/extracted" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -1)"
+    if [[ -z "$extracted_dir" ]]; then
+        warn "TIAN self-update: unexpected archive layout — skipping"
+        rm -rf "$tmp_dir"
+        return 0
+    fi
+
+    # Overwrite scripts in place.  User data (jobs, tasks, schedules) lives in
+    # ~/.tian/ — not inside ~/.tian/repo/ — so a plain cp -r is safe.
+    cp -r "$extracted_dir/." "$TIAN_DIR/"
+    chmod +x "$TIAN_DIR/tian-cli.sh" "$TIAN_DIR/mac/setup.sh" \
+              "$TIAN_DIR/mac/tian-cli-bash.sh" "$TIAN_DIR/setup.sh" 2>/dev/null || true
+    rm -rf "$tmp_dir"
+    ok "TIAN scripts updated to latest version from GitHub"
+}
+
+cmd_update() {
+    hdr "TIAN Update — Upgrade TIAN & AI Backends"
+
+    # --- Step 1: self-update TIAN scripts --------------------------------
+    echo -e "${BOLD}  TIAN scripts${RESET}"
+    _update_tian_self
+    echo ""
+
+    # --- Step 2: upgrade AI backend CLIs via npm -------------------------
+    echo -e "${BOLD}  AI backend CLIs${RESET}"
     if ! command -v npm &>/dev/null; then
         warn "npm not found. Install Node.js first: https://nodejs.org"
         return 1
