@@ -702,6 +702,8 @@ $(rule)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
+    config export       Export setup (API keys, MCP configs, skills, schedules) to a file
+    config import       Restore a previously exported config on this machine
     help                Show this help
 
   INSTALL FLAGS (non-interactive)
@@ -722,6 +724,9 @@ $(rule)
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
     bash tian-cli.sh schedule list
+    bash tian-cli.sh config export --output my-tian-backup.json
+    bash tian-cli.sh config export --no-keys
+    bash tian-cli.sh config import my-tian-backup.json
 
 EOF
 }
@@ -2083,6 +2088,310 @@ cmd_repair() {
     bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
 }
 
+# ── Config export / import ────────────────────────────────────────────────────
+
+_cmd_config_export() {
+    local out_file="$1" include_keys="$2"
+    local platform; platform=$(detect_platform)
+
+    if [[ "$include_keys" == "true" ]]; then
+        warn "This export file will contain your API keys in plaintext."
+        info "Keep it secure. Use --no-keys to omit keys."
+        echo ""
+    fi
+
+    python3 - "$CATALOG" "$out_file" "$platform" "$HOME" \
+        "$include_keys" "$SCHEDULES_FILE" "$HOME/.tian/skills" <<'PYEOF'
+import json, os, sys, datetime
+
+catalog_path, out_file, platform, home = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+include_keys   = sys.argv[5] == "true"
+schedules_file = sys.argv[6]
+skills_dir     = sys.argv[7]
+
+catalog = json.load(open(catalog_path))
+
+export_data = {
+    "version":    1,
+    "exportedAt": datetime.datetime.now().isoformat(),
+    "platform":   platform,
+}
+
+# ── API keys from current environment ──────────────────────────────────────
+if include_keys:
+    api_keys, seen = {}, set()
+    for b in catalog["backends"]:
+        env = b.get("apiKeyEnvVar", "")
+        if not env or env in seen:
+            continue
+        seen.add(env)
+        val = os.environ.get(env, "")
+        if val:
+            api_keys[env] = val
+    export_data["apiKeys"] = api_keys
+
+# ── MCP server configs ─────────────────────────────────────────────────────
+def expand_path(target, custom):
+    if target == "claude_desktop":
+        if platform == "macos":
+            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    if target == "claude_code":
+        return os.path.join(home, ".claude", "settings.json")
+    if custom:
+        base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
+        return custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/")
+    return os.path.join(home, ".tian", "mcp_config.json")
+
+mcp_configs, seen_paths = {}, set()
+for backend in catalog["backends"]:
+    if not backend.get("supportsMcp", True):
+        continue
+    target = backend.get("mcpConfigTarget") or ""
+    custom = backend.get("mcpConfigPath") or ""
+    path   = expand_path(target, custom)
+    key    = target or backend.get("id", "")
+    if path in seen_paths or not os.path.isfile(path):
+        continue
+    seen_paths.add(path)
+    try:
+        cfg     = json.load(open(path))
+        servers = cfg.get("mcpServers", {})
+        if servers:
+            mcp_configs[key] = servers
+    except Exception:
+        pass
+export_data["mcpServers"] = mcp_configs
+
+# ── Schedules ──────────────────────────────────────────────────────────────
+try:
+    schedules = json.load(open(schedules_file))
+except Exception:
+    schedules = []
+export_data["schedules"] = schedules
+
+# ── Installed skills (files in ~/.tian/skills/) ───────────────────────────
+installed_skills = []
+if os.path.isdir(skills_dir):
+    for f in sorted(os.listdir(skills_dir)):
+        if f.endswith(".md"):
+            installed_skills.append(f[:-3])
+export_data["installedSkills"] = installed_skills
+
+with open(out_file, "w", encoding="utf-8") as fh:
+    json.dump(export_data, fh, indent=2)
+PYEOF
+    ok "Config exported to: $out_file"
+    info "Copy this file to the new machine, then run:"
+    info "  bash tian-cli.sh config import $out_file"
+    echo ""
+}
+
+_cmd_config_import() {
+    local in_file="$1" assume_yes="$2"
+    local platform; platform=$(detect_platform)
+
+    [[ -f "$in_file" ]] || fail "File not found: $in_file"
+    python3 -c "import json, sys; json.load(open(sys.argv[1]))" "$in_file" 2>/dev/null \
+        || fail "Invalid JSON in $in_file"
+
+    info "Importing TIAN config from: $in_file"
+    echo ""
+
+    if [[ "$assume_yes" != "true" ]]; then
+        printf "  Proceed? [y/N]: "
+        read -r _answer
+        [[ "$_answer" =~ ^[Yy]$ ]] || { echo "  Cancelled."; return 0; }
+        echo ""
+    fi
+
+    # ── API keys ───────────────────────────────────────────────────────────────
+    echo -e "${BOLD}  API Keys${RESET}"
+    local key_count=0
+    while IFS='|' read -r _kname _kval; do
+        [[ -n "$_kname" && -n "$_kval" ]] || continue
+        save_shell_env_var "$_kname" "$_kval"
+        ok "$_kname saved to $(profile_file)"
+        ((key_count++)) || true
+    done < <(python3 - "$in_file" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as fh:
+    data = json.load(fh)
+for name, val in (data.get("apiKeys") or {}).items():
+    if name and val:
+        print(f"{name}|{val}")
+PYEOF
+)
+    [[ $key_count -eq 0 ]] && info "No API keys in export file"
+    echo ""
+
+    # ── MCP server configs ─────────────────────────────────────────────────────
+    echo -e "${BOLD}  MCP Servers${RESET}"
+    local mcp_count
+    mcp_count=$(python3 - "$CATALOG" "$in_file" "$platform" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, in_file, platform, home = sys.argv[1:]
+catalog  = json.load(open(catalog_path))
+imported = json.load(open(in_file))
+
+def expand_path(target):
+    if target == "claude_desktop":
+        if platform == "macos":
+            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    if target == "claude_code":
+        return os.path.join(home, ".claude", "settings.json")
+    return os.path.join(home, ".tian", "mcp_config.json")
+
+count = 0
+for target, new_servers in (imported.get("mcpServers") or {}).items():
+    if not new_servers:
+        continue
+    # Verify target exists in catalog (skip unknown targets)
+    known = any(
+        (b.get("mcpConfigTarget") or "") == target
+        for b in catalog["backends"]
+    )
+    if not known:
+        print(f"WARN|{target}|Unknown backend target — skipping")
+        continue
+    cfg_path = expand_path(target)
+    os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
+    cfg = {}
+    if os.path.exists(cfg_path):
+        try:
+            cfg = json.load(open(cfg_path))
+        except Exception:
+            cfg = {}
+    cfg.setdefault("mcpServers", {}).update(new_servers)
+    with open(cfg_path, "w", encoding="utf-8") as fh:
+        json.dump(cfg, fh, indent=2)
+    n = len(new_servers)
+    print(f"OK|{target}|{n} MCP server(s) merged into {cfg_path}")
+    count += 1
+
+if count == 0:
+    print("NONE||No MCP servers in export file")
+PYEOF
+)
+    while IFS='|' read -r _status _target _msg; do
+        case "$_status" in
+            OK)   ok "$_target: $_msg" ;;
+            WARN) warn "$_target: $_msg" ;;
+            NONE) info "$_msg" ;;
+        esac
+    done <<< "$mcp_count"
+    echo ""
+
+    # ── Skills ─────────────────────────────────────────────────────────────────
+    echo -e "${BOLD}  Skills${RESET}"
+    local skill_count=0
+    while IFS= read -r _sid; do
+        [[ -n "$_sid" ]] || continue
+        if (install_skill "$_sid") 2>/dev/null; then
+            ok "Skill '$_sid' installed"
+            ((skill_count++)) || true
+        else
+            warn "Skill '$_sid' not found in catalog — skipping"
+        fi
+    done < <(python3 - "$in_file" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as fh:
+    data = json.load(fh)
+for s in (data.get("installedSkills") or []):
+    if s:
+        print(s)
+PYEOF
+)
+    [[ $skill_count -eq 0 ]] && info "No skills in export file"
+    echo ""
+
+    # ── Schedules ──────────────────────────────────────────────────────────────
+    echo -e "${BOLD}  Schedules${RESET}"
+    ensure_dirs
+    local sched_count=0
+    while IFS='|' read -r _sname _sprompt _stime _srepeat; do
+        [[ -n "$_sname" && -n "$_sprompt" ]] || continue
+        if [[ "$platform" == "linux" || "$platform" == "wsl" ]]; then
+            _schedule_add_linux "$_sname" "$_sprompt" "$_stime" "$_srepeat" 2>/dev/null \
+                && ok "Schedule '$_sname' created" \
+                || warn "Could not create schedule '$_sname'"
+        elif [[ "$platform" == "macos" ]]; then
+            _schedule_add_macos "$_sname" "$_sprompt" "$_stime" "$_srepeat" 2>/dev/null \
+                && ok "Schedule '$_sname' created" \
+                || warn "Could not create schedule '$_sname'"
+        else
+            warn "Unsupported platform for schedules — skipping '$_sname'"
+        fi
+        ((sched_count++)) || true
+    done < <(python3 - "$in_file" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as fh:
+    data = json.load(fh)
+for s in (data.get("schedules") or []):
+    name   = s.get("name", "")
+    prompt = s.get("prompt", "")
+    time   = s.get("time", "08:00")
+    repeat = s.get("repeat", "daily")
+    if name and prompt:
+        print(f"{name}|{prompt}|{time}|{repeat}")
+PYEOF
+)
+    [[ $sched_count -eq 0 ]] && info "No schedules in export file"
+    echo ""
+
+    rule
+    ok "Import complete!"
+    info "Open a new terminal so the saved env vars take effect."
+    echo ""
+}
+
+cmd_config() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        export)
+            local out_file="tian-config.json" include_keys="true"
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    --output|-o) out_file="${2:-}"; shift 2 ;;
+                    --no-keys)   include_keys="false"; shift ;;
+                    *) shift ;;
+                esac
+            done
+            hdr "TIAN Config Export"
+            _cmd_config_export "$out_file" "$include_keys"
+            ;;
+        import)
+            local in_file="${1:-}" assume_yes="false"
+            shift || true
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    -y|--yes) assume_yes="true"; shift ;;
+                    *) shift ;;
+                esac
+            done
+            [[ -n "$in_file" ]] || fail "Usage: config import <file> [--yes]"
+            hdr "TIAN Config Import"
+            _cmd_config_import "$in_file" "$assume_yes"
+            ;;
+        *)
+            cat <<EOF
+
+  config export [--output <file>] [--no-keys]
+      Export your TIAN setup (API keys, MCP configs, skills, schedules) to a
+      portable JSON file. Default output: tian-config.json
+      Use --no-keys to omit API keys from the export.
+
+  config import <file> [--yes]
+      Restore a previously exported TIAN config on this machine.
+      Re-applies API keys, MCP server configs, skills, and schedules.
+
+EOF
+            ;;
+    esac
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
@@ -2099,6 +2408,7 @@ case "$CMD" in
     jobs)      cmd_jobs "$@" ;;
     schedule)  cmd_schedule "$@" ;;
     list)      cmd_list "$@" ;;
+    config)    cmd_config "$@" ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
 esac
