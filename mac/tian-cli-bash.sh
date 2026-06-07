@@ -967,15 +967,30 @@ _schedule_add_linux() {
     hour=$(echo "$time" | cut -d: -f1)
     minute=$(echo "$time" | cut -d: -f2)
 
+    local job_cmd="bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'"
+
     case "$repeat" in
         hourly) cron_expr="0 * * * *" ;;
         daily)  cron_expr="$minute $hour * * *" ;;
         weekly) cron_expr="$minute $hour * * 1" ;;
-        once)   warn "Linux cron does not support one-time jobs directly. Falling back to daily at $time."; cron_expr="$minute $hour * * *" ;;
+        once)
+            # Write a self-removing wrapper: runs the task then deletes its own
+            # cron entry so it fires exactly once rather than becoming recurring.
+            cron_expr="$minute $hour * * *"
+            local once_script="$HOME/.tian/once-${name}.sh"
+            cat > "$once_script" <<ONCESCRIPT
+#!/usr/bin/env bash
+bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'
+( crontab -l 2>/dev/null | grep -vF "# tian-$name" ) | crontab - 2>/dev/null || true
+rm -f '$once_script'
+ONCESCRIPT
+            chmod +x "$once_script"
+            job_cmd="bash '$once_script'"
+            ;;
         *)      cron_expr="$minute $hour * * *" ;;
     esac
 
-    local job_line="$cron_expr  bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'  # tian-$name"
+    local job_line="$cron_expr  $job_cmd  # tian-$name"
 
     # Remove existing entry for this name then append new one
     ( crontab -l 2>/dev/null | grep -vF "# tian-$name" ; echo "$job_line" ) | crontab -
@@ -1014,15 +1029,40 @@ _schedule_add_macos() {
 
     local hour; hour=$(echo "$time" | cut -d: -f1 | sed 's/^0//')
     local minute; minute=$(echo "$time" | cut -d: -f2 | sed 's/^0//')
+    # sed can turn "00" into "" — ensure at least "0"
+    hour="${hour:-0}"; minute="${minute:-0}"
 
-    local interval_block=""
+    local interval_block program_args
     case "$repeat" in
         hourly) interval_block="<key>StartInterval</key><integer>3600</integer>" ;;
         daily)  interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
         weekly) interval_block="<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-        once)   interval_block="" ;;
+        once)
+            # Fire at the specified time exactly once: use a self-removing wrapper
+            # script so launchd doesn't repeat the job on subsequent days.
+            interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>"
+            local once_script="$HOME/.tian/once-${name}.sh"
+            cat > "$once_script" <<ONCESCRIPT
+#!/usr/bin/env bash
+bash '$TIAN_DIR/tian-cli.sh' schedule run '$name'
+launchctl unload '$plist_file' 2>/dev/null || launchctl bootout "gui/\$(id -u)" '$plist_file' 2>/dev/null || true
+rm -f '$plist_file' '$once_script'
+ONCESCRIPT
+            chmod +x "$once_script"
+            program_args="    <string>/bin/bash</string>
+        <string>$once_script</string>"
+            ;;
         *)      interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
     esac
+
+    # For non-once repeats, ProgramArguments calls tian-cli directly
+    if [[ "$repeat" != "once" ]]; then
+        program_args="    <string>/bin/bash</string>
+        <string>$TIAN_DIR/tian-cli.sh</string>
+        <string>schedule</string>
+        <string>run</string>
+        <string>$name</string>"
+    fi
 
     cat > "$plist_file" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1033,11 +1073,7 @@ _schedule_add_macos() {
     <string>$plist_label</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/bin/bash</string>
-        <string>$TIAN_DIR/tian-cli.sh</string>
-        <string>schedule</string>
-        <string>run</string>
-        <string>$name</string>
+        $program_args
     </array>
     <key>StandardOutPath</key>
     <string>$HOME/.tian/tasks/schedule-$name.log</string>
@@ -1069,6 +1105,7 @@ PYEOF
 _schedule_remove_linux() {
     local name="$1"
     ( crontab -l 2>/dev/null | grep -vF "# tian-$name" ) | crontab - 2>/dev/null || true
+    rm -f "$HOME/.tian/once-${name}.sh"
 }
 
 _schedule_remove_macos() {
