@@ -1729,6 +1729,50 @@ PYEOF
     fi
     echo ""
 
+    echo -e "${BOLD}  Network & service reachability${RESET}"
+    if command -v curl &>/dev/null; then
+        local anthropic_status openai_status
+        anthropic_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+            -H "x-api-key: test" -H "anthropic-version: 2023-06-01" \
+            "https://api.anthropic.com/v1/models" 2>/dev/null) || anthropic_status="000"
+        case "$anthropic_status" in
+            200|401|403|429) ok "api.anthropic.com reachable (HTTP $anthropic_status)" ;;
+            000) warn "Cannot reach api.anthropic.com — check internet / firewall"; ((issues++)) || true ;;
+            *)   info "api.anthropic.com returned HTTP $anthropic_status" ;;
+        esac
+
+        openai_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+            -H "Authorization: Bearer test" \
+            "https://api.openai.com/v1/models" 2>/dev/null) || openai_status="000"
+        case "$openai_status" in
+            200|401|403|429) ok "api.openai.com reachable (HTTP $openai_status)" ;;
+            000) warn "Cannot reach api.openai.com — check internet / firewall"; ((issues++)) || true ;;
+            *)   info "api.openai.com returned HTTP $openai_status" ;;
+        esac
+    else
+        info "curl not found — skipping network reachability checks"
+    fi
+
+    # Check if Ollama service is running (it needs a daemon, not just a CLI binary)
+    if command -v ollama &>/dev/null; then
+        local ollama_status
+        if command -v curl &>/dev/null; then
+            ollama_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 \
+                "http://localhost:11434/api/tags" 2>/dev/null) || ollama_status="000"
+        else
+            # fallback: `ollama list` exits 0 only when the daemon is running
+            ollama list &>/dev/null && ollama_status="200" || ollama_status="000"
+        fi
+        if [[ "$ollama_status" == "200" ]]; then
+            ok "Ollama service is running (localhost:11434)"
+        else
+            warn "Ollama is installed but the service is NOT running"
+            info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
+            ((issues++)) || true
+        fi
+    fi
+    echo ""
+
     echo -e "${BOLD}  Background scheduler${RESET}"
     local sched_count=0
     [[ -f "$SCHEDULES_FILE" ]] && sched_count=$(python3 -c "import json,sys;print(len(json.load(open(sys.argv[1]))))" "$SCHEDULES_FILE" 2>/dev/null || echo 0)

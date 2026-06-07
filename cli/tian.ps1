@@ -736,24 +736,48 @@ function Cmd-Doctor {
     if (Test-Path $tianHome) { Write-Ok "~\.tian directory present"; $okCount++ }
     else                      { Write-Info "~\.tian not yet created (created on first job run)" }
 
-    # ── Network Connectivity ──────────────────────────────────────────────────────
+    # ── Network & Service Reachability ───────────────────────────────────────────
     Write-Host ""
-    Write-Color "  Connectivity" DarkGray
-    try {
-        $req          = [System.Net.WebRequest]::Create("https://api.anthropic.com")
-        $req.Timeout  = 5000
-        $req.Method   = "HEAD"
-        $resp = $req.GetResponse()
-        $resp.Close()
-        Write-Ok "Anthropic API reachable"; $okCount++
-    } catch [System.Net.WebException] {
-        if ($_.Exception.Response) {
-            Write-Ok "Anthropic API reachable (HTTP $([int]$_.Exception.Response.StatusCode))"; $okCount++
+    Write-Color "  Network & service reachability" DarkGray
+
+    function Test-HttpReachable([string]$url, [hashtable]$headers = @{}) {
+        try {
+            $req = [System.Net.WebRequest]::Create($url)
+            $req.Timeout = 5000
+            $req.Method  = "GET"
+            foreach ($h in $headers.GetEnumerator()) { $req.Headers[$h.Key] = $h.Value }
+            $resp = $req.GetResponse(); $resp.Close()
+            return 200
+        } catch [System.Net.WebException] {
+            if ($_.Exception.Response) { return [int]$_.Exception.Response.StatusCode }
+            return 0
+        } catch { return 0 }
+    }
+
+    $anthropicCode = Test-HttpReachable "https://api.anthropic.com/v1/models" @{
+        "x-api-key"           = "test"
+        "anthropic-version"   = "2023-06-01"
+    }
+    if ($anthropicCode -in 200,401,403,429) { Write-Ok "api.anthropic.com reachable (HTTP $anthropicCode)"; $okCount++ }
+    elseif ($anthropicCode -eq 0)           { Write-Warn "Cannot reach api.anthropic.com — check internet / firewall"; $warnCount++ }
+    else                                    { Write-Info "api.anthropic.com returned HTTP $anthropicCode" }
+
+    $openaiCode = Test-HttpReachable "https://api.openai.com/v1/models" @{ "Authorization" = "Bearer test" }
+    if ($openaiCode -in 200,401,403,429) { Write-Ok "api.openai.com reachable (HTTP $openaiCode)"; $okCount++ }
+    elseif ($openaiCode -eq 0)           { Write-Warn "Cannot reach api.openai.com — check internet / firewall"; $warnCount++ }
+    else                                 { Write-Info "api.openai.com returned HTTP $openaiCode" }
+
+    # Check whether the Ollama daemon is running (the backend needs it, not just the CLI)
+    $ollamaCmd = Get-Command ollama -ErrorAction SilentlyContinue
+    if ($ollamaCmd) {
+        $ollamaCode = Test-HttpReachable "http://localhost:11434/api/tags"
+        if ($ollamaCode -eq 200) {
+            Write-Ok "Ollama service is running (localhost:11434)"; $okCount++
         } else {
-            Write-Warn "Cannot reach api.anthropic.com — check internet / firewall"; $warnCount++
+            Write-Warn "Ollama is installed but the service is NOT running"
+            Write-Info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
+            $warnCount++
         }
-    } catch {
-        Write-Warn "Connectivity check failed: $($_.Exception.Message)"; $warnCount++
     }
 
     # ── Summary ───────────────────────────────────────────────────────────────────
