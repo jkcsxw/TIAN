@@ -979,10 +979,30 @@ cmd_run() {
 
     if $background; then
         info "Running in background (job: $job_id)..."
-        # Run AI command, then classify quota exhaustion so scheduled jobs can be disabled.
+        # Run AI command with multi-backend fallback on quota exhaustion.
+        # Mirrors the foreground fallback loop so background jobs also survive a rate-limited primary.
         nohup bash -c '
-"$1" $2 "$3" >"$4" 2>&1
-_ec=$?
+CATALOG="$8/config/catalog.json"
+_primary="$1"
+_prompt="$3"
+_out="$4"
+_ec=1
+backends=$(python3 -c "
+import json, subprocess, sys
+c = json.load(open(sys.argv[1]))
+for b in c[\"backends\"]:
+    cmd = b.get(\"cliCommand\", \"\")
+    flag = (b.get(\"nonInteractiveFlag\", \"\") or \"\").strip()
+    if cmd and subprocess.run([\"which\", cmd], capture_output=True).returncode == 0:
+        print(cmd + \"|\" + flag)
+" "$CATALOG" 2>/dev/null)
+while IFS="|" read -r r_cmd r_flag; do
+    [[ -z "$r_cmd" ]] && continue
+    $r_cmd $r_flag "$_prompt" >"$_out" 2>&1
+    _ec=$?
+    grep -qiE "insufficient_quota|quota(_is_)?exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded" "$_out" 2>/dev/null && continue
+    break
+done <<< "$backends"
 python3 -c "
 import json, os, re, subprocess, sys
 jf, jid, code, out_file, schedule_name, tian_dir = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]

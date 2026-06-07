@@ -186,4 +186,67 @@ _test_sync_marks_quota_stopped() {
 }
 it "marks dead running jobs as stopped when quota is exhausted" _test_sync_marks_quota_stopped
 
+suite "background multi-backend fallback"
+
+_test_bg_fallback_tries_second_backend() {
+    local out_file="$TMPDIR_TEST/bg-fallback.txt"
+    local _ec=1
+
+    # Build a fake backends list: first cmd returns quota error, second succeeds
+    local bin_dir="$TMPDIR_TEST/fakebins"
+    mkdir -p "$bin_dir"
+    printf '#!/bin/sh\necho "429 insufficient_quota"\nexit 1\n' > "$bin_dir/fake-quota-backend"
+    printf '#!/bin/sh\necho "Task completed successfully"\nexit 0\n'  > "$bin_dir/fake-ok-backend"
+    chmod +x "$bin_dir/fake-quota-backend" "$bin_dir/fake-ok-backend"
+
+    local saved_PATH="$PATH"
+    export PATH="$bin_dir:$PATH"
+
+    # Simulate the inner nohup fallback loop from cmd_run
+    local backends
+    backends=$(printf 'fake-quota-backend|\nfake-ok-backend|\n')
+    while IFS="|" read -r r_cmd r_flag; do
+        [[ -z "$r_cmd" ]] && continue
+        $r_cmd $r_flag "test prompt" >"$out_file" 2>&1
+        _ec=$?
+        grep -qiE "insufficient_quota|quota(_is_)?exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded" "$out_file" 2>/dev/null && continue
+        break
+    done <<< "$backends"
+
+    export PATH="$saved_PATH"
+
+    assert_contains "$(cat "$out_file" 2>/dev/null)" "Task completed successfully"
+    [[ "$_ec" -eq 0 ]]
+}
+it "falls back to second backend when first hits a quota error" _test_bg_fallback_tries_second_backend
+
+_test_bg_fallback_quota_when_all_fail() {
+    local out_file="$TMPDIR_TEST/bg-allfail.txt"
+    local _ec=0
+
+    local bin_dir="$TMPDIR_TEST/fakebins2"
+    mkdir -p "$bin_dir"
+    printf '#!/bin/sh\necho "rate limit exceeded"\nexit 1\n' > "$bin_dir/fake-rl-backend"
+    chmod +x "$bin_dir/fake-rl-backend"
+
+    local saved_PATH="$PATH"
+    export PATH="$bin_dir:$PATH"
+
+    local backends
+    backends="fake-rl-backend|"
+    while IFS="|" read -r r_cmd r_flag; do
+        [[ -z "$r_cmd" ]] && continue
+        $r_cmd $r_flag "test prompt" >"$out_file" 2>&1
+        _ec=$?
+        grep -qiE "insufficient_quota|quota(_is_)?exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded" "$out_file" 2>/dev/null && continue
+        break
+    done <<< "$backends"
+
+    export PATH="$saved_PATH"
+
+    # Output file should contain the quota error from the only backend
+    assert_contains "$(cat "$out_file" 2>/dev/null)" "rate limit exceeded"
+}
+it "output contains the quota error when all backends fail" _test_bg_fallback_quota_when_all_fail
+
 finish
