@@ -791,6 +791,31 @@ function Cmd-Doctor {
         $ollamaCode = Test-HttpReachable "http://localhost:11434/api/tags"
         if ($ollamaCode -eq 200) {
             Write-Ok "Ollama service is running (localhost:11434)"; $okCount++
+            # Check that at least one model has been pulled
+            try {
+                $tagsJson  = Invoke-RestMethod -Uri "http://localhost:11434/api/tags" -TimeoutSec 5 -ErrorAction Stop
+                $modelCount = if ($tagsJson.models) { @($tagsJson.models).Count } else { 0 }
+                if ($modelCount -gt 0) {
+                    Write-Ok "Ollama: $modelCount model(s) available"; $okCount++
+                } else {
+                    Write-Warn "Ollama is running but no models are pulled — tasks will fail"
+                    Write-Info "  Fix: run 'ollama pull llama3' (or another model name)"
+                    if ($Fix) {
+                        Write-Info "  Auto-fixing: pulling llama3 (this may take several minutes)..."
+                        $pullResult = & ollama pull llama3 2>&1
+                        if ($LASTEXITCODE -eq 0) {
+                            Write-Ok "  llama3 pulled successfully"; $fixedCount++
+                        } else {
+                            Write-Warn "  'ollama pull llama3' failed — try manually or choose a different model"
+                            $warnCount++
+                        }
+                    } else {
+                        $warnCount++
+                    }
+                }
+            } catch {
+                Write-Info "  Could not query Ollama model list — skipping model check"
+            }
         } elseif ($Fix) {
             Write-Info "  Auto-fixing: starting 'ollama serve' in background..."
             Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
@@ -808,6 +833,48 @@ function Cmd-Doctor {
             Write-Info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
             $warnCount++
         }
+    }
+
+    # ── Shell environment & disk space ────────────────────────────────────────────
+    Write-Host ""
+    Write-Color "  Shell environment & disk space" DarkGray
+
+    # Is tian-cli on PATH?
+    $tianBin = Get-Command tian-cli -ErrorAction SilentlyContinue
+    if ($tianBin) {
+        Write-Ok "tian-cli found on PATH: $($tianBin.Source)"; $okCount++
+    } else {
+        Write-Warn "tian-cli not found on PATH — open a new terminal or re-run setup"
+        $warnCount++
+    }
+
+    # Disk space check (warn if < 5 GB free on system drive)
+    try {
+        $drive     = Split-Path -Qualifier $env:USERPROFILE
+        $diskInfo  = Get-PSDrive ($drive.TrimEnd(':')) -ErrorAction Stop
+        $freeGB    = [math]::Round($diskInfo.Free / 1GB, 1)
+        if ($freeGB -ge 5) {
+            Write-Ok "Disk space: $freeGB GB free on $drive"; $okCount++
+        } elseif ($freeGB -ge 2) {
+            Write-Warn "Disk space: only $freeGB GB free on $drive — Ollama models need ~4 GB+"
+            Write-Info "  Free up space or choose a smaller model (e.g. ollama pull phi)"
+            $warnCount++
+        } else {
+            Write-Fail "Disk space: critically low — only $freeGB GB free on $drive"
+            Write-Info "  TIAN and AI models need several GB of free space"
+            $failCount++
+        }
+    } catch {
+        Write-Info "Could not read disk usage — skipping disk space check"
+    }
+
+    # TIAN data directory size (informational)
+    $tianHome = Join-Path $env:USERPROFILE ".tian"
+    if (Test-Path $tianHome) {
+        $tianSizeKB = (Get-ChildItem $tianHome -Recurse -ErrorAction SilentlyContinue |
+            Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum / 1KB
+        $tianSizeStr = if ($tianSizeKB -gt 1024) { "$([math]::Round($tianSizeKB/1024,1)) MB" } else { "$([math]::Round($tianSizeKB,0)) KB" }
+        Write-Info "TIAN data directory: $tianSizeStr  ($tianHome)"
     }
 
     # ── Summary ───────────────────────────────────────────────────────────────────

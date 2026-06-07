@@ -1980,6 +1980,34 @@ PYEOF
         fi
         if [[ "$ollama_status" == "200" ]]; then
             ok "Ollama service is running (localhost:11434)"
+            # Check that at least one model has been pulled; service running with no models is a
+            # common non-obvious failure — users get confusing "no models" errors at runtime.
+            local ollama_models=""
+            if command -v curl &>/dev/null; then
+                ollama_models=$(curl -s --max-time 5 "http://localhost:11434/api/tags" 2>/dev/null \
+                    | python3 -c "import json,sys; d=json.load(sys.stdin); print(len(d.get('models',[])))" 2>/dev/null) \
+                    || ollama_models="0"
+            else
+                ollama_models=$(ollama list 2>/dev/null | tail -n +2 | wc -l | tr -d ' ') || ollama_models="0"
+            fi
+            if [[ "${ollama_models:-0}" -gt 0 ]]; then
+                ok "Ollama: ${ollama_models} model(s) available"
+            else
+                warn "Ollama is running but no models are pulled — tasks will fail"
+                info "  Fix: run 'ollama pull llama3' (or another model name)"
+                if $fix; then
+                    info "  Auto-fixing: pulling llama3 (this may take several minutes)..."
+                    if ollama pull llama3 2>/dev/null; then
+                        ok "  llama3 pulled successfully"
+                        ((fixed++)) || true
+                    else
+                        warn "  'ollama pull llama3' failed — try manually or choose a different model"
+                        ((issues++)) || true
+                    fi
+                else
+                    ((issues++)) || true
+                fi
+            fi
         else
             warn "Ollama is installed but the service is NOT running"
             if $fix; then
@@ -2005,6 +2033,56 @@ PYEOF
                 ((issues++)) || true
             fi
         fi
+    fi
+    echo ""
+
+    echo -e "${BOLD}  Shell environment${RESET}"
+
+    # ── PATH: is tian-cli findable? ───────────────────────────────────────────
+    local tian_bin
+    tian_bin=$(command -v tian-cli 2>/dev/null || true)
+    if [[ -n "$tian_bin" ]]; then
+        ok "tian-cli found on PATH: $tian_bin"
+    else
+        warn "tian-cli not found on PATH — you may need to open a new terminal or re-run setup"
+        info "  Fix: open a new terminal window, or run: source $(profile_file)"
+        ((issues++)) || true
+    fi
+
+    # ── Shell profile: is the profile actually sourced in this session? ───────
+    # We detect this by checking whether TIAN_DIR resolves to our actual install dir.
+    # If the env var is empty the profile hasn't been sourced yet this session.
+    if [[ -n "${TIAN_DIR:-}" ]]; then
+        ok "Shell profile sourced (TIAN_DIR=$TIAN_DIR)"
+    else
+        warn "TIAN_DIR not set — shell profile may not have been sourced"
+        info "  Fix: open a new terminal, or run: source $(profile_file)"
+        ((issues++)) || true
+    fi
+
+    # ── Disk space: warn if free space is low (Ollama models need several GB) ─
+    local avail_kb avail_gb
+    avail_kb=$(df -k "$HOME" 2>/dev/null | awk 'NR==2{print $4}') || avail_kb=""
+    if [[ -n "$avail_kb" ]]; then
+        avail_gb=$(awk "BEGIN{printf \"%.1f\", $avail_kb/1048576}")
+        if awk "BEGIN{exit ($avail_kb >= 5242880) ? 0 : 1}"; then
+            ok "Disk space: ${avail_gb} GB free"
+        elif awk "BEGIN{exit ($avail_kb >= 2097152) ? 0 : 1}"; then
+            warn "Disk space: only ${avail_gb} GB free — Ollama models may not fit (need ~4 GB+)"
+            info "  Free up space or choose a smaller model (e.g. ollama pull phi)"
+            ((issues++)) || true
+        else
+            warn "Disk space: critically low — only ${avail_gb} GB free"
+            info "  TIAN and AI models need several GB of free space"
+            ((issues++)) || true
+        fi
+    fi
+
+    # ── TIAN data directory size ───────────────────────────────────────────────
+    if [[ -d "$TIAN_DIR" ]]; then
+        local tian_size
+        tian_size=$(du -sh "$TIAN_DIR" 2>/dev/null | awk '{print $1}') || tian_size="?"
+        info "TIAN data directory: $tian_size  ($TIAN_DIR)"
     fi
     echo ""
 
