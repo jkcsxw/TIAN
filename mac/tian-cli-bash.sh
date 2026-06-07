@@ -697,6 +697,7 @@ $(rule)
     jobs result <id>    Show output of a completed job
     jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
     jobs stop <id>      Stop a running job (--all stops every running job)
+    jobs retry <id>     Re-run a failed or quota-stopped job with its original prompt
     jobs clear          Clear completed jobs
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
     schedule list       List scheduled tasks
@@ -1056,6 +1057,7 @@ cmd_jobs() {
                 echo -e "${DIM}       Options: wait for your quota to reset, upgrade your API plan,${RESET}"
                 echo -e "${DIM}       or install a second backend (e.g. Ollama) for free local fallback.${RESET}"
                 echo -e "${DIM}       Run tian-cli doctor to check your current key and quota status.${RESET}"
+                echo -e "${DIM}       Once ready, retry this job with: tian-cli jobs retry $id${RESET}"
                 echo ""
                 rule
             fi
@@ -1079,6 +1081,34 @@ cmd_jobs() {
             local target="${1:-}"
             [[ -n "$target" ]] || target="--all"
             stop_jobs "$target"
+            ;;
+        retry)
+            local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs retry <job-id>"
+            local orig_prompt orig_name orig_schedule
+            orig_prompt=$(python3 - "$JOBS_FILE" "$id" <<'PYEOF'
+import json, sys
+jobs = json.load(open(sys.argv[1]))
+j = next((x for x in jobs if x.get('id') == sys.argv[2]), None)
+if not j: sys.exit(1)
+print(j.get('prompt', ''))
+PYEOF
+) || fail "Job '$id' not found."
+            [[ -z "$orig_prompt" ]] && fail "Job '$id' has no recorded prompt."
+            orig_name=$(python3 -c "
+import json,sys
+j=next((x for x in json.load(open(sys.argv[1])) if x.get('id')==sys.argv[2]),{})
+print(j.get('name','') or '')
+" "$JOBS_FILE" "$id")
+            orig_schedule=$(python3 -c "
+import json,sys
+j=next((x for x in json.load(open(sys.argv[1])) if x.get('id')==sys.argv[2]),{})
+print(j.get('scheduleName','') or '')
+" "$JOBS_FILE" "$id")
+            info "Retrying prompt from job $id..."
+            local retry_args=(-b)
+            [[ -n "$orig_name"     ]] && retry_args+=(--job-name     "$orig_name")
+            [[ -n "$orig_schedule" ]] && retry_args+=(--schedule-name "$orig_schedule")
+            cmd_run "$orig_prompt" "${retry_args[@]}"
             ;;
         clear)
             python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
@@ -1134,6 +1164,7 @@ else:
         print(f"  \033[0;35m[!!]\033[0m QUOTA = API quota or rate limit exhausted.")
         print(f"  \033[2m     Wait for your quota to reset, upgrade your plan, or switch backends.\033[0m")
         print(f"  \033[2m     Diagnose with: tian-cli doctor\033[0m")
+        print(f"  \033[2m     Retry a stopped job with: tian-cli jobs retry <job-id>\033[0m")
         print()
 PYEOF
             ;;
