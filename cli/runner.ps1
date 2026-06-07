@@ -577,6 +577,10 @@ function Show-Jobs {
     }
     Write-Rule
     Write-Color "  tian-cli jobs result <任务ID>   查看输出 / to read output" DarkGray
+    $hasQuota = $jobs | Where-Object { $_.stopReason -eq "quota_exhausted" }
+    if ($hasQuota) {
+        Write-Color "  tian-cli jobs retry <任务ID>    重新执行已停止任务 / re-run a quota-stopped job" DarkYellow
+    }
     Write-Host ""
 }
 
@@ -591,7 +595,14 @@ function Show-JobResult {
     Write-Info "后端 / Backend : $($meta.backend)"
     Write-Info "创建时间 / Created : $($meta.createdAt)"
     if ($meta.finishedAt) { Write-Info "完成时间 / Finished: $($meta.finishedAt)" }
-    if ($meta.stopReason) { Write-Info "停止原因 / Stop reason: $($meta.stopReason)" }
+    if ($meta.stopReason) {
+        Write-Info "停止原因 / Stop reason: $($meta.stopReason)"
+        if ($meta.stopReason -eq "quota_exhausted") {
+            Write-Warn "  [!!] This job stopped because the API quota or rate limit was exhausted."
+            Write-Color "       Wait for your quota to reset, upgrade your plan, or install a fallback backend (e.g. Ollama)." DarkGray
+            Write-Color "       Once ready, retry this job with: tian-cli jobs retry $JobId" DarkGray
+        }
+    }
     Write-Info "提示词 / Prompt  : $($meta.prompt)"
     Write-Rule
 
@@ -604,6 +615,19 @@ function Show-JobResult {
         Write-Warn "输出文件未找到。/ Output file not found."
     }
     Write-Rule
+}
+
+function Retry-Job {
+    param([string]$JobId, [string]$TianDir)
+    if (-not $JobId) { Write-Fail "Usage: tian-cli jobs retry <job-id>"; return }
+    $jobs = Read-Jobs
+    $job = $jobs | Where-Object { $_.id -eq $JobId } | Select-Object -First 1
+    if (-not $job) { Write-Fail "Job '$JobId' not found."; return }
+    $origPrompt = $job.prompt
+    if (-not $origPrompt) { Write-Fail "Job '$JobId' has no recorded prompt."; return }
+    Write-Info "重新执行任务 / Retrying prompt from job $JobId..."
+    Invoke-Task -Prompt $origPrompt -TianDir $TianDir -Background:$true `
+        -JobName ($job.name) -ScheduleName ($job.scheduleName)
 }
 
 function Clear-Jobs {

@@ -164,6 +164,7 @@ function Cmd-Help {
     jobs result <id>                查看已完成任务的输出
     jobs tail <id>                  实时追踪任务输出（auto-exits when done; Ctrl+C 停止追踪）
     jobs stop <id>                  停止运行中的任务（--all 停止全部）
+    jobs retry <id>                 重新执行已停止或失败的任务（使用原始提示词）
     jobs clear                      清除已完成任务（--all 清除全部）
 
     schedule add              创建定时任务
@@ -236,6 +237,7 @@ function Cmd-Help {
     jobs result <id>                 Show output of a completed job
     jobs tail <id>                   Stream a running job's output live (auto-exits when done; Ctrl+C stops watching)
     jobs stop <id>                   Stop a running job (--all stops all)
+    jobs retry <id>                  Re-run a quota-stopped or failed job with its original prompt
     jobs clear                       Clear completed jobs (--all clears all)
 
     schedule add               Create a recurring scheduled task
@@ -1143,6 +1145,11 @@ switch ($Command.ToLower()) {
                 $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $All -and -not $jobId) { Write-Fail "Usage: tian-cli jobs stop <job-id> [--all]"; exit 1 }
                 Stop-Jobs -JobId $jobId -All:$All
+            }
+            "retry"  {
+                $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
+                if (-not $jobId) { Write-Fail "Usage: tian-cli jobs retry <job-id>"; exit 1 }
+                Retry-Job -JobId $jobId -TianDir $TianDir
             }
             "clear"  { Clear-Jobs -All:$All }
             ""       { Show-Jobs }
