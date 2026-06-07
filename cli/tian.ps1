@@ -13,6 +13,7 @@ param(
     [string]$Repeat    = "daily",
     [string]$Day       = "",
     [switch]$Background,
+    [switch]$Watch,
     [switch]$Yes,
     [switch]$All,
     [switch]$List,
@@ -155,12 +156,14 @@ function Cmd-Help {
     repair              重新安装修复当前配置
     lang en|zh          切换界面语言
 
-    run  "提示词"              立即执行任务（前台）
-    run  "提示词" --background 在后台执行任务
-    jobs                      列出后台任务
-    jobs result <id>          查看已完成任务的输出
-    jobs stop <id>            停止运行中的任务（--all 停止全部）
-    jobs clear                清除已完成任务（--all 清除全部）
+    run  "提示词"                    立即执行任务（前台）
+    run  "提示词" --background       在后台执行任务
+    run  "提示词" -w/--watch         后台执行并实时显示输出（auto-exits when done）
+    jobs                            列出后台任务
+    jobs result <id>                查看已完成任务的输出
+    jobs tail <id>                  实时追踪任务输出（auto-exits when done; Ctrl+C 停止追踪）
+    jobs stop <id>                  停止运行中的任务（--all 停止全部）
+    jobs clear                      清除已完成任务（--all 清除全部）
 
     schedule add              创建定时任务
     schedule list             列出所有定时任务
@@ -225,12 +228,14 @@ function Cmd-Help {
     repair              Re-run install to fix the current config
     lang en|zh          Switch interface language
 
-    run  "prompt"              Run a task now (foreground)
-    run  "prompt" --background Run a task in the background
-    jobs                       List background jobs
-    jobs result <id>           Show output of a completed job
-    jobs stop <id>             Stop a running job (--all stops all)
-    jobs clear                 Clear completed jobs (--all clears all)
+    run  "prompt"                    Run a task now (foreground)
+    run  "prompt" --background       Run a task in the background
+    run  "prompt" -w/--watch         Background task with live output streaming (auto-exits when done)
+    jobs                             List background jobs
+    jobs result <id>                 Show output of a completed job
+    jobs tail <id>                   Stream a running job's output live (auto-exits when done; Ctrl+C stops watching)
+    jobs stop <id>                   Stop a running job (--all stops all)
+    jobs clear                       Clear completed jobs (--all clears all)
 
     schedule add               Create a recurring scheduled task
     schedule list              List all scheduled tasks
@@ -1037,13 +1042,15 @@ switch ($Command.ToLower()) {
     "uninstall" { Cmd-Uninstall }
 
     "run" {
-        # tian-cli run "prompt"  or  tian-cli run "prompt" --background
+        # tian-cli run "prompt"  [-b/--background]  [-w/--watch]
         $prompt = if ($Subcommand) { $Subcommand } elseif ($Task) { $Task } else { "" }
         if (-not $prompt) {
-            Write-Fail "Usage: tian-cli run `"your task prompt`" [--background]"
+            Write-Fail "Usage: tian-cli run `"your task prompt`" [--background] [--watch]"
             exit 1
         }
-        Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$Background
+        # --watch implies --background (job must be backgrounded to be watched)
+        $runBackground = $Background -or $Watch
+        Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$runBackground -Watch:$Watch
     }
 
     "jobs" {
@@ -1052,6 +1059,19 @@ switch ($Command.ToLower()) {
                 $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
                 if (-not $jobId) { Write-Fail "Usage: tian-cli jobs result <job-id>"; exit 1 }
                 Show-JobResult -JobId $jobId
+            }
+            "tail"   {
+                $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
+                if (-not $jobId) { Write-Fail "Usage: tian-cli jobs tail <job-id>"; exit 1 }
+                $meta = Get-JobStatus -JobId $jobId
+                if (-not $meta) { Write-Fail "Job '$jobId' not found."; exit 1 }
+                if ($meta.status -ne "running") {
+                    Write-Info "Job $jobId status: $($meta.status) — showing stored output."
+                    Show-JobResult -JobId $jobId
+                } else {
+                    Write-Info "Job $jobId is still running — streaming output (auto-exits when finished; Ctrl+C to stop watching)..."
+                    Watch-Job -JobId $jobId
+                }
             }
             "stop"   {
                 $jobId = if ($Name) { $Name } elseif ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }

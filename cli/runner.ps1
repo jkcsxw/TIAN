@@ -128,11 +128,114 @@ function Resolve-ScheduleNameByPrompt {
     return $null
 }
 
+# Stream a background job's output to the terminal until the job finishes.
+# Pressing Ctrl+C exits the watch but the background job keeps running.
+function Watch-Job {
+    param([string]$JobId)
+
+    $outFile  = Join-Path $global:TIAN_TASKS_DIR "$JobId.txt"
+    $metaFile = Join-Path $global:TIAN_TASKS_DIR "$JobId.meta.json"
+
+    # Wait up to 5 s for the background process to create the output file.
+    $waited = 0
+    while (-not (Test-Path $outFile) -and $waited -lt 20) {
+        Start-Sleep -Milliseconds 250
+        $waited++
+    }
+    if (-not (Test-Path $outFile)) {
+        Write-Warn "Output file did not appear — job may have failed to start."
+        return
+    }
+
+    Write-Info "Streaming output (Ctrl+C stops watching; the job continues in background)..."
+    Write-Rule
+
+    $position = 0
+    $jobDone  = $false
+
+    try {
+        while (-not $jobDone) {
+            # Read any new bytes written since last iteration.
+            if (Test-Path $outFile) {
+                $fs = [System.IO.File]::Open(
+                    $outFile,
+                    [System.IO.FileMode]::Open,
+                    [System.IO.FileAccess]::Read,
+                    [System.IO.FileShare]::ReadWrite)
+                $sr = [System.IO.StreamReader]::new($fs, [System.Text.Encoding]::UTF8)
+                try {
+                    [void]$fs.Seek($position, [System.IO.SeekOrigin]::Begin)
+                    while (-not $sr.EndOfStream) { Write-Host ($sr.ReadLine()) }
+                    $position = $fs.Position
+                } finally {
+                    $sr.Dispose()
+                    $fs.Dispose()
+                }
+            }
+
+            # Check whether the job has finished.
+            $currentStatus = "running"
+            if (Test-Path $metaFile) {
+                try {
+                    $currentStatus = (Get-Content $metaFile -Raw | ConvertFrom-Json).status
+                } catch {}
+            }
+
+            if ($currentStatus -ne "running") {
+                $jobDone = $true
+                # Final flush after a brief pause so the process can finish writing.
+                Start-Sleep -Milliseconds 500
+                if (Test-Path $outFile) {
+                    $fs = [System.IO.File]::Open(
+                        $outFile,
+                        [System.IO.FileMode]::Open,
+                        [System.IO.FileAccess]::Read,
+                        [System.IO.FileShare]::ReadWrite)
+                    $sr = [System.IO.StreamReader]::new($fs, [System.Text.Encoding]::UTF8)
+                    try {
+                        [void]$fs.Seek($position, [System.IO.SeekOrigin]::Begin)
+                        while (-not $sr.EndOfStream) { Write-Host ($sr.ReadLine()) }
+                    } finally { $sr.Dispose(); $fs.Dispose() }
+                }
+            } else {
+                Start-Sleep -Milliseconds 500
+            }
+        }
+    } catch {
+        # Ctrl+C or pipeline stop — the background job continues running.
+        Write-Host ""
+        Write-Rule
+        Write-Info "Stopped watching — job $JobId is still running in the background."
+        Write-Info "Resume watching with:  tian-cli jobs tail $JobId"
+        Write-Info "Read final output with: tian-cli jobs result $JobId"
+        return
+    }
+
+    Write-Host ""
+    Write-Rule
+
+    $finalMeta   = if (Test-Path $metaFile) { try { Get-Content $metaFile -Raw | ConvertFrom-Json } catch { $null } } else { $null }
+    $finalStatus = if ($finalMeta) { $finalMeta.status } else { "unknown" }
+    switch ($finalStatus) {
+        "done"    { Write-Ok "Job $JobId finished successfully." }
+        "error"   { Write-Warn "Job $JobId finished with errors. See output above." }
+        "stopped" {
+            if ($finalMeta -and $finalMeta.stopReason -eq "quota_exhausted") {
+                Write-Warn "Job $JobId stopped — quota or rate limit exhausted."
+            } else {
+                Write-Warn "Job $JobId was stopped."
+            }
+        }
+        default   { Write-Info "Job $JobId status: $finalStatus" }
+    }
+}
+
 function Invoke-Task {
     param(
         [string]$Prompt,
         [string]$TianDir,
         [switch]$Background,
+        [switch]$Watch,
         [string]$JobName = "",
         [string]$ScheduleName = ""
     )
@@ -281,6 +384,12 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
         Write-Ok "任务已在后台启动。/ Task started in background."
         Write-Info "任务ID / Job ID : $jobId"
         Write-Info "查看结果 / Check result with:  tian-cli jobs result $jobId"
+
+        if ($Watch) {
+            Write-Host ""
+            Watch-Job -JobId $jobId
+        }
+
         return $jobId
     } else {
         # Foreground — try each installed backend in catalog order, falling back on quota/rate-limit
