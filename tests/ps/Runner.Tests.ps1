@@ -282,6 +282,45 @@ Describe "Invoke-Task" {
         $savedMeta = Get-JobStatus -JobId $jobId
         $savedMeta.status | Should -Be "error"
     }
+
+    It "falls back to next backend when primary hits quota in foreground mode" {
+        $script:CallOrder = @()
+
+        function global:Invoke-QuotaBackend {
+            param([string]$Flag, [string]$Prompt)
+            $script:CallOrder += "quota-backend"
+            $global:LASTEXITCODE = 0
+            "Error 429 insufficient_quota"
+        }
+        function global:Invoke-FallbackBackend {
+            param([string]$Flag, [string]$Prompt)
+            $script:CallOrder += "fallback-backend"
+            $global:LASTEXITCODE = 0
+            "All good, task completed."
+        }
+
+        Mock Get-ActiveBackend {
+            [PSCustomObject]@{
+                id = "primary-backend"
+                displayName = "Primary Backend"
+                cliCommand = "Invoke-QuotaBackend"
+                nonInteractiveFlag = "--print"
+            }
+        }
+        Mock Get-AllAvailableBackends {
+            @(
+                [PSCustomObject]@{ id = "primary-backend"; displayName = "Primary Backend";  cliCommand = "Invoke-QuotaBackend";   nonInteractiveFlag = "--print" },
+                [PSCustomObject]@{ id = "fallback-backend"; displayName = "Fallback Backend"; cliCommand = "Invoke-FallbackBackend"; nonInteractiveFlag = "--print" }
+            )
+        }
+
+        $jobId = Invoke-Task -Prompt "try this" -TianDir (Get-TianRoot)
+
+        $script:CallOrder | Should -Be @("quota-backend", "fallback-backend")
+        $job = @(Read-Jobs) | Where-Object { $_.id -eq $jobId } | Select-Object -First 1
+        $job.status | Should -Be "done"
+        $job.backend | Should -Be "fallback-backend"
+    }
 }
 
 Describe "Test-QuotaExhaustedText" {

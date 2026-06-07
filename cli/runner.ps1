@@ -65,6 +65,18 @@ function Get-ActiveBackend {
     return $null
 }
 
+function Get-AllAvailableBackends {
+    param([string]$TianDir)
+    $catalog = Get-Catalog -TianDir $TianDir
+    $available = @()
+    foreach ($b in $catalog.backends) {
+        if ($b.cliCommand -and $b.nonInteractiveFlag -and (Get-Command $b.cliCommand -ErrorAction SilentlyContinue)) {
+            $available += $b
+        }
+    }
+    return $available
+}
+
 function New-JobId {
     return [System.DateTime]::Now.ToString("yyyyMMdd-HHmmss") + "-" + ([System.Guid]::NewGuid().ToString("N").Substring(0,6))
 }
@@ -271,25 +283,41 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
         Write-Info "查看结果 / Check result with:  tian-cli jobs result $jobId"
         return $jobId
     } else {
-        # Foreground — stream output directly, also save to file
-        Write-Info "正在使用 $($backend.displayName) 执行任务... / Running task with $($backend.displayName)..."
-        Write-Rule
-        $result = Invoke-BackendCommand -BackendCommand $backend.cliCommand -BackendFlag $backend.nonInteractiveFlag -Prompt $Prompt
-        $output = $result.Output
-        $output | Out-File -FilePath $outputFile -Encoding UTF8
-        $output | ForEach-Object { Write-Host $_ }
-        Write-Rule
+        # Foreground — try each installed backend in catalog order, falling back on quota/rate-limit
+        $allBackends = @(Get-AllAvailableBackends -TianDir $TianDir)
+        if ($allBackends.Count -eq 0) { $allBackends = @($backend) }
+
+        $primaryCmd  = $backend.cliCommand
+        $result      = $null
+        $outputText  = ""
+        $usedBackend = $backend
+
+        foreach ($b in $allBackends) {
+            if ($b.cliCommand -ne $primaryCmd) {
+                Write-Warn "Falling back to $($b.displayName) (quota/rate-limit on previous backend)..."
+            }
+            Write-Info "正在使用 $($b.displayName) 执行任务... / Running task with $($b.displayName)..."
+            Write-Rule
+            $result = Invoke-BackendCommand -BackendCommand $b.cliCommand -BackendFlag $b.nonInteractiveFlag -Prompt $Prompt
+            $result.Output | ForEach-Object { Write-Host $_ }
+            Write-Rule
+            $result.Output | Out-File -FilePath $outputFile -Encoding UTF8
+            $outputText  = if ($result.Output) { ($result.Output | Out-String) } else { "" }
+            $usedBackend = $b
+            if (-not (Test-QuotaExhaustedText -Text $outputText)) { break }
+            Write-Warn "$($b.displayName): quota or rate limit — trying next backend..."
+        }
 
         # Mark complete
-        $outputText = if ($output) { ($output | Out-String) } else { "" }
         $status = if (Test-QuotaExhaustedText -Text $outputText) {
             "stopped"
-        } elseif ($result.ExitCode -eq 0) {
+        } elseif ($result -and $result.ExitCode -eq 0) {
             "done"
         } else {
             "error"
         }
-        $meta.status    = $status
+        $meta.status     = $status
+        $meta.backend    = $usedBackend.id
         $meta.finishedAt = [System.DateTime]::Now.ToString("o")
         if ($status -eq "stopped") { $meta.stopReason = "quota_exhausted" }
         $meta | ConvertTo-Json | Set-Content $metaFile -Encoding UTF8
