@@ -891,7 +891,19 @@ cmd_jobs() {
         result)
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs result <job-id>"
             local f="$TASKS_DIR/$id.txt"
-            [[ -f "$f" ]] && cat "$f" || fail "Job '$id' not found."
+            [[ -f "$f" ]] || fail "Job '$id' not found."
+            local stop_reason; stop_reason=$(_get_job_stop_reason "$id")
+            if [[ "$stop_reason" == "quota_exhausted" ]]; then
+                echo ""
+                echo -e "${YELLOW}  [!!] This job stopped because the API quota or rate limit was exhausted.${RESET}"
+                echo -e "${DIM}       The AI backend ran out of credits or hit its usage cap mid-task.${RESET}"
+                echo -e "${DIM}       Options: wait for your quota to reset, upgrade your API plan,${RESET}"
+                echo -e "${DIM}       or install a second backend (e.g. Ollama) for free local fallback.${RESET}"
+                echo -e "${DIM}       Run tian-cli doctor to check your current key and quota status.${RESET}"
+                echo ""
+                rule
+            fi
+            cat "$f"
             ;;
         tail)
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs tail <job-id>"
@@ -943,17 +955,30 @@ else:
         'done':    '\033[0;32m',
         'failed':  '\033[0;31m',
         'stopped': '\033[1;33m',
+        'quota':   '\033[0;35m',
     }
     RESET = '\033[0m'
+    has_quota = False
     for j in reversed(jobs[-20:]):
-        jid       = j.get('id','?')[:28]
-        status_raw = j.get('status','?')
-        status_pad = f"{status_raw.upper():<10}"
-        color      = STATUS_COLORS.get(status_raw, '')
-        status_str = f"{color}{status_pad}{RESET}" if color else status_pad
-        prompt    = j.get('prompt','')[:50]
+        jid        = j.get('id', '?')[:28]
+        status_raw = j.get('status', '?')
+        is_quota   = j.get('stopReason') == 'quota_exhausted'
+        if is_quota:
+            has_quota   = True
+            label       = 'QUOTA'
+            color       = STATUS_COLORS['quota']
+        else:
+            label       = status_raw.upper()
+            color       = STATUS_COLORS.get(status_raw, '')
+        status_str = f"{color}{label:<10}{RESET}" if color else f"{label:<10}"
+        prompt     = j.get('prompt', '')[:50]
         print(f"  {jid:<30} {status_str} {prompt}...")
     print()
+    if has_quota:
+        print(f"  \033[0;35m[!!]\033[0m QUOTA = API quota or rate limit exhausted.")
+        print(f"  \033[2m     Wait for your quota to reset, upgrade your plan, or switch backends.\033[0m")
+        print(f"  \033[2m     Diagnose with: tian-cli doctor\033[0m")
+        print()
 PYEOF
             ;;
     esac
