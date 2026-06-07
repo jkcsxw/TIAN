@@ -1513,17 +1513,29 @@ PYEOF
     echo ""
 
     echo -e "${BOLD}  API keys${RESET}"
+    local _profile_file; _profile_file=$(profile_file)
     while IFS='|' read -r env provider url_hint installed; do
         [[ -n "$env" ]] || continue
         local actual_val="${!env:-}"
         if [[ -n "$actual_val" ]]; then
             ok "$env is set (${actual_val:0:8}...)"
             _verify_api_key "$provider" "$actual_val" "$url_hint" || ((issues++)) || true
-        elif [[ "$installed" == "1" ]]; then
-            warn "$env not set — get key: $url_hint"
-            ((issues++)) || true
         else
-            info "$env (backend not installed)"
+            # Check if the key exists in the shell profile but wasn't loaded into this session
+            local in_profile=false
+            if [[ -f "$_profile_file" ]] && grep -qE "export[[:space:]]+${env}[[:space:]]*=" "$_profile_file" 2>/dev/null; then
+                in_profile=true
+            fi
+            if $in_profile; then
+                warn "$env saved in $(basename "$_profile_file") but not active in this session"
+                info "  Fix: open a new terminal, or run: source $_profile_file"
+                ((issues++)) || true
+            elif [[ "$installed" == "1" ]]; then
+                warn "$env not set — get key: $url_hint"
+                ((issues++)) || true
+            else
+                info "$env (backend not installed)"
+            fi
         fi
     done < <(python3 - "$CATALOG" <<'PYEOF'
 import json, os, subprocess, sys
@@ -1578,6 +1590,81 @@ PYEOF
 )
     [[ -f "$CATALOG" ]] && ok "catalog.json found" || { warn "catalog.json missing — reinstall TIAN"; ((issues++)) || true; }
     [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh found" || { warn "launcher.sh missing — run setup"; ((issues++)) || true; }
+    echo ""
+
+    echo -e "${BOLD}  Configured MCP servers${RESET}"
+    local mcp_check_output
+    mcp_check_output=$(python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
+import json, os, sys
+
+catalog_path, platform, home = sys.argv[1:4]
+catalog = json.load(open(catalog_path))
+
+# Build a map from configKey -> server (for env-var lookups)
+server_by_key = {s.get("configKey", ""): s for s in catalog.get("mcpServers", []) if s.get("configKey")}
+
+def expand_path(target, custom):
+    if target == "claude_desktop":
+        if platform == "macos":
+            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
+        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+    if target == "claude_code":
+        return os.path.join(home, ".claude", "settings.json")
+    if custom:
+        base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
+        return custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/")
+    return os.path.join(home, ".tian", "mcp_config.json")
+
+seen_paths = set()
+found_any = False
+for backend in catalog["backends"]:
+    if not backend.get("supportsMcp", True):
+        continue
+    target = backend.get("mcpConfigTarget") or ""
+    custom = backend.get("mcpConfigPath") or ""
+    path = expand_path(target, custom)
+    if path in seen_paths or not os.path.isfile(path):
+        continue
+    seen_paths.add(path)
+    try:
+        config = json.load(open(path))
+    except Exception:
+        continue
+    mcp_servers = config.get("mcpServers", {})
+    if not mcp_servers:
+        continue
+    for config_key in mcp_servers:
+        server = server_by_key.get(config_key)
+        if not server:
+            continue
+        found_any = True
+        for ev in server.get("requiredEnvVars", []):
+            var_name = ev.get("name", "")
+            label = ev.get("label") or var_name
+            hint = ev.get("hint") or ""
+            is_set = "1" if os.environ.get(var_name) else "0"
+            print(f"{server['displayName']}|{var_name}|{label}|{hint}|{is_set}")
+
+if not found_any:
+    print("__none__")
+PYEOF
+)
+    if [[ "$mcp_check_output" == "__none__" ]]; then
+        info "No MCP servers configured yet"
+    else
+        local mcp_issues=0
+        while IFS='|' read -r svc_name var_name label hint is_set; do
+            [[ -z "$var_name" ]] && continue
+            if [[ "$is_set" == "1" ]]; then
+                ok "$svc_name: $var_name is set"
+            else
+                warn "$svc_name: $var_name not set — ${hint:-required for this MCP server}"
+                info "  Fix: export $var_name=<your-key>, then source your shell profile"
+                ((issues++)) || true
+                ((mcp_issues++)) || true
+            fi
+        done <<< "$mcp_check_output"
+    fi
     echo ""
 
     echo -e "${BOLD}  Background scheduler${RESET}"
