@@ -733,38 +733,100 @@ EOF
 
 cmd_status() {
     hdr "TIAN Status"
-    command -v node &>/dev/null && ok "Node.js    $(node --version)" || warn "Node.js    not found"
-    python3 - "$CATALOG" <<'PYEOF'
-import json, subprocess, os, sys
-c = json.load(open(sys.argv[1]))
-print()
-for b in c['backends']:
-    cmd = b.get('cliCommand','')
-    if not cmd: continue
-    found = subprocess.run(['which', cmd], capture_output=True).returncode == 0
-    status = '[ok]' if found else '[!!]'
-    print(f'  {status}  {b["displayName"]}')
-print()
-for b in c['backends']:
-    env = b.get('apiKeyEnvVar','')
-    if not env: continue
-    val = os.environ.get(env,'')
-    status = '[ok]' if val else '[!!]'
-    print(f'  {status}  {env}')
-PYEOF
-    echo ""
-    python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
-import json, os, sys
 
+    # ── Active backend ────────────────────────────────────────────────────────
+    echo -e "${BOLD}  Active backend${RESET}"
+    local active_row; active_row=$(active_backend || true)
+    if [[ -n "$active_row" ]]; then
+        local active_cmd; active_cmd=$(echo "$active_row" | cut -d'|' -f1)
+        local active_id;  active_id=$(echo "$active_row"  | cut -d'|' -f3)
+        local active_ver=""
+        case "$active_cmd" in
+            claude) active_ver=$(claude --version 2>/dev/null | head -1 | awk '{print $1}') ;;
+            codex)  active_ver=$(codex  --version 2>/dev/null | head -1 | awk '{print $1}') ;;
+            ollama) active_ver=$(ollama --version 2>/dev/null | head -1 | awk '{print $NF}') ;;
+        esac
+        [[ -n "$active_ver" ]] && ok "$active_cmd  v$active_ver  (${active_id})" \
+                                || ok "$active_cmd  (${active_id})"
+    else
+        warn "No backend installed — run: bash setup.sh"
+    fi
+    echo ""
+
+    # ── All backends ──────────────────────────────────────────────────────────
+    echo -e "${BOLD}  All backends${RESET}"
+    while IFS='|' read -r b_cmd _flag b_id b_name b_installed; do
+        [[ -z "$b_cmd" ]] && continue
+        if [[ "$b_installed" == "1" ]]; then
+            [[ "$b_cmd" == "$active_cmd" ]] \
+                && ok   "$b_name  ← active" \
+                || info "$b_name  (installed)"
+        else
+            info "$b_name  (not installed)"
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, subprocess, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    cmd = b.get('cliCommand', '')
+    flag = b.get('nonInteractiveFlag', '') or ''
+    found = '1' if (cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0) else '0'
+    print(f"{cmd}|{flag}|{b.get('id','')}|{b['displayName']}|{found}")
+PYEOF
+)
+    echo ""
+
+    # ── API keys ──────────────────────────────────────────────────────────────
+    echo -e "${BOLD}  API keys${RESET}"
+    local any_key=false
+    while IFS='|' read -r env_var b_installed; do
+        [[ -z "$env_var" ]] && continue
+        local val="${!env_var:-}"
+        if [[ -n "$val" ]]; then
+            ok "$env_var  ${val:0:8}..."
+            any_key=true
+        elif [[ "$b_installed" == "1" ]]; then
+            warn "$env_var  not set — run: tian-cli setup"
+        else
+            info "$env_var  (backend not installed)"
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, subprocess, sys
+c, seen = json.load(open(sys.argv[1])), set()
+for b in c['backends']:
+    env = b.get('apiKeyEnvVar', '')
+    cmd = b.get('cliCommand', '')
+    if not env or env in seen: continue
+    seen.add(env)
+    installed = '1' if (cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0) else '0'
+    print(f"{env}|{installed}")
+PYEOF
+)
+    echo ""
+
+    # ── MCP config files ──────────────────────────────────────────────────────
+    echo -e "${BOLD}  MCP config files${RESET}"
+    local platform; platform=$(detect_platform)
+    local mcp_count=0
+    while IFS='|' read -r label path; do
+        [[ -z "$path" ]] && continue
+        if [[ -f "$path" ]]; then
+            local n_servers
+            n_servers=$(python3 -c "import json,os; d=json.load(open('$path')); print(len(d.get('mcpServers',{})))" 2>/dev/null || echo "?")
+            ok "$label  ($n_servers server(s))  $path"
+            ((mcp_count++)) || true
+        else
+            info "$label  not configured yet"
+        fi
+    done < <(python3 - "$CATALOG" "$platform" "$HOME" <<'PYEOF'
+import json, os, sys
 catalog_path, platform, home = sys.argv[1:4]
 catalog = json.load(open(catalog_path))
 seen = set()
 for backend in catalog["backends"]:
-    if not backend.get("supportsMcp", True):
-        continue
+    if not backend.get("supportsMcp", True): continue
     key = backend.get("mcpConfigTarget") or backend.get("mcpConfigPath") or ""
-    if not key or key in seen:
-        continue
+    if not key or key in seen: continue
     seen.add(key)
     target = backend.get("mcpConfigTarget") or ""
     custom = backend.get("mcpConfigPath") or ""
@@ -775,11 +837,100 @@ for backend in catalog["backends"]:
     else:
         base = os.path.join(home, "Library", "Application Support") if platform == "macos" else os.path.join(home, ".config")
         path = custom.replace("%APPDATA%", base).replace("%USERPROFILE%", home).replace("\\", "/") if custom else os.path.join(home, ".tian", "mcp_config.json")
-    state = "[ok]" if os.path.isfile(path) else "[!!]"
-    print(f"  {state}  {target or backend.get('id', 'mcp')}: {path}")
+    print(f"{target or backend.get('id','mcp')}|{path}")
 PYEOF
-    [[ -f "$TIAN_DIR/launcher.sh" ]] && ok "launcher.sh exists" || warn "launcher.sh not found — run setup.sh first"
-    echo ""; rule
+)
+    echo ""
+
+    # ── Jobs summary ──────────────────────────────────────────────────────────
+    echo -e "${BOLD}  Background jobs${RESET}"
+    if [[ -f "$JOBS_FILE" ]]; then
+        python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
+import json, os, sys
+
+jobs_file, tasks_dir = sys.argv[1:3]
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; DIM='\033[2m'; RESET='\033[0m'; BOLD='\033[1m'
+PURPLE='\033[0;35m'
+
+try:
+    jobs = json.load(open(jobs_file))
+except Exception:
+    jobs = []
+
+counts = {}
+for j in jobs:
+    s = j.get('status', 'unknown')
+    counts[s] = counts.get(s, 0) + 1
+
+if not jobs:
+    print(f"  {DIM}  [..]{RESET} No jobs yet — run: tian-cli run \"your task\"")
+else:
+    parts = []
+    if counts.get('running'):  parts.append(f"{GREEN}{counts['running']} running{RESET}")
+    if counts.get('done'):     parts.append(f"{DIM}{counts['done']} done{RESET}")
+    if counts.get('failed'):   parts.append(f"{RED}{counts['failed']} failed{RESET}")
+    if counts.get('stopped'):  parts.append(f"{PURPLE}{counts['stopped']} quota-stopped{RESET}")
+    print(f"  {GREEN}  [ok]{RESET} {',  '.join(parts)}  (total: {len(jobs)})")
+
+    # show any currently running jobs
+    running = [j for j in jobs if j.get('status') == 'running']
+    for j in running[:3]:
+        name = j.get('name') or j.get('id', '')
+        task = (j.get('prompt') or '')[:60]
+        print(f"  {DIM}  [..]{RESET}   ↳ [{j['id']}] {task}{'…' if len(j.get('prompt',''))>60 else ''}")
+
+    # compute disk usage
+    total_bytes = 0
+    if os.path.isdir(tasks_dir):
+        for fn in os.listdir(tasks_dir):
+            try:
+                total_bytes += os.path.getsize(os.path.join(tasks_dir, fn))
+            except OSError:
+                pass
+    if total_bytes > 0:
+        kb = total_bytes / 1024
+        size_str = f"{kb/1024:.1f} MB" if kb > 1024 else f"{kb:.0f} KB"
+        print(f"  {DIM}  [..]{RESET} Task output storage: {size_str}  ({tasks_dir})")
+PYEOF
+    else
+        info "No jobs file yet"
+    fi
+    echo ""
+
+    # ── Schedules summary ─────────────────────────────────────────────────────
+    echo -e "${BOLD}  Scheduled tasks${RESET}"
+    if [[ -f "$SCHEDULES_FILE" ]]; then
+        python3 - "$SCHEDULES_FILE" <<'PYEOF'
+import json, sys
+GREEN='\033[0;32m'; DIM='\033[2m'; RESET='\033[0m'
+try:
+    schedules = json.load(open(sys.argv[1]))
+except Exception:
+    schedules = []
+if not schedules:
+    print(f"  {DIM}  [..]{RESET} No schedules — run: tian-cli schedule add ...")
+else:
+    print(f"  {GREEN}  [ok]{RESET} {len(schedules)} schedule(s) configured")
+    for s in schedules[:5]:
+        name   = s.get('name', '?')
+        repeat = s.get('repeat', '?')
+        time_  = s.get('time', '')
+        task   = (s.get('prompt') or '')[:50]
+        label  = f"{time_} {repeat}" if time_ else repeat
+        print(f"  {DIM}  [..]{RESET}   ↳ {name}  [{label}]  {task}{'…' if len(s.get('prompt',''))>50 else ''}")
+    if len(schedules) > 5:
+        print(f"  {DIM}  [..]{RESET}   ↳ … and {len(schedules)-5} more")
+PYEOF
+    else
+        info "No schedules yet"
+    fi
+    echo ""
+
+    # ── Quick tips ────────────────────────────────────────────────────────────
+    [[ -f "$TIAN_DIR/launcher.sh" ]] || warn "launcher.sh not found — run: bash setup.sh"
+    rule
+    info "Run 'tian-cli doctor' for a full health check."
+    echo ""
 }
 
 cmd_run() {
