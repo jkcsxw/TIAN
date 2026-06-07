@@ -1426,6 +1426,47 @@ EOF
     echo ""
 }
 
+# Make a lightweight API call to verify a key is accepted.
+# provider: "anthropic" | "openai" | "" (unknown — skip silently)
+# Returns 0 on success/skipped, 1 if key is rejected.
+_verify_api_key() {
+    local provider="${1:-}" key="${2:-}" url_hint="${3:-}"
+    [[ -n "$provider" && -n "$key" ]] || return 0
+    if ! command -v curl &>/dev/null; then
+        info "  curl not found — skipping live key verification"
+        return 0
+    fi
+
+    local endpoint http_status
+    case "$provider" in
+        anthropic)
+            endpoint="https://api.anthropic.com/v1/models"
+            http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+                -H "x-api-key: $key" \
+                -H "anthropic-version: 2023-06-01" \
+                "$endpoint" 2>/dev/null) || http_status="000"
+            ;;
+        openai)
+            endpoint="https://api.openai.com/v1/models"
+            http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+                -H "Authorization: Bearer $key" \
+                "$endpoint" 2>/dev/null) || http_status="000"
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    case "$http_status" in
+        200) ok "  Key accepted by API" ;;
+        401) warn "  Key rejected (HTTP 401) — check for typos or regenerate at: $url_hint" ; return 1 ;;
+        403) warn "  Key forbidden (HTTP 403) — key may lack required permissions" ; return 1 ;;
+        429) info "  Rate limited (HTTP 429) — key looks valid but quota may be exhausted" ;;
+        000) info "  Could not reach API (no network or DNS failure) — skipping live check" ;;
+        *)   info "  Unexpected HTTP $http_status — could not verify key" ;;
+    esac
+}
+
 cmd_doctor() {
     hdr "TIAN Doctor — Setup Diagnostics"
     local platform; platform=$(detect_platform)
@@ -1472,22 +1513,32 @@ PYEOF
     echo ""
 
     echo -e "${BOLD}  API keys${RESET}"
-    python3 - "$CATALOG" <<'PYEOF'
+    while IFS='|' read -r env provider url_hint installed; do
+        [[ -n "$env" ]] || continue
+        local actual_val="${!env:-}"
+        if [[ -n "$actual_val" ]]; then
+            ok "$env is set (${actual_val:0:8}...)"
+            _verify_api_key "$provider" "$actual_val" "$url_hint" || ((issues++)) || true
+        elif [[ "$installed" == "1" ]]; then
+            warn "$env not set — get key: $url_hint"
+            ((issues++)) || true
+        else
+            info "$env (backend not installed)"
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
 import json, os, subprocess, sys
 c, seen = json.load(open(sys.argv[1])), set()
 for b in c['backends']:
-    env = b.get('apiKeyEnvVar', ''); cmd = b.get('cliCommand', '')
-    if not env or env in seen: continue
+    env = b.get('apiKeyEnvVar', '')
+    cmd = b.get('cliCommand', '')
+    if not env or env in seen:
+        continue
     seen.add(env)
-    installed = cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0
-    val = os.environ.get(env, '')
-    if val:
-        print(f"  [ok]  {env} is set ({val[:8]}...)")
-    elif installed:
-        print(f"  [!!]  {env} not set — get key: {b.get('apiKeyUrl', 'see docs')}")
-    else:
-        print(f"  [..]  {env} (backend not installed)")
+    installed = '1' if (cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0) else '0'
+    provider = 'anthropic' if 'ANTHROPIC' in env else ('openai' if 'OPENAI' in env else '')
+    print(f"{env}|{provider}|{b.get('apiKeyUrl', 'see docs')}|{installed}")
 PYEOF
+)
     echo ""
 
     echo -e "${BOLD}  Config files${RESET}"
