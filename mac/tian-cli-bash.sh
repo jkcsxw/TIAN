@@ -1648,7 +1648,36 @@ EOF
             else
                 [[ -n "$b_keyhint" ]] && info "$b_envkey ($b_keyhint)"
                 [[ -n "$b_keyurl" ]]  && info "Get it at: $b_keyurl"
-                api_key=$(prompt_secret "$b_envkey")
+                local _provider=""
+                case "$b_envkey" in
+                    ANTHROPIC_API_KEY) _provider="anthropic" ;;
+                    OPENAI_API_KEY)    _provider="openai" ;;
+                esac
+                local _key_attempts=0
+                while true; do
+                    api_key=$(prompt_secret "$b_envkey")
+                    ((_key_attempts++)) || true
+                    if [[ -z "$api_key" ]]; then
+                        warn "No key entered — you can set it later with: export $b_envkey=..."
+                        break
+                    fi
+                    if [[ -n "$_provider" ]]; then
+                        info "  Verifying key with API..."
+                        if _verify_api_key "$_provider" "$api_key" "$b_keyurl"; then
+                            break
+                        else
+                            if [[ "$_key_attempts" -ge 3 ]]; then
+                                warn "3 failed attempts — saving key anyway. Fix it later with: export $b_envkey=<your-key>"
+                                break
+                            fi
+                            printf "  Try again? [Y/n]: "
+                            local _retry; read -r _retry </dev/tty
+                            [[ "$_retry" =~ ^[Nn] ]] && break
+                        fi
+                    else
+                        break
+                    fi
+                done
             fi
         fi
         if [[ -n "$api_key" ]]; then

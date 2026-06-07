@@ -114,6 +114,54 @@ function Confirm-Action {
     return (Read-Host).Trim() -imatch '^y'
 }
 
+function Test-ApiKey {
+    param([object]$Backend, [string]$ApiKey)
+    if (-not $ApiKey) { return $true }
+    $envVar = $Backend.apiKeyEnvVar
+    if (-not $envVar) { return $true }
+
+    $headers = @{}
+    $url     = ""
+    switch -Wildcard ($envVar) {
+        "ANTHROPIC_API_KEY" {
+            $url     = "https://api.anthropic.com/v1/models"
+            $headers = @{ "x-api-key" = $ApiKey; "anthropic-version" = "2023-06-01" }
+        }
+        "OPENAI_API_KEY" {
+            $url     = "https://api.openai.com/v1/models"
+            $headers = @{ "Authorization" = "Bearer $ApiKey" }
+        }
+        default { return $true }
+    }
+
+    Write-Info "  Verifying key with API..."
+    try {
+        $req = [System.Net.WebRequest]::Create($url)
+        $req.Timeout = 6000
+        $req.Method  = "GET"
+        foreach ($h in $headers.GetEnumerator()) { $req.Headers[$h.Key] = $h.Value }
+        $resp = $req.GetResponse(); $resp.Close()
+        Write-Ok "  Key accepted by API"
+        return $true
+    } catch [System.Net.WebException] {
+        if ($_.Exception.Response) {
+            $code = [int]$_.Exception.Response.StatusCode
+            switch ($code) {
+                401 { Write-Warn "  Key rejected (HTTP 401) — check for typos or regenerate at: $($Backend.apiKeyUrl)"; return $false }
+                403 { Write-Warn "  Key forbidden (HTTP 403) — key may lack required permissions"; return $false }
+                429 { Write-Info "  Rate limited (HTTP 429) — key looks valid but quota may be exhausted"; return $true }
+                default { Write-Info "  API returned HTTP $code — could not verify key"; return $true }
+            }
+        } else {
+            Write-Info "  Could not reach API (no network or timeout) — skipping live check"
+            return $true
+        }
+    } catch {
+        Write-Info "  Could not verify key — skipping live check"
+        return $true
+    }
+}
+
 # Fake progress bar object so lib functions don't crash
 $script:_fakeProgress = 0
 $fakeProgress = [PSCustomObject]@{}
@@ -301,7 +349,22 @@ function Cmd-Setup {
         $keyLabel = Get-ApiKeyLabel $selectedBackend
         Write-Info "$keyLabel  ($($selectedBackend.apiKeyHint))"
         Write-Info (TF "cli.get_at" $selectedBackend.apiKeyUrl)
-        $apiKey = Prompt-Secret $keyLabel
+        $keyAttempts = 0
+        do {
+            $apiKey = Prompt-Secret $keyLabel
+            $keyAttempts++
+            if (-not $apiKey) { break }
+            $keyOk = Test-ApiKey $selectedBackend $apiKey
+            if (-not $keyOk) {
+                if ($keyAttempts -ge 3) {
+                    Write-Warn "  3 failed attempts — saving key anyway. Fix later with: tian-cli install --backend $($selectedBackend.id) --key <new-key>"
+                    break
+                }
+                Write-Color "  Try a different key? [Y/n]: " Yellow -NoNewline
+                $retry = (Read-Host).Trim()
+                if ($retry -imatch '^n') { break }
+            }
+        } while (-not $keyOk)
     } elseif ($selectedBackend.setupNote) {
         Write-Info $selectedBackend.setupNote
     }
@@ -366,6 +429,7 @@ function Cmd-Install {
     } elseif (-not (Test-BackendRequiresApiKey $selectedBackend)) {
         $apiKey = ""
     }
+    if ($apiKey) { Test-ApiKey $selectedBackend $apiKey | Out-Null }
 
     $selectedMcp = @()
     if ($Mcp -and (Test-BackendSupportsMcp $selectedBackend)) {
