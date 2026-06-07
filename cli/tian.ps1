@@ -17,6 +17,7 @@ param(
     [switch]$Yes,
     [switch]$All,
     [switch]$List,
+    [switch]$Fix,
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$RemainingArgs
 )
 
@@ -143,7 +144,7 @@ function Cmd-Help {
   命令
     setup               交互式引导安装（首次使用推荐）
     install             使用参数快速安装
-    doctor              诊断常见安装问题
+    doctor [--fix]      诊断常见安装问题；--fix 自动修复可修复的问题
     update              将已安装的AI后端更新到最新版本
     uninstall           移除TIAN安装的组件（后端、密钥、数据）
     status              查看当前安装状态
@@ -215,7 +216,7 @@ function Cmd-Help {
   COMMANDS
     setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
-    doctor              Check your setup and diagnose common problems
+    doctor [--fix]      Check your setup and diagnose common problems; --fix auto-resolves fixable issues
     update              Upgrade installed AI backends to their latest versions
     uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is currently installed
@@ -617,12 +618,17 @@ function Cmd-Remove {
 }
 
 function Cmd-Doctor {
-    Write-Header "TIAN Doctor — Setup Diagnostics"
-    Write-Rule
+    param([switch]$Fix)
 
-    $okCount   = 0
-    $warnCount = 0
-    $failCount = 0
+    $headerSuffix = if ($Fix) { " (--fix mode)" } else { "" }
+    Write-Header "TIAN Doctor — Setup Diagnostics$headerSuffix"
+    Write-Rule
+    if ($Fix) { Write-Info "Auto-fix enabled — will attempt to resolve fixable issues automatically." }
+
+    $okCount    = 0
+    $warnCount  = 0
+    $failCount  = 0
+    $fixedCount = 0
 
     # ── Runtime ───────────────────────────────────────────────────────────────────
     Write-Host ""
@@ -656,8 +662,18 @@ function Cmd-Doctor {
         $name = (Get-DisplayName $b).PadRight(24)
         if ($cmd) {
             Write-Ok "$name  $($b.cliCommand)"; $okCount++
+        } elseif ($Fix -and $b.npmPackage -and (Get-Command npm -ErrorAction SilentlyContinue)) {
+            Write-Info "  Auto-fixing: installing $($b.displayName) via npm..."
+            $npmOut = & npm install -g $b.npmPackage 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "$name — installed successfully"
+                $fixedCount++
+            } else {
+                Write-Warn "$name — npm install failed; run: npm install -g $($b.npmPackage)"
+                $warnCount++
+            }
         } else {
-            $hint = if ($b.npmPackage) { "  (install: npm install -g $($b.npmPackage))" } else { "" }
+            $hint = if ($b.npmPackage) { "  (fix: npm install -g $($b.npmPackage))" } else { "" }
             Write-Warn "$name not installed$hint"
             $warnCount++
         }
@@ -773,6 +789,18 @@ function Cmd-Doctor {
         $ollamaCode = Test-HttpReachable "http://localhost:11434/api/tags"
         if ($ollamaCode -eq 200) {
             Write-Ok "Ollama service is running (localhost:11434)"; $okCount++
+        } elseif ($Fix) {
+            Write-Info "  Auto-fixing: starting 'ollama serve' in background..."
+            Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+            $newOllamaCode = Test-HttpReachable "http://localhost:11434/api/tags"
+            if ($newOllamaCode -eq 200) {
+                Write-Ok "  Ollama service started successfully"
+                $fixedCount++
+            } else {
+                Write-Warn "  Could not start Ollama automatically; run: ollama serve"
+                $warnCount++
+            }
         } else {
             Write-Warn "Ollama is installed but the service is NOT running"
             Write-Info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
@@ -789,12 +817,26 @@ function Cmd-Doctor {
     Write-Color "[xx] $failCount" Red
 
     Write-Host ""
-    if ($failCount -gt 0) {
-        Write-Color "  Fix the errors above, then re-run: tian-cli doctor" Red
-    } elseif ($warnCount -gt 0) {
-        Write-Color "  Setup mostly OK — review warnings above." Yellow
-    } else {
+    if ($failCount -eq 0 -and $warnCount -eq 0 -and $fixedCount -eq 0) {
         Write-Color "  All checks passed — you're ready to use TIAN!" Green
+    } elseif ($failCount -eq 0 -and $warnCount -eq 0 -and $fixedCount -gt 0) {
+        Write-Color "  Fixed $fixedCount issue(s) automatically — you're ready to use TIAN!" Green
+    } elseif ($Fix -and $fixedCount -gt 0) {
+        Write-Color "  Fixed $fixedCount issue(s) automatically." Green
+        if ($failCount -gt 0) {
+            Write-Color "  $failCount error(s) remain — fix them above, then re-run: tian-cli doctor" Red
+        } elseif ($warnCount -gt 0) {
+            Write-Color "  $warnCount warning(s) remain — review above." Yellow
+        }
+    } else {
+        if ($failCount -gt 0) {
+            Write-Color "  Fix the errors above, then re-run: tian-cli doctor" Red
+        } elseif ($warnCount -gt 0) {
+            Write-Color "  Setup mostly OK — review warnings above." Yellow
+        }
+        if (-not $Fix) {
+            Write-Color "  Tip: run 'tian-cli doctor --fix' to auto-resolve fixable issues (npm backends, Ollama)" DarkGray
+        }
     }
     Write-Host ""
 }
@@ -1060,7 +1102,7 @@ switch ($Command.ToLower()) {
             } else { Write-Warn (TF "cli.mcp_not_configured" (Get-DisplayName $server)) }
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
-    "doctor"    { Cmd-Doctor }
+    "doctor"    { Cmd-Doctor -Fix:$Fix }
     "update"    { Cmd-Update }
     "repair"    { Cmd-Repair }
     "uninstall" { Cmd-Uninstall }

@@ -681,7 +681,7 @@ $(rule)
     install             Non-interactive install (flag-driven, scriptable)
     repair              Re-run setup to repair the current install
     update              Upgrade installed AI backends to their latest versions
-    doctor              Check your setup and diagnose common problems
+    doctor [--fix]      Check your setup and diagnose common problems; --fix auto-resolves fixable issues
     uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is installed
     list backends       List available AI backends
@@ -1535,7 +1535,15 @@ _verify_api_key() {
 }
 
 cmd_doctor() {
-    hdr "TIAN Doctor — Setup Diagnostics"
+    local fix=false
+    while [[ $# -gt 0 ]]; do
+        case "${1:-}" in
+            --fix|-f) fix=true; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    hdr "TIAN Doctor — Setup Diagnostics${fix:+ (--fix mode)}"
     local platform; platform=$(detect_platform)
     case "$platform" in
         macos) info "Platform: macOS" ;;
@@ -1543,8 +1551,10 @@ cmd_doctor() {
         linux) info "Platform: Linux" ;;
         *)     warn "Platform: unknown ($(uname -s))" ;;
     esac
+    if $fix; then info "Auto-fix enabled — will attempt to resolve fixable issues automatically."; fi
     echo ""
     local issues=0
+    local fixed=0
 
     echo -e "${BOLD}  Core dependencies${RESET}"
     if command -v node &>/dev/null; then
@@ -1565,18 +1575,36 @@ cmd_doctor() {
     echo ""
 
     echo -e "${BOLD}  AI backends${RESET}"
-    python3 - "$CATALOG" <<'PYEOF'
+    while IFS='|' read -r _status _name _npm; do
+        [[ -z "$_name" ]] && continue
+        if [[ "$_status" == "ok" ]]; then
+            ok "$_name"
+        elif $fix && [[ -n "$_npm" ]] && command -v npm &>/dev/null; then
+            info "  Auto-fixing: installing $_name via npm..."
+            if npm install -g "$_npm" 2>/dev/null; then
+                ok "$_name — installed successfully"
+                ((fixed++)) || true
+            else
+                warn "$_name — install failed; run manually: npm install -g $_npm"
+                ((issues++)) || true
+            fi
+        else
+            local _hint=""
+            [[ -n "$_npm" ]] && _hint=" (fix: npm install -g $_npm)"
+            warn "$_name not installed${_hint}"
+            ((issues++)) || true
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
 import json, subprocess, sys
 c = json.load(open(sys.argv[1]))
 for b in c['backends']:
     cmd = b.get('cliCommand', '')
     if not cmd: continue
-    ok = subprocess.run(['which', cmd], capture_output=True).returncode == 0
-    sym = '[ok]' if ok else '[!!]'
-    npm = b.get('npmPackage', b.get('downloadUrl', 'see docs'))
-    hint = f" (install: npm install -g {npm})" if not ok else ''
-    print(f"  {sym}  {b['displayName']}{hint}")
+    is_ok = subprocess.run(['which', cmd], capture_output=True).returncode == 0
+    npm = b.get('npmPackage', '')
+    print(f"{'ok' if is_ok else 'missing'}|{b['displayName']}|{npm}")
 PYEOF
+)
     echo ""
 
     echo -e "${BOLD}  API keys${RESET}"
@@ -1772,8 +1800,28 @@ PYEOF
             ok "Ollama service is running (localhost:11434)"
         else
             warn "Ollama is installed but the service is NOT running"
-            info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
-            ((issues++)) || true
+            if $fix; then
+                info "  Auto-fixing: starting 'ollama serve' in background..."
+                nohup ollama serve &>/dev/null &
+                sleep 2
+                local _new_ollama_status
+                if command -v curl &>/dev/null; then
+                    _new_ollama_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 \
+                        "http://localhost:11434/api/tags" 2>/dev/null) || _new_ollama_status="000"
+                else
+                    ollama list &>/dev/null && _new_ollama_status="200" || _new_ollama_status="000"
+                fi
+                if [[ "$_new_ollama_status" == "200" ]]; then
+                    ok "  Ollama service started successfully"
+                    ((fixed++)) || true
+                else
+                    warn "  Could not start Ollama automatically; run: ollama serve"
+                    ((issues++)) || true
+                fi
+            else
+                info "  Fix: run 'ollama serve' in a separate terminal (or start the Ollama app)"
+                ((issues++)) || true
+            fi
         fi
     fi
     echo ""
@@ -1794,10 +1842,22 @@ PYEOF
                 ok "cron daemon is running"
             elif [[ "$sched_count" -gt 0 ]]; then
                 warn "cron daemon is NOT running — your $sched_count schedule(s) will not fire"
-                while IFS= read -r line; do
-                    [[ -n "$line" ]] && info "$line"
-                done < <(cron_fix_hint "$platform")
-                ((issues++)) || true
+                if $fix; then
+                    info "  Auto-fixing: attempting to start cron (requires sudo)..."
+                    if sudo -n service cron start &>/dev/null 2>&1; then
+                        ok "  cron daemon started"
+                        ((fixed++)) || true
+                    else
+                        warn "  Cannot start cron automatically (sudo password required)"
+                        info "  Run manually: sudo service cron start"
+                        ((issues++)) || true
+                    fi
+                else
+                    while IFS= read -r line; do
+                        [[ -n "$line" ]] && info "$line"
+                    done < <(cron_fix_hint "$platform")
+                    ((issues++)) || true
+                fi
             else
                 info "cron daemon is not running (no schedules defined — fine for now)"
                 [[ "$platform" == "wsl" ]] && info "  Note: cron is off by default on WSL; start it before using 'schedule add'."
@@ -1810,10 +1870,16 @@ PYEOF
     echo ""
 
     rule
-    if [[ $issues -eq 0 ]]; then
+    if [[ $issues -eq 0 && $fixed -eq 0 ]]; then
         ok "All checks passed — TIAN looks healthy!"
+    elif [[ $issues -eq 0 && $fixed -gt 0 ]]; then
+        ok "Fixed $fixed issue(s) automatically — TIAN looks healthy!"
+    elif $fix && [[ $fixed -gt 0 ]]; then
+        ok "Fixed $fixed issue(s) automatically."
+        warn "$issues problem(s) remain. Follow the hints above, then re-run: tian-cli doctor"
     else
         warn "$issues problem(s) found. Follow the hints above, then re-run: tian-cli doctor"
+        info "  Tip: run 'tian-cli doctor --fix' to auto-resolve fixable issues (npm backends, Ollama)"
     fi
     echo ""
 }
@@ -2399,7 +2465,7 @@ case "$CMD" in
     install)   cmd_install "$@" ;;
     repair)    cmd_repair ;;
     update)    cmd_update ;;
-    doctor)    cmd_doctor ;;
+    doctor)    cmd_doctor "$@" ;;
     status)    cmd_status ;;
     uninstall) cmd_uninstall "$@" ;;
     add)       cmd_add "$@" ;;
