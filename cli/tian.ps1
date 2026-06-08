@@ -14,6 +14,8 @@ param(
     [string]$Day       = "",
     [switch]$Background,
     [switch]$Watch,
+    [string]$File       = "",
+    [switch]$Stdin,
     [switch]$Yes,
     [switch]$All,
     [switch]$List,
@@ -210,6 +212,8 @@ function Cmd-Help {
     run  "提示词"                    立即执行任务（前台）
     run  "提示词" --background       在后台执行任务
     run  "提示词" -w/--watch         后台执行并实时显示输出（auto-exits when done）
+    run  "提示词" --file <路径>       将文件内容附加到提示词（如：总结文档）
+    run  "提示词" --stdin            将管道输入内容附加到提示词
     jobs                            列出后台任务
     jobs result <id>                查看已完成任务的输出
     jobs tail <id>                  实时追踪任务输出（auto-exits when done; Ctrl+C 停止追踪）
@@ -290,6 +294,8 @@ function Cmd-Help {
     run  "prompt"                    Run a task now (foreground)
     run  "prompt" --background       Run a task in the background
     run  "prompt" -w/--watch         Background task with live output streaming (auto-exits when done)
+    run  "prompt" --file <path>      Append file content to the prompt (e.g. summarize a document)
+    run  "prompt" --stdin            Append piped stdin content to the prompt
     jobs                             List background jobs
     jobs result <id>                 Show output of a completed job
     jobs tail <id>                   Stream a running job's output live (auto-exits when done; Ctrl+C stops watching)
@@ -332,6 +338,8 @@ function Cmd-Help {
 
     tian-cli run "Summarise today's AI news"
     tian-cli run "Write my daily work report" --background
+    tian-cli run "Summarise this document" --file report.pdf
+    tian-cli run "Review this code for bugs" --file src/main.py --background
     tian-cli jobs
     tian-cli jobs result 20240417-083012-ab12cd
 
@@ -1483,12 +1491,38 @@ switch ($Command.ToLower()) {
     "uninstall" { Cmd-Uninstall }
 
     "run" {
-        # tian-cli run "prompt"  [-b/--background]  [-w/--watch]
+        # tian-cli run "prompt"  [-b/--background]  [-w/--watch]  [--file path]  [--stdin]
         $prompt = if ($Subcommand) { $Subcommand } elseif ($Task) { $Task } else { "" }
         if (-not $prompt) {
-            Write-Fail "Usage: tian-cli run `"your task prompt`" [--background] [--watch]"
+            Write-Fail "Usage: tian-cli run `"your task prompt`" [--background] [--watch] [--file <path>] [--stdin]"
             exit 1
         }
+
+        # Append --file content to prompt
+        if ($File) {
+            if (-not (Test-Path $File)) {
+                Write-Fail "File not found: $File"
+                exit 1
+            }
+            $fileSize = (Get-Item $File).Length
+            if ($fileSize -gt 524288) {
+                Write-Warn "File is larger than 512 KB ($fileSize bytes). Large files may exceed the AI's context window."
+            }
+            $fileName  = Split-Path $File -Leaf
+            $fileContent = Get-Content $File -Raw -Encoding UTF8
+            $prompt = "$prompt`n`n---`nFile: $fileName`n`n$fileContent"
+            Write-Info "Appended file content: $File"
+        }
+
+        # Append --stdin content to prompt
+        if ($Stdin) {
+            $stdinContent = $input | Out-String
+            if ($stdinContent.Trim()) {
+                $prompt = "$prompt`n`n---`nPiped input:`n`n$stdinContent"
+                Write-Info "Appended piped stdin content."
+            }
+        }
+
         # --watch implies --background (job must be backgrounded to be watched)
         $runBackground = $Background -or $Watch
         Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$runBackground -Watch:$Watch

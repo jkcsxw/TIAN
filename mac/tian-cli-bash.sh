@@ -698,6 +698,8 @@ $(rule)
     run "prompt" -b     Run a task in the background
     run "prompt" -w     Run in background and stream live output (auto-exits when done)
     run "prompt" --backend <id>   Force a specific backend (e.g. ollama-qwen-local for privacy)
+    run "prompt" --file <path>    Append file content to the prompt (e.g. summarize a document)
+    run "prompt" --stdin          Append piped stdin to the prompt (also triggered automatically when stdin is not a tty)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
@@ -733,6 +735,9 @@ $(rule)
     bash tian-cli.sh run "Research the latest LLM papers" -w
     bash tian-cli.sh run "Summarise this privately" --backend ollama-qwen-local
     bash tian-cli.sh run "Urgent task" --backend claude-code -b
+    bash tian-cli.sh run "Summarise this document" --file report.pdf
+    bash tian-cli.sh run "Review this code for bugs" --file src/main.py -b
+    cat notes.txt | bash tian-cli.sh run "Organise these notes into bullet points"
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
@@ -973,6 +978,8 @@ cmd_run() {
     local job_name=""
     local schedule_name=""
     local forced_backend_id=""
+    local input_file=""
+    local read_stdin=false
     while [[ $# -gt 0 ]]; do
         case "${1:-}" in
             -b|--background)
@@ -996,11 +1003,54 @@ cmd_run() {
                 forced_backend_id="${2:-}"
                 shift 2
                 ;;
+            --file|-f)
+                input_file="${2:-}"
+                shift 2
+                ;;
+            --stdin)
+                read_stdin=true
+                shift
+                ;;
             *)
                 shift
                 ;;
         esac
     done
+
+    # Append file content to the prompt when --file is given
+    if [[ -n "$input_file" ]]; then
+        [[ -f "$input_file" ]] || fail "File not found: $input_file"
+        local file_size
+        file_size=$(wc -c < "$input_file" 2>/dev/null || echo 0)
+        if [[ "$file_size" -gt 524288 ]]; then
+            warn "File is larger than 512 KB ($file_size bytes). Large files may exceed the AI's context window."
+        fi
+        local filename; filename=$(basename "$input_file")
+        local file_content; file_content=$(cat "$input_file")
+        prompt="${prompt}
+
+---
+File: ${filename}
+
+${file_content}"
+        info "Appended file content: $input_file"
+    fi
+
+    # Append stdin content when --stdin is given (or when stdin is not a tty)
+    if $read_stdin || { [[ ! -t 0 ]] && [[ -z "$input_file" ]]; }; then
+        local stdin_content; stdin_content=$(cat)
+        if [[ -n "$stdin_content" ]]; then
+            prompt="${prompt}
+
+---
+Piped input:
+
+${stdin_content}"
+            $read_stdin && info "Appended piped stdin content."
+        fi
+    fi
+
+    [[ -z "$prompt" ]] && fail "Usage: tian-cli run \"your prompt\" [--file path] [--stdin] [-b] [-w]"
 
     local backend_row cmd flag
     if [[ -n "$forced_backend_id" ]]; then
