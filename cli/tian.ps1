@@ -226,6 +226,8 @@ function Cmd-Help {
     schedule list             列出所有定时任务
     schedule run <名称>        立即运行某个定时任务
     schedule remove <名称>     删除定时任务
+    schedule templates        列出内置定时任务模板（早间简报、每周复盘等）
+    schedule templates apply <名称>  从模板创建定时任务（--time HH:MM 自定义时间）
 
     config export             将配置（API密钥、MCP、技能、定时任务）导出到文件
     config import <文件>       在此机器上恢复之前导出的配置
@@ -309,6 +311,8 @@ function Cmd-Help {
     schedule list              List all scheduled tasks
     schedule run <name>        Run a scheduled task immediately
     schedule remove <name>     Delete a scheduled task
+    schedule templates         List pre-built schedule templates (morning briefing, weekly review, …)
+    schedule templates apply <name>  Create a schedule from a template (--time HH:MM to customise)
 
     config export              Export setup (API keys, MCP configs, skills, schedules) to a file
     config import <file>       Restore a previously exported config on this machine
@@ -1736,7 +1740,88 @@ switch ($Command.ToLower()) {
                 if (-not $scheduleName) { Write-Fail "Usage: tian-cli schedule remove --name <name>"; exit 1 }
                 Remove-Schedule -Name $scheduleName -TianDir $TianDir
             }
-            default  { Write-Fail "Usage: tian-cli schedule add|list|run|remove" }
+            "templates" {
+                # Built-in template library: name, defaultTime, repeat, day, description, prompt
+                $schedTemplates = @(
+                    [ordered]@{
+                        Name="morning-briefing"; Time="08:00"; Repeat="daily"; Day="MON"
+                        Desc="Morning priority check"
+                        Prompt="Start my day well: suggest exactly 3 clear priorities for me to focus on today, note any recurring commitments I should not forget, and add a one-line motivational nudge to help me get started with energy."
+                    },
+                    [ordered]@{
+                        Name="evening-digest"; Time="18:00"; Repeat="daily"; Day="MON"
+                        Desc="End-of-day wrap-up"
+                        Prompt="Give me a concise end-of-day reflection template: what I likely accomplished today, what should carry over to tomorrow, and one concrete thing I can improve tomorrow. Keep it brief and action-oriented."
+                    },
+                    [ordered]@{
+                        Name="weekly-review"; Time="17:00"; Repeat="weekly"; Day="FRI"
+                        Desc="Weekly retrospective"
+                        Prompt="Create a structured weekly review for me: celebrate this week's wins, list any unfinished tasks to roll into next week, share one lesson worth remembering, and suggest my top 3 priorities for next week."
+                    },
+                    [ordered]@{
+                        Name="inbox-triage"; Time="09:00"; Repeat="daily"; Day="MON"
+                        Desc="Email inbox triage guide"
+                        Prompt="Walk me through email triage. Sort messages into four buckets — Act Now (urgent reply needed today), Schedule (respond within 48 hours), Delegate (forward to someone else), Archive (no action needed) — and give me a one-line template reply for each bucket."
+                    },
+                    [ordered]@{
+                        Name="meeting-prep"; Time="08:30"; Repeat="daily"; Day="MON"
+                        Desc="Daily meeting preparation"
+                        Prompt="Help me prepare for any meetings today. Suggest 5 sharp questions I could ask in a typical team meeting, a 3-step pre-meeting checklist (agenda, materials, goal), and one tip for keeping meetings on time."
+                    },
+                    [ordered]@{
+                        Name="focus-reset"; Time="14:00"; Repeat="daily"; Day="MON"
+                        Desc="Afternoon focus reset"
+                        Prompt="It is early afternoon — help me reset. Remind me to review this morning's priorities, assess which are done versus still open, then recommend: should I push through current tasks or reprioritise for the remaining hours of the day?"
+                    }
+                )
+
+                $templateSub = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0].ToLower() } else { "list" }
+                switch ($templateSub) {
+                    { $_ -in "list","" } {
+                        Write-Header "Schedule Templates"
+                        Write-Rule
+                        Write-Host ""
+                        $fmt = "  {0,-22} {1,-10} {2,-14} {3}"
+                        Write-Color ($fmt -f "NAME","TIME","REPEAT","DESCRIPTION") DarkGray
+                        Write-Color ("  " + ("─" * 74)) DarkGray
+                        foreach ($t in $schedTemplates) {
+                            $repeatLabel = if ($t.Repeat -eq "weekly") { "weekly($($t.Day))" } else { $t.Repeat }
+                            Write-Color ($fmt -f $t.Name, $t.Time, $repeatLabel, $t.Desc) White
+                        }
+                        Write-Host ""
+                        Write-Color "  Apply a template:   tian-cli schedule templates apply <name>" DarkGray
+                        Write-Color "  Custom time:        tian-cli schedule templates apply <name> --time HH:MM" DarkGray
+                        Write-Host ""
+                    }
+                    "apply" {
+                        $tName = if ($RemainingArgs.Count -gt 1) { $RemainingArgs[1] } else { "" }
+                        if (-not $tName) { Write-Fail "Usage: tian-cli schedule templates apply <name> [--time HH:MM]"; exit 1 }
+                        $tmpl = $schedTemplates | Where-Object { $_.Name -eq $tName } | Select-Object -First 1
+                        if (-not $tmpl) {
+                            Write-Fail "Template '$tName' not found. Run: tian-cli schedule templates"
+                            exit 1
+                        }
+                        $applyTime = if ($Time) { $Time } else { $tmpl.Time }
+
+                        # Check for existing schedule with same name
+                        $schedulesPath = Join-Path $env:USERPROFILE ".tian\schedules.json"
+                        if (Test-Path $schedulesPath) {
+                            $existingSchedules = Get-Content $schedulesPath -Raw | ConvertFrom-Json
+                            if ($existingSchedules | Where-Object { $_.name -eq $tName }) {
+                                Write-Fail "A schedule named '$tName' already exists. Remove it first: tian-cli schedule remove $tName"
+                                exit 1
+                            }
+                        }
+
+                        Write-Info "Applying template: $($tmpl.Desc)"
+                        Write-Info "  Prompt: $($tmpl.Prompt.Substring(0, [Math]::Min(72, $tmpl.Prompt.Length)))..."
+                        Write-Host ""
+                        Add-Schedule -Name $tName -Prompt $tmpl.Prompt -Time $applyTime -Repeat $tmpl.Repeat -DayOfWeek $tmpl.Day -TianDir $TianDir
+                    }
+                    default { Write-Fail "Usage: tian-cli schedule templates [list|apply <name>]" }
+                }
+            }
+            default  { Write-Fail "Usage: tian-cli schedule add|list|run|remove|templates" }
         }
     }
 

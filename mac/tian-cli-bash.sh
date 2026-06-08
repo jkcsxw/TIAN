@@ -716,6 +716,8 @@ $(rule)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
+    schedule templates  List pre-built schedule templates (morning briefing, weekly review, …)
+    schedule templates apply <name>  Create a schedule from a template
     key set [id]        Set or update an API key for a backend (interactive)
     key show            Show which API keys are currently set
     key remove <id>     Remove an API key from your shell profile
@@ -807,6 +809,8 @@ cat <<'ZHEOF'
     schedule list       列出所有定时任务
     schedule run <名称> 立即运行某个定时任务
     schedule remove <名称> 删除定时任务
+    schedule templates  列出内置定时任务模板（早间简报、每周复盘等）
+    schedule templates apply <名称>  从模板创建定时任务
     key set [id]        设置或更新API密钥（交互式）
     key show            显示当前已设置的API密钥
     key remove <id>     从Shell配置文件中移除API密钥
@@ -1695,6 +1699,18 @@ _schedule_remove_macos() {
     fi
 }
 
+# Built-in schedule templates.  Format: name|time|repeat|day|description|prompt
+_tian_sched_templates() {
+    cat <<'TEMPLATES'
+morning-briefing|08:00|daily|MON|Morning priority check|Start my day well: suggest exactly 3 clear priorities for me to focus on today, note any recurring commitments I should not forget, and add a one-line motivational nudge to help me get started with energy.
+evening-digest|18:00|daily|MON|End-of-day wrap-up|Give me a concise end-of-day reflection template: what I likely accomplished today, what should carry over to tomorrow, and one concrete thing I can improve tomorrow. Keep it brief and action-oriented.
+weekly-review|17:00|weekly|FRI|Weekly retrospective|Create a structured weekly review for me: celebrate this week's wins, list any unfinished tasks to roll into next week, share one lesson worth remembering, and suggest my top 3 priorities for next week.
+inbox-triage|09:00|daily|MON|Email inbox triage guide|Walk me through email triage. Sort messages into four buckets — Act Now (urgent reply needed today), Schedule (respond within 48 hours), Delegate (forward to someone else), Archive (no action needed) — and give me a one-line template reply for each bucket.
+meeting-prep|08:30|daily|MON|Daily meeting preparation|Help me prepare for any meetings today. Suggest 5 sharp questions I could ask in a typical team meeting, a 3-step pre-meeting checklist (agenda, materials, goal), and one tip for keeping meetings on time.
+focus-reset|14:00|daily|MON|Afternoon focus reset|It is early afternoon — help me reset. Remind me to review this morning's priorities, assess which are done versus still open, then recommend: should I push through current tasks or reprioritise for the remaining hours of the day?
+TEMPLATES
+}
+
 cmd_schedule() {
     local sub="${1:-list}"; shift || true
     local platform; platform=$(detect_platform)
@@ -1800,7 +1816,67 @@ PYEOF
             ok "Schedule '$name' removed."
             ;;
 
-        *) fail "Usage: schedule add|list|run|remove" ;;
+        templates)
+            local tsub="${1:-list}"; shift || true
+            case "$tsub" in
+                list|"")
+                    echo ""
+                    echo -e "${BOLD}  Available schedule templates${RESET}"
+                    echo ""
+                    printf "  %-22s %-10s %-14s %s\n" "NAME" "TIME" "REPEAT" "DESCRIPTION"
+                    printf "  %s\n" "$(printf '%74s' | tr ' ' '─')"
+                    while IFS='|' read -r tname ttime trepeat tday tdesc _tprompt; do
+                        local extra=""
+                        [[ "$trepeat" == "weekly" ]] && extra=" ($tday)"
+                        printf "  %-22s %-10s %-14s %s\n" "$tname" "$ttime" "${trepeat}${extra}" "$tdesc"
+                    done < <(_tian_sched_templates)
+                    echo ""
+                    echo -e "  ${DIM}Apply a template:       tian-cli schedule templates apply <name>${RESET}"
+                    echo -e "  ${DIM}Custom time:            tian-cli schedule templates apply <name> --time HH:MM${RESET}"
+                    echo -e "  ${DIM}Edit after applying:    tian-cli schedule remove <name>, then schedule add${RESET}"
+                    echo ""
+                    ;;
+                apply)
+                    local tname="${1:-}"; shift || true
+                    [[ -z "$tname" ]] && fail "Usage: schedule templates apply <name> [--time HH:MM]"
+                    local custom_time=""
+                    while [[ $# -gt 0 ]]; do
+                        case "${1:-}" in
+                            --time|-t) custom_time="${2:-}"; shift 2 ;;
+                            *) shift ;;
+                        esac
+                    done
+
+                    local row
+                    row=$(_tian_sched_templates | grep "^${tname}|") \
+                        || fail "Template '$tname' not found. Run: tian-cli schedule templates"
+
+                    local ttime trepeat tday tdesc tprompt
+                    IFS='|' read -r _ ttime trepeat tday tdesc tprompt <<< "$row"
+                    [[ -n "$custom_time" ]] && ttime="$custom_time"
+
+                    ensure_dirs
+                    local existing
+                    existing=$(python3 - "$SCHEDULES_FILE" "$tname" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as fh:
+    s = json.load(fh)
+print('1' if any(x['name'] == sys.argv[2] for x in s) else '0')
+PYEOF
+)
+                    [[ "$existing" == "1" ]] && \
+                        fail "A schedule named '$tname' already exists. Remove it first: tian-cli schedule remove $tname"
+
+                    info "Applying template: $tdesc"
+                    info "  Prompt: ${tprompt:0:72}..."
+                    echo ""
+                    cmd_schedule add "$tname" "$tprompt" "$ttime" "$trepeat" --day "$tday"
+                    ;;
+                *) fail "Usage: schedule templates [list|apply <name>]" ;;
+            esac
+            ;;
+
+        *) fail "Usage: schedule add|list|run|remove|templates" ;;
     esac
 }
 
@@ -3733,7 +3809,7 @@ _tian_complete() {
             fi ;;
         schedule)
             if [[ \$cword -eq 2 ]]; then
-                COMPREPLY=( \$(compgen -W "add list run remove" -- "\$cur") )
+                COMPREPLY=( \$(compgen -W "add list run remove templates" -- "\$cur") )
             else
                 case "\${COMP_WORDS[2]}" in
                     run|remove) COMPREPLY=( \$(compgen -W "\$(_ts_names)" -- "\$cur") ) ;;
@@ -3742,6 +3818,12 @@ _tian_complete() {
                             COMPREPLY=( \$(compgen -W "SUN MON TUE WED THU FRI SAT" -- "\$cur") )
                         else
                             COMPREPLY=( \$(compgen -W "--day" -- "\$cur") )
+                        fi ;;
+                    templates)
+                        if [[ \$cword -eq 3 ]]; then
+                            COMPREPLY=( \$(compgen -W "list apply" -- "\$cur") )
+                        elif [[ "\${COMP_WORDS[3]}" == "apply" ]]; then
+                            COMPREPLY=( \$(compgen -W "morning-briefing evening-digest weekly-review inbox-triage meeting-prep focus-reset" -- "\$cur") )
                         fi ;;
                 esac
             fi ;;
