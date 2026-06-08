@@ -712,7 +712,8 @@ $(rule)
     jobs retry <id>     Re-run a failed or quota-stopped job with its original prompt
     jobs clear          Clear completed jobs (--old <days> keeps recent ones; --dry-run previews)
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
-    schedule add --day  Set day of week for weekly schedules (SUN MON TUE WED THU FRI SAT)
+    schedule add --day  Day(s) for weekly schedules: single (FRI), comma-separated (MON,WED,FRI),
+                        or named preset (weekdays, weekends)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
@@ -753,6 +754,8 @@ $(rule)
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
     bash tian-cli.sh schedule add weekly-report "Weekly summary" 09:00 weekly --day FRI
+    bash tian-cli.sh schedule add mwf-standup  "Standup notes"  09:00 weekly --day MON,WED,FRI
+    bash tian-cli.sh schedule add weekday-task "Daily digest"   08:00 weekly --day weekdays
     bash tian-cli.sh schedule list
     bash tian-cli.sh config export --output my-tian-backup.json
     bash tian-cli.sh config export --no-keys
@@ -805,7 +808,7 @@ cat <<'ZHEOF'
     jobs retry <id>     用原始提示词重新执行失败或配额耗尽的任务
     jobs clear          清除已完成任务（--old <天数> 保留近期；--dry-run 预览）
     schedule add        创建定时任务（Linux 用 crontab，macOS 用 launchd）
-    schedule add --day  为每周任务设置星期（SUN MON TUE WED THU FRI SAT）
+    schedule add --day  指定每周任务的运行日期：单天（FRI）、多天（MON,WED,FRI）或预设（weekdays、weekends）
     schedule list       列出所有定时任务
     schedule run <名称> 立即运行某个定时任务
     schedule remove <名称> 删除定时任务
@@ -841,7 +844,9 @@ cat <<'ZHEOF'
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "早间简报" 08:00 daily
-    bash tian-cli.sh schedule add weekly-report "每周总结" 09:00 weekly --day FRI
+    bash tian-cli.sh schedule add weekly-report "每周总结"   09:00 weekly --day FRI
+    bash tian-cli.sh schedule add mwf-standup  "站会记录"   09:00 weekly --day MON,WED,FRI
+    bash tian-cli.sh schedule add weekday-task "每日摘要"   08:00 weekly --day weekdays
     bash tian-cli.sh config export --output 我的备份.json
     bash tian-cli.sh config import 我的备份.json
     bash tian-cli.sh quota
@@ -1540,6 +1545,82 @@ _day_name_to_num() {
     esac
 }
 
+# Expand named presets and return a normalised comma-separated list of 3-letter
+# day abbreviations in upper case.  Examples:
+#   weekdays  → MON,TUE,WED,THU,FRI
+#   weekends  → SAT,SUN
+#   MON,wed,FRI → MON,WED,FRI
+_expand_days() {
+    local raw; raw=$(echo "${1:-MON}" | tr '[:lower:]' '[:upper:]')
+    case "$raw" in
+        WEEKDAYS|WORKDAYS) echo "MON,TUE,WED,THU,FRI" ;;
+        WEEKENDS)          echo "SAT,SUN" ;;
+        EVERYDAY|DAILY)    echo "SUN,MON,TUE,WED,THU,FRI,SAT" ;;
+        *)
+            # Normalise to comma-separated 3-char abbreviations
+            local result="" IFS_SAVE="$IFS"
+            IFS=','
+            for d in $raw; do
+                IFS="$IFS_SAVE"
+                d=$(echo "$d" | tr -d ' ' | cut -c1-3)
+                result="${result:+$result,}$d"
+                IFS=','
+            done
+            IFS="$IFS_SAVE"
+            echo "$result"
+            ;;
+    esac
+}
+
+# Convert a (possibly multi-day) day spec to a cron weekday field.
+# "MON"          → "1"
+# "MON,WED,FRI"  → "1,3,5"
+# "weekdays"     → "1,2,3,4,5"
+_days_to_cron_field() {
+    local expanded nums="" IFS_SAVE="$IFS"
+    expanded=$(_expand_days "${1:-MON}")
+    IFS=','
+    for d in $expanded; do
+        IFS="$IFS_SAVE"
+        local n; n=$(_day_name_to_num "$d")
+        nums="${nums:+$nums,}$n"
+        IFS=','
+    done
+    IFS="$IFS_SAVE"
+    echo "$nums"
+}
+
+# Build a launchd StartCalendarInterval XML block for one or more days.
+# For a single day produces a <dict>; for multiple days produces an <array> of
+# <dict> entries — both are valid launchd plist formats.
+_days_to_launchd_block() {
+    local expanded hour="$2" minute="$3" IFS_SAVE="$IFS"
+    expanded=$(_expand_days "${1:-MON}")
+
+    local day_count=0 IFS_SAVE2="$IFS"
+    IFS=','
+    for _d in $expanded; do ((day_count++)) || true; done
+    IFS="$IFS_SAVE2"
+
+    if [[ "$day_count" -eq 1 ]]; then
+        local n; n=$(_day_name_to_num "$expanded")
+        echo "<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>${n}</integer><key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>${minute}</integer></dict>"
+    else
+        local entries=""
+        IFS=','
+        for d in $expanded; do
+            IFS="$IFS_SAVE"
+            local n; n=$(_day_name_to_num "$d")
+            entries="${entries}
+        <dict><key>Weekday</key><integer>${n}</integer><key>Hour</key><integer>${hour}</integer><key>Minute</key><integer>${minute}</integer></dict>"
+            IFS=','
+        done
+        IFS="$IFS_SAVE"
+        echo "<key>StartCalendarInterval</key><array>${entries}
+    </array>"
+    fi
+}
+
 _schedule_add_linux() {
     local name="$1" prompt="$2" time="$3" repeat="$4" day="${5:-MON}"
     local hour minute cron_expr
@@ -1551,7 +1632,7 @@ _schedule_add_linux() {
     case "$repeat" in
         hourly) cron_expr="0 * * * *" ;;
         daily)  cron_expr="$minute $hour * * *" ;;
-        weekly) cron_expr="$minute $hour * * $(_day_name_to_num "$day")" ;;
+        weekly) cron_expr="$minute $hour * * $(_days_to_cron_field "$day")" ;;
         once)
             # Write a self-removing wrapper: runs the task then deletes its own
             # cron entry so it fires exactly once rather than becoming recurring.
@@ -1617,7 +1698,7 @@ _schedule_add_macos() {
     case "$repeat" in
         hourly) interval_block="<key>StartInterval</key><integer>3600</integer>" ;;
         daily)  interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-        weekly) interval_block="<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>$(_day_name_to_num "$day")</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
+        weekly) interval_block="$(_days_to_launchd_block "$day" "$hour" "$minute")" ;;
         once)
             # Fire at the specified time exactly once: use a self-removing wrapper
             # script so launchd doesn't repeat the job on subsequent days.
@@ -1727,11 +1808,20 @@ cmd_schedule() {
                     *) shift ;;
                 esac
             done
-            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once] [--day MON]"
+            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once] [--day MON,WED,FRI]"
             [[ ! "$time" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] && fail "Invalid time '$time'. Use HH:MM format (e.g. 08:30)."
             [[ ! "$repeat" =~ ^(daily|weekly|hourly|once)$ ]] && fail "Invalid repeat '$repeat'. Choose: daily, weekly, hourly, once."
-            day=$(echo "$day" | tr '[:lower:]' '[:upper:]' | cut -c1-3)
-            [[ ! "$day" =~ ^(SUN|MON|TUE|WED|THU|FRI|SAT)$ ]] && fail "Invalid day '$day'. Use: SUN MON TUE WED THU FRI SAT"
+            # Expand named presets then validate each individual day token
+            day=$(_expand_days "$day")
+            local _bad_day=""
+            local _IFS_SAVE="$IFS"; IFS=','
+            for _d in $day; do
+                IFS="$_IFS_SAVE"
+                [[ ! "$_d" =~ ^(SUN|MON|TUE|WED|THU|FRI|SAT)$ ]] && { _bad_day="$_d"; break; }
+                IFS=','
+            done
+            IFS="$_IFS_SAVE"
+            [[ -n "$_bad_day" ]] && fail "Invalid day '$_bad_day'. Use: SUN MON TUE WED THU FRI SAT (comma-separated for multiple days, or: weekdays, weekends)"
             ensure_dirs
             if [[ "$platform" == "linux" || "$platform" == "wsl" ]]; then
                 _schedule_add_linux "$name" "$prompt" "$time" "$repeat" "$day"
