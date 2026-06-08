@@ -790,7 +790,8 @@ function Cmd-Doctor {
                 $warnCount++
             } else {
                 Write-Ok "$padName set ($($val.Length) chars)"
-                $okCount++
+                $keyOk = Test-ApiKey $b $val
+                if ($keyOk) { $okCount++ } else { $warnCount++ }
             }
         }
     }
