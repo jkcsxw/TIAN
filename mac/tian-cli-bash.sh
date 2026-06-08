@@ -2256,6 +2256,78 @@ _verify_api_key() {
     esac
 }
 
+# Validate a known MCP server credential by making a lightweight test API call.
+# Returns 0 if valid or check skipped; returns 1 if credential is definitely invalid.
+_validate_mcp_credential() {
+    local var_name="${1:-}" key="${2:-}"
+    [[ -n "$var_name" && -n "$key" ]] || return 0
+    command -v curl &>/dev/null || return 0
+
+    local http_status body ok_flag err_msg
+
+    case "$var_name" in
+        BRAVE_API_KEY)
+            http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+                -H "X-Subscription-Token: $key" \
+                "https://api.search.brave.com/res/v1/web/search?q=test&count=1" 2>/dev/null) \
+                || http_status="000"
+            case "$http_status" in
+                200)     ok     "  Brave API key is valid" ;;
+                401|403) warn   "  Brave API key is invalid (HTTP $http_status) — regenerate at https://api.search.brave.com/register"; return 1 ;;
+                429)     info   "  Brave API rate limited (HTTP 429) — key is likely valid" ;;
+                000)     info   "  Cannot reach Brave API — skipping credential check" ;;
+                *)       info   "  Brave API returned HTTP $http_status" ;;
+            esac
+            ;;
+        GITHUB_PERSONAL_ACCESS_TOKEN)
+            http_status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
+                -H "Authorization: Bearer $key" \
+                -H "Accept: application/vnd.github+json" \
+                "https://api.github.com/user" 2>/dev/null) \
+                || http_status="000"
+            case "$http_status" in
+                200)     ok     "  GitHub token is valid" ;;
+                401)     warn   "  GitHub token is invalid or expired (HTTP 401) — create a new one at https://github.com/settings/tokens"; return 1 ;;
+                403)     warn   "  GitHub token lacks required permissions (HTTP 403) — check scopes at https://github.com/settings/tokens"; return 1 ;;
+                000)     info   "  Cannot reach GitHub API — skipping credential check" ;;
+                *)       info   "  GitHub API returned HTTP $http_status" ;;
+            esac
+            ;;
+        SLACK_BOT_TOKEN)
+            body=$(curl -s --max-time 5 \
+                -H "Authorization: Bearer $key" \
+                "https://slack.com/api/auth.test" 2>/dev/null) || body=""
+            if [[ -z "$body" ]]; then
+                info "  Cannot reach Slack API — skipping credential check"
+            else
+                ok_flag=$(echo "$body" | python3 -c \
+                    "import json,sys; print('ok' if json.load(sys.stdin).get('ok') else 'fail')" \
+                    2>/dev/null) || ok_flag="fail"
+                if [[ "$ok_flag" == "ok" ]]; then
+                    ok "  Slack bot token is valid"
+                else
+                    err_msg=$(echo "$body" | python3 -c \
+                        "import json,sys; print(json.load(sys.stdin).get('error','unknown'))" \
+                        2>/dev/null) || err_msg="unknown"
+                    warn "  Slack bot token is invalid: $err_msg — check your Slack app at https://api.slack.com/apps"; return 1
+                fi
+            fi
+            ;;
+        POSTGRES_CONNECTION_STRING)
+            if command -v psql &>/dev/null; then
+                if PGCONNECT_TIMEOUT=3 psql "$key" -c "SELECT 1" &>/dev/null 2>&1; then
+                    ok "  PostgreSQL connection string is valid"
+                else
+                    warn "  Cannot connect to PostgreSQL — check the connection string"; return 1
+                fi
+            else
+                info "  psql not found — skipping PostgreSQL connection test"
+            fi
+            ;;
+    esac
+    return 0
+}
+
 cmd_doctor() {
     local fix=false
     while [[ $# -gt 0 ]]; do
@@ -2474,6 +2546,8 @@ PYEOF
             [[ -z "$var_name" ]] && continue
             if [[ "$is_set" == "1" ]]; then
                 ok "$svc_name: $var_name is set"
+                local _actual_val="${!var_name:-}"
+                _validate_mcp_credential "$var_name" "$_actual_val" || ((issues++)) || true
             else
                 warn "$svc_name: $var_name not set — ${hint:-required for this MCP server}"
                 info "  Fix: export $var_name=<your-key>, then source your shell profile"
@@ -2800,11 +2874,44 @@ cmd_list() {
         backends)
             hdr "Available AI Backends"
             python3 - "$CATALOG" <<'PYEOF'
-import json, sys
+import json, sys, subprocess, os
+
+GREEN  = '\033[0;32m'; YELLOW = '\033[1;33m'; DIM  = '\033[2m'
+CYAN   = '\033[0;36m'; BOLD   = '\033[1m';    RESET = '\033[0m'
+
 c = json.load(open(sys.argv[1]))
+active_found = False
+rows = []
 for b in c['backends']:
-    install = b.get('npmPackage') or b.get('downloadUrl') or 'built-in'
-    print(f"  {b['id']:<20} {b['displayName']:<30} {install}")
+    cmd = b.get('cliCommand', '')
+    installed = bool(cmd and subprocess.run(['which', cmd], capture_output=True).returncode == 0)
+    is_active = installed and not active_found
+    if is_active:
+        active_found = True
+    env_var = b.get('apiKeyEnvVar', '')
+    key_set  = bool(env_var and os.environ.get(env_var))
+    npm      = b.get('npmPackage', '')
+
+    marker    = f"{CYAN}★{RESET}" if is_active else ' '
+    inst_str  = f"{GREEN}✓ installed{RESET}    " if installed else f"{DIM}✗ not installed{RESET}"
+    if not env_var:
+        key_str = f"{DIM}no key needed{RESET}"
+    elif key_set:
+        key_str = f"{GREEN}✓ key set{RESET}"
+    else:
+        key_str = f"{YELLOW}✗ key not set{RESET}"
+    hint = f"  {DIM}→ npm install -g {npm}{RESET}" if npm and not installed else ''
+    rows.append((marker, b['id'], b['displayName'], inst_str, key_str, hint))
+
+# Print header row
+print(f"  {'':1}  {'ID':<22} {'NAME':<26} {'INSTALLED':<23} {'API KEY'}")
+print("  " + "─"*80)
+for marker, bid, name, inst_str, key_str, hint in rows:
+    print(f"  {marker}  {bid:<22} {name:<26} {inst_str} {key_str}{hint}")
+print()
+print(f"  {CYAN}★{RESET} = active backend (first installed one used by default)")
+print(f"  {DIM}install:  tian-cli install --backend <id>{RESET}")
+print(f"  {DIM}use once: tian-cli run \"task\" --backend <id>{RESET}")
 PYEOF
             rule ;;
         mcp)
