@@ -698,7 +698,7 @@ $(rule)
     jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
     jobs stop <id>      Stop a running job (--all stops every running job)
     jobs retry <id>     Re-run a failed or quota-stopped job with its original prompt
-    jobs clear          Clear completed jobs
+    jobs clear          Clear completed jobs (--old <days> keeps recent ones; --dry-run previews)
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
@@ -1131,18 +1131,71 @@ print(j.get('scheduleName','') or '')
             cmd_run "$orig_prompt" "${retry_args[@]}"
             ;;
         clear)
-            python3 - "$JOBS_FILE" "$TASKS_DIR" <<'PYEOF'
+            local _clear_old_days="" _clear_dry_run=false
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    --old)
+                        _clear_old_days="${2:-}"
+                        [[ "$_clear_old_days" =~ ^[0-9]+$ ]] || fail "Usage: jobs clear --old <days>"
+                        shift 2
+                        ;;
+                    --dry-run) _clear_dry_run=true; shift ;;
+                    *) shift ;;
+                esac
+            done
+            local _dry_flag; $_clear_dry_run && _dry_flag=1 || _dry_flag=0
+            python3 - "$JOBS_FILE" "$TASKS_DIR" "${_clear_old_days:-}" "$_dry_flag" <<'PYEOF'
 import json, sys, os, glob
-jobs_file, tasks_dir = sys.argv[1], sys.argv[2]
+from datetime import datetime, timezone
+
+jobs_file, tasks_dir, old_days_str, dry_run_flag = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+dry_run = (dry_run_flag == "1")
+old_days = int(old_days_str) if old_days_str else None
+
+now = datetime.now(timezone.utc)
+
 with open(jobs_file) as fh:
     jobs = json.load(fh)
-keep = [j for j in jobs if j.get('status') == 'running']
-for j in [x for x in jobs if x.get('status') != 'running']:
-    for f in glob.glob(f"{tasks_dir}/{j['id']}*"):
-        os.remove(f)
-with open(jobs_file, 'w') as fh:
-    json.dump(keep, fh, indent=2)
-print(f"  Cleared {len(jobs)-len(keep)} completed jobs.")
+
+to_remove = []
+for j in jobs:
+    if j.get('status') == 'running':
+        continue
+    if old_days is not None:
+        created_str = j.get('createdAt', '')
+        if created_str:
+            try:
+                created = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
+                age_days = (now - created).days
+                if age_days < old_days:
+                    continue
+            except ValueError:
+                pass
+    to_remove.append(j)
+
+if dry_run:
+    if not to_remove:
+        print("  Nothing to clear.")
+    else:
+        print(f"  Would clear {len(to_remove)} job(s) (--dry-run, nothing deleted):")
+        for j in to_remove:
+            created = j.get('createdAt', 'unknown date')[:10]
+            prompt = (j.get('prompt') or '')[:50]
+            print(f"    [{j['id']}] {created}  {j.get('status','?')}  {prompt}{'…' if len(j.get('prompt',''))>50 else ''}")
+else:
+    remove_ids = {j['id'] for j in to_remove}
+    keep = [j for j in jobs if j['id'] not in remove_ids]
+    for j in to_remove:
+        for f in glob.glob(f"{tasks_dir}/{j['id']}*"):
+            os.remove(f)
+    with open(jobs_file, 'w') as fh:
+        json.dump(keep, fh, indent=2)
+    if old_days is not None:
+        print(f"  Cleared {len(to_remove)} job(s) older than {old_days} day(s).")
+    else:
+        print(f"  Cleared {len(to_remove)} completed job(s).")
 PYEOF
             ;;
         *)
