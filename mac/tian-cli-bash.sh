@@ -8,6 +8,10 @@ CATALOG="$TIAN_DIR/config/catalog.json"
 TASKS_DIR="$HOME/.tian/tasks"
 SCHEDULES_FILE="$HOME/.tian/schedules.json"
 JOBS_FILE="$HOME/.tian/jobs.json"
+TIAN_LANG_FILE="$HOME/.tian/lang"
+TIAN_LANG="${TIAN_LANG:-}"
+[[ -z "$TIAN_LANG" && -f "$TIAN_LANG_FILE" ]] && TIAN_LANG=$(cat "$TIAN_LANG_FILE" 2>/dev/null | tr -d '[:space:]') || true
+[[ "$TIAN_LANG" == "zh" ]] || TIAN_LANG="en"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; RESET='\033[0m'
@@ -666,6 +670,7 @@ PYEOF
 
 # ── Commands ──────────────────────────────────────────────────────────────────
 cmd_help() {
+    [[ "${TIAN_LANG:-en}" == "zh" ]] && { _cmd_help_zh; return; }
 cat <<EOF
 
   TIAN CLI
@@ -720,6 +725,7 @@ $(rule)
     completion bash     Print a bash tab-completion script (eval "\$(tian-cli completion bash)")
     completion zsh      Print a zsh tab-completion script  (eval "\$(tian-cli completion zsh)")
     completion install  Auto-install tab completion into your shell profile
+    lang en|zh          Switch interface language (切换界面语言)
     help                Show this help
 
   INSTALL FLAGS (non-interactive)
@@ -750,8 +756,124 @@ $(rule)
     bash tian-cli.sh config export --no-keys
     bash tian-cli.sh config import my-tian-backup.json
     bash tian-cli.sh quota
+    bash tian-cli.sh lang zh
 
 EOF
+}
+
+_cmd_help_zh() {
+cat <<'ZHEOF'
+
+  TIAN CLI
+  Talk Is All you Need
+
+──────────────────────────────────────────────────────────
+
+  用法
+    tian-cli.sh <命令> [选项]
+
+  命令
+    setup               重新运行交互式安装向导
+    install             非交互式安装（参数驱动，适合脚本）
+    repair              重新运行安装以修复当前配置
+    update              将TIAN脚本和已安装的AI后端升级到最新版本
+    doctor [--fix]      检查安装并诊断常见问题；--fix 自动修复可修复的问题
+    uninstall           移除TIAN安装的组件（后端、密钥、数据）
+    status              显示已安装的内容
+    list backends       列出可用的AI后端
+    list mcp            列出可用的MCP服务器
+    list skills         列出可用的技能包
+    add mcp <id>        将MCP服务器添加到后端配置
+    add skill <id>      安装技能包
+    remove mcp <id>     从后端配置中移除MCP服务器
+    skill list          列出技能包并显示已安装的
+    skill run <id>      运行已安装的技能（使用提示词模板）
+    skill run <id> <t>  带额外输入/上下文运行技能
+    skill info <id>     打印技能的提示词模板
+    run "提示词"        运行任务（前台）
+    run "提示词" -b     在后台运行任务
+    run "提示词" -w     在后台运行并实时显示输出（完成后自动退出）
+    run "提示词" --backend <id>   指定后端（如：ollama-qwen-local 用于隐私任务）
+    run "提示词" --file <路径>    将文件内容附加到提示词（如：总结文档）
+    run "提示词" --stdin          将管道输入内容附加到提示词
+    jobs                列出后台任务
+    jobs result <id>    查看已完成任务的输出
+    jobs tail <id>      实时追踪输出（任务结束后自动退出；Ctrl+C 停止追踪）
+    jobs stop <id>      停止运行中的任务（--all 停止全部）
+    jobs retry <id>     用原始提示词重新执行失败或配额耗尽的任务
+    jobs clear          清除已完成任务（--old <天数> 保留近期；--dry-run 预览）
+    schedule add        创建定时任务（Linux 用 crontab，macOS 用 launchd）
+    schedule add --day  为每周任务设置星期（SUN MON TUE WED THU FRI SAT）
+    schedule list       列出所有定时任务
+    schedule run <名称> 立即运行某个定时任务
+    schedule remove <名称> 删除定时任务
+    key set [id]        设置或更新API密钥（交互式）
+    key show            显示当前已设置的API密钥
+    key remove <id>     从Shell配置文件中移除API密钥
+    quota               检查所有API密钥的配额/速率限制状态（彩色输出）
+    config export       将配置（API密钥、MCP、技能、定时任务）导出到文件
+    config import       在此机器上恢复之前导出的配置
+    completion bash     打印bash自动补全脚本
+    completion zsh      打印zsh自动补全脚本
+    completion install  自动将自动补全安装到Shell配置文件
+    lang en|zh          切换界面语言
+    help                显示此帮助
+
+  安装参数（非交互式）
+    --backend <id>      AI后端（必填，如：claude-code）
+    --key     <key>     API密钥（保存到Shell配置文件）
+    --mcp     <ids>     MCP服务器ID（逗号分隔，或填 'default'）
+    --skills  <ids>     技能包ID（逗号分隔）
+    --yes               跳过确认；缺少必要环境变量时跳过该MCP（非致命错误）
+
+  示例
+    bash tian-cli.sh install --backend claude-code --key sk-ant-xxx --mcp default --yes
+    bash tian-cli.sh run "总结今日AI领域最新动态"
+    bash tian-cli.sh run "帮我写今天的工作日报" -b
+    bash tian-cli.sh run "研究最新的大语言模型论文" -w
+    bash tian-cli.sh run "私密任务" --backend ollama-qwen-local
+    bash tian-cli.sh run "总结这份文档" --file report.pdf
+    cat notes.txt | bash tian-cli.sh run "将这些笔记整理成要点"
+    bash tian-cli.sh list backends
+    bash tian-cli.sh jobs
+    bash tian-cli.sh schedule add morning-brief "早间简报" 08:00 daily
+    bash tian-cli.sh schedule add weekly-report "每周总结" 09:00 weekly --day FRI
+    bash tian-cli.sh config export --output 我的备份.json
+    bash tian-cli.sh config import 我的备份.json
+    bash tian-cli.sh quota
+    bash tian-cli.sh lang en
+
+ZHEOF
+}
+
+cmd_lang() {
+    local lang="${1:-}"
+    case "$lang" in
+        en|zh)
+            mkdir -p "$(dirname "$TIAN_LANG_FILE")"
+            echo "$lang" > "$TIAN_LANG_FILE"
+            TIAN_LANG="$lang"
+            if [[ "$lang" == "zh" ]]; then
+                ok "界面语言已切换为中文。运行 'tian-cli lang en' 可切回英文。"
+            else
+                ok "Interface language set to English. Run 'tian-cli lang zh' to switch to Chinese."
+            fi
+            ;;
+        *)
+            echo ""
+            echo -e "  Usage: tian-cli lang en|zh"
+            echo ""
+            echo "    en   English interface"
+            echo "    zh   中文界面"
+            echo ""
+            if [[ "${TIAN_LANG:-en}" == "zh" ]]; then
+                info "当前语言：中文  (Current: zh)"
+            else
+                info "Current language: English  (当前：en)"
+            fi
+            echo ""
+            ;;
+    esac
 }
 
 cmd_status() {
@@ -3581,7 +3703,7 @@ _tian_complete() {
 
     # Top-level subcommands
     if [[ \$cword -eq 1 ]]; then
-        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key quota completion help" -- "\$cur") )
+        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key quota completion lang help" -- "\$cur") )
         return
     fi
 
@@ -3664,6 +3786,7 @@ _tian_complete() {
                 esac
             fi ;;
         doctor)     COMPREPLY=( \$(compgen -W "--fix -f" -- "\$cur") ) ;;
+        lang)       COMPREPLY=( \$(compgen -W "en zh" -- "\$cur") ) ;;
         completion) COMPREPLY=( \$(compgen -W "bash zsh install" -- "\$cur") ) ;;
         uninstall)  COMPREPLY=( \$(compgen -W "--yes -y" -- "\$cur") ) ;;
     esac
@@ -3747,6 +3870,7 @@ case "$CMD" in
     key)        cmd_key "$@" ;;
     quota)      cmd_quota ;;
     completion) cmd_completion "$@" ;;
+    lang)       cmd_lang "$@" ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
 esac
