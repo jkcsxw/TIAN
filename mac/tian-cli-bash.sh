@@ -939,6 +939,24 @@ PYEOF
     else
         info "No schedules yet"
     fi
+
+    # Show whether the scheduler daemon is actually running — critical on WSL/Linux
+    # where cron is off by default and schedules would silently never fire.
+    local _sched_platform; _sched_platform=$(detect_platform)
+    case "$_sched_platform" in
+        macos)
+            ok "Daemon: launchd (always active on macOS)" ;;
+        linux|wsl)
+            if cron_running; then
+                ok "Daemon: cron is running — scheduled tasks will fire"
+            else
+                warn "Daemon: cron is NOT running — scheduled tasks will never fire"
+                while IFS= read -r _hint; do
+                    info "  $_hint"
+                done < <(cron_fix_hint "$_sched_platform")
+            fi
+            ;;
+    esac
     echo ""
 
     # ── Quick tips ────────────────────────────────────────────────────────────
