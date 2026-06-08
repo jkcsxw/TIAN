@@ -690,6 +690,10 @@ $(rule)
     add mcp <id>        Add an MCP server to backend config
     add skill <id>      Install a skill
     remove mcp <id>     Remove an MCP server from backend config
+    skill list          List skills and show which are installed
+    skill run <id>      Run an installed skill (use its prompt template)
+    skill run <id> <t>  Run a skill with extra input/context
+    skill info <id>     Print a skill's prompt template
     run "prompt"        Run a task (foreground)
     run "prompt" -b     Run a task in the background
     run "prompt" -w     Run in background and stream live output (auto-exits when done)
@@ -2300,6 +2304,116 @@ PYEOF
     echo ""
 }
 
+cmd_skill() {
+    local sub="${1:-}"; shift || true
+    case "$sub" in
+        run)
+            local skill_id="${1:-}"; shift || true
+            [[ -n "$skill_id" ]] || fail "Usage: skill run <id> [input text]"
+            local extra_input="$*"
+
+            # Prefer the installed copy; fall back to the bundled builtin file
+            local skill_file=""
+            if [[ -f "$HOME/.tian/skills/${skill_id}.md" ]]; then
+                skill_file="$HOME/.tian/skills/${skill_id}.md"
+            else
+                local row; row=$(find_skill_by_id "$skill_id" 2>/dev/null) \
+                    || fail "Unknown skill '$skill_id'. Run: tian-cli list skills"
+                local _id _name _source prompt_file
+                IFS='|' read -r _id _name _source prompt_file _ <<< "$row"
+                if [[ -n "$prompt_file" && -f "$TIAN_DIR/$prompt_file" ]]; then
+                    skill_file="$TIAN_DIR/$prompt_file"
+                else
+                    fail "Skill '$skill_id' is not installed. Run: tian-cli add skill $skill_id"
+                fi
+            fi
+
+            local skill_prompt; skill_prompt=$(cat "$skill_file")
+            local full_prompt="$skill_prompt"
+            if [[ -n "$extra_input" ]]; then
+                full_prompt="${skill_prompt}
+
+---
+
+${extra_input}"
+            fi
+
+            info "Running skill: $skill_id"
+            cmd_run "$full_prompt"
+            ;;
+
+        list)
+            hdr "Skills"
+            python3 - "$CATALOG" "$HOME" <<'PYEOF'
+import json, os, sys
+catalog, home = json.load(open(sys.argv[1])), sys.argv[2]
+skills_dir = os.path.join(home, ".tian", "skills")
+GREEN  = '\033[0;32m'
+DIM    = '\033[2m'
+YELLOW = '\033[1;33m'
+RESET  = '\033[0m'
+BOLD   = '\033[1m'
+for s in catalog["skills"]:
+    sid   = s.get("id", "")
+    name  = s.get("displayName", sid)
+    cat_  = s.get("category", "")
+    installed = os.path.isfile(os.path.join(skills_dir, f"{sid}.md"))
+    tag = f"{GREEN}installed{RESET}" if installed else f"{DIM}not installed{RESET}"
+    print(f"  {sid:<26} {name:<28} {cat_:<14}  {tag}")
+PYEOF
+            echo ""
+            info "Run a skill: tian-cli skill run <id> [input text]"
+            info "Install:     tian-cli add skill <id>"
+            rule
+            ;;
+
+        info)
+            local skill_id="${1:-}"
+            [[ -n "$skill_id" ]] || fail "Usage: skill info <id>"
+            local row; row=$(find_skill_by_id "$skill_id") \
+                || fail "Unknown skill '$skill_id'. Run: tian-cli skill list"
+            local _id display_name _source prompt_file
+            IFS='|' read -r _id display_name _source prompt_file _ <<< "$row"
+
+            local skill_file=""
+            if [[ -f "$HOME/.tian/skills/${skill_id}.md" ]]; then
+                skill_file="$HOME/.tian/skills/${skill_id}.md"
+            elif [[ -n "$prompt_file" && -f "$TIAN_DIR/$prompt_file" ]]; then
+                skill_file="$TIAN_DIR/$prompt_file"
+            fi
+
+            hdr "Skill: $display_name"
+            if [[ -n "$skill_file" ]]; then
+                cat "$skill_file"
+                echo ""
+                info "Run it with: tian-cli skill run $skill_id [your input]"
+            else
+                warn "Skill not installed. Run: tian-cli add skill $skill_id"
+            fi
+            ;;
+
+        ""|help|--help|-h)
+            echo ""
+            echo -e "${CYAN}${BOLD}  tian-cli skill${RESET}"
+            rule
+            echo "  skill list                  List available skills and show which are installed"
+            echo "  skill run <id>              Run a skill (reads its prompt template)"
+            echo "  skill run <id> <input>      Run a skill with extra context or instructions"
+            echo "  skill info <id>             Print the skill's prompt template"
+            echo ""
+            echo "  Examples:"
+            echo "    tian-cli skill run email-assistant"
+            echo "    tian-cli skill run email-assistant \"Draft a reply declining the meeting\""
+            echo "    tian-cli skill run meeting-notes \"$(printf '<paste your notes here>')\" "
+            echo ""
+            ;;
+
+        *)
+            fail "Unknown subcommand '$sub'. Run: tian-cli skill"
+            ;;
+    esac
+}
+
 cmd_list() {
     local sub="${1:-}"; shift || true
     case "$sub" in
@@ -2890,6 +3004,7 @@ case "$CMD" in
     jobs)      cmd_jobs "$@" ;;
     schedule)  cmd_schedule "$@" ;;
     list)      cmd_list "$@" ;;
+    skill)     cmd_skill "$@" ;;
     config)    cmd_config "$@" ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
