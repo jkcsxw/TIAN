@@ -704,6 +704,7 @@ $(rule)
     jobs retry <id>     Re-run a failed or quota-stopped job with its original prompt
     jobs clear          Clear completed jobs (--old <days> keeps recent ones; --dry-run previews)
     schedule add        Create a recurring task (crontab on Linux, launchd on macOS)
+    schedule add --day  Set day of week for weekly schedules (SUN MON TUE WED THU FRI SAT)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
@@ -728,6 +729,7 @@ $(rule)
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
+    bash tian-cli.sh schedule add weekly-report "Weekly summary" 09:00 weekly --day FRI
     bash tian-cli.sh schedule list
     bash tian-cli.sh config export --output my-tian-backup.json
     bash tian-cli.sh config export --no-keys
@@ -1250,8 +1252,24 @@ PYEOF
 
 # ── Schedule helpers ───────────────────────────────────────────────────────────
 
+# Convert a day name (SUN MON TUE WED THU FRI SAT, case-insensitive) to the
+# cron/launchd weekday integer (0=Sun … 6=Sat). Accepts full names too.
+_day_name_to_num() {
+    local d; d=$(echo "${1:-MON}" | tr '[:lower:]' '[:upper:]' | cut -c1-3)
+    case "$d" in
+        SUN) echo 0 ;;
+        MON) echo 1 ;;
+        TUE) echo 2 ;;
+        WED) echo 3 ;;
+        THU) echo 4 ;;
+        FRI) echo 5 ;;
+        SAT) echo 6 ;;
+        *) echo "1" ;;  # fallback to Monday
+    esac
+}
+
 _schedule_add_linux() {
-    local name="$1" prompt="$2" time="$3" repeat="$4"
+    local name="$1" prompt="$2" time="$3" repeat="$4" day="${5:-MON}"
     local hour minute cron_expr
     hour=$(echo "$time" | cut -d: -f1)
     minute=$(echo "$time" | cut -d: -f2)
@@ -1261,7 +1279,7 @@ _schedule_add_linux() {
     case "$repeat" in
         hourly) cron_expr="0 * * * *" ;;
         daily)  cron_expr="$minute $hour * * *" ;;
-        weekly) cron_expr="$minute $hour * * 1" ;;
+        weekly) cron_expr="$minute $hour * * $(_day_name_to_num "$day")" ;;
         once)
             # Write a self-removing wrapper: runs the task then deletes its own
             # cron entry so it fires exactly once rather than becoming recurring.
@@ -1284,17 +1302,19 @@ ONCESCRIPT
     # Remove existing entry for this name then append new one
     ( crontab -l 2>/dev/null | grep -vF "# tian-$name" ; echo "$job_line" ) | crontab -
 
-    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "" <<'PYEOF'
+    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "$day" <<'PYEOF'
 import json, sys
 from datetime import datetime
-sf, name, prompt, time, repeat, _ = sys.argv[1:]
+sf, name, prompt, time, repeat, day = sys.argv[1:]
 with open(sf) as fh:
     schedules = json.load(fh)
 schedules = [s for s in schedules if s.get('name') != name]
-schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat,
-                  "createdAt": datetime.now().isoformat()})
+entry = {"name": name, "prompt": prompt, "time": time, "repeat": repeat,
+         "createdAt": datetime.now().isoformat()}
+if repeat == "weekly" and day:
+    entry["dayOfWeek"] = day.upper()
 with open(sf, 'w') as fh:
-    json.dump(schedules, fh, indent=2)
+    json.dump(schedules + [entry], fh, indent=2)
 PYEOF
     ok "Schedule '$name' created ($repeat at $time) via crontab."
     info "Results will appear in: bash tian-cli.sh jobs"
@@ -1310,7 +1330,7 @@ PYEOF
 }
 
 _schedule_add_macos() {
-    local name="$1" prompt="$2" time="$3" repeat="$4"
+    local name="$1" prompt="$2" time="$3" repeat="$4" day="${5:-MON}"
     local plist_dir="$HOME/Library/LaunchAgents"
     local plist_label="com.tian.$name"
     local plist_file="$plist_dir/$plist_label.plist"
@@ -1325,7 +1345,7 @@ _schedule_add_macos() {
     case "$repeat" in
         hourly) interval_block="<key>StartInterval</key><integer>3600</integer>" ;;
         daily)  interval_block="<key>StartCalendarInterval</key><dict><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
-        weekly) interval_block="<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
+        weekly) interval_block="<key>StartCalendarInterval</key><dict><key>Weekday</key><integer>$(_day_name_to_num "$day")</integer><key>Hour</key><integer>$hour</integer><key>Minute</key><integer>$minute</integer></dict>" ;;
         once)
             # Fire at the specified time exactly once: use a self-removing wrapper
             # script so launchd doesn't repeat the job on subsequent days.
@@ -1375,17 +1395,19 @@ PLIST
 
     launchctl load "$plist_file" 2>/dev/null || launchctl bootstrap "gui/$(id -u)" "$plist_file" 2>/dev/null || true
 
-    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "$plist_file" <<'PYEOF'
+    python3 - "$SCHEDULES_FILE" "$name" "$prompt" "$time" "$repeat" "$plist_file" "$day" <<'PYEOF'
 import json, sys
 from datetime import datetime
-sf, name, prompt, time, repeat, plist = sys.argv[1:]
+sf, name, prompt, time, repeat, plist, day = sys.argv[1:]
 with open(sf) as fh:
     schedules = json.load(fh)
 schedules = [s for s in schedules if s.get('name') != name]
-schedules.append({"name": name, "prompt": prompt, "time": time, "repeat": repeat,
-                  "plistFile": plist, "createdAt": datetime.now().isoformat()})
+entry = {"name": name, "prompt": prompt, "time": time, "repeat": repeat,
+         "plistFile": plist, "createdAt": datetime.now().isoformat()}
+if repeat == "weekly" and day:
+    entry["dayOfWeek"] = day.upper()
 with open(sf, 'w') as fh:
-    json.dump(schedules, fh, indent=2)
+    json.dump(schedules + [entry], fh, indent=2)
 PYEOF
     ok "Schedule '$name' created ($repeat at $time) via launchd."
     info "Results will appear in: bash tian-cli.sh jobs"
@@ -1412,14 +1434,25 @@ cmd_schedule() {
     case "$sub" in
         add)
             local name="${1:-}"; local prompt="${2:-}"; local time="${3:-08:00}"; local repeat="${4:-daily}"
-            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once]"
+            # Consume positional args before scanning for flags
+            shift 4 2>/dev/null || true
+            local day="MON"
+            while [[ $# -gt 0 ]]; do
+                case "${1:-}" in
+                    --day|-d) day="${2:-MON}"; shift 2 ;;
+                    *) shift ;;
+                esac
+            done
+            [[ -z "$name" || -z "$prompt" ]] && fail "Usage: schedule add <name> \"prompt\" [HH:MM] [daily|weekly|hourly|once] [--day MON]"
             [[ ! "$time" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] && fail "Invalid time '$time'. Use HH:MM format (e.g. 08:30)."
             [[ ! "$repeat" =~ ^(daily|weekly|hourly|once)$ ]] && fail "Invalid repeat '$repeat'. Choose: daily, weekly, hourly, once."
+            day=$(echo "$day" | tr '[:lower:]' '[:upper:]' | cut -c1-3)
+            [[ ! "$day" =~ ^(SUN|MON|TUE|WED|THU|FRI|SAT)$ ]] && fail "Invalid day '$day'. Use: SUN MON TUE WED THU FRI SAT"
             ensure_dirs
             if [[ "$platform" == "linux" || "$platform" == "wsl" ]]; then
-                _schedule_add_linux "$name" "$prompt" "$time" "$repeat"
+                _schedule_add_linux "$name" "$prompt" "$time" "$repeat" "$day"
             elif [[ "$platform" == "macos" ]]; then
-                _schedule_add_macos "$name" "$prompt" "$time" "$repeat"
+                _schedule_add_macos "$name" "$prompt" "$time" "$repeat" "$day"
             else
                 fail "schedule add is not supported on this platform ($platform)."
             fi
@@ -1443,10 +1476,13 @@ with open(sys.argv[1]) as fh:
 if not schedules:
     print("  No schedules. Create one with: bash tian-cli.sh schedule add <name> \"prompt\" HH:MM daily")
 else:
-    print(f"\n  {'NAME':<22} {'REPEAT':<10} {'TIME':<8} PROMPT")
-    print("  " + "─"*70)
+    print(f"\n  {'NAME':<22} {'REPEAT':<14} {'TIME':<8} PROMPT")
+    print("  " + "─"*74)
     for s in schedules:
-        print(f"  {s['name']:<22} {s['repeat']:<10} {s['time']:<8} {s['prompt'][:40]}...")
+        repeat = s['repeat']
+        if repeat == 'weekly' and s.get('dayOfWeek'):
+            repeat = f"weekly({s['dayOfWeek']})"
+        print(f"  {s['name']:<22} {repeat:<14} {s['time']:<8} {s['prompt'][:40]}{'...' if len(s.get('prompt',''))>40 else ''}")
     print()
 PYEOF
             ;;
