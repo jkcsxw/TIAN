@@ -3297,7 +3297,12 @@ PYEOF
 
 cmd_repair() {
     info "Re-running setup to repair the current install."
-    bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
+    local platform; platform=$(detect_platform)
+    if [[ "$platform" == "macos" ]]; then
+        bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
+    else
+        bash "$TIAN_DIR/linux/setup.sh" "$TIAN_DIR"
+    fi
 }
 
 # ── Config export / import ────────────────────────────────────────────────────
@@ -4371,7 +4376,14 @@ PYEOF
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
-    setup)      bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR" ;;
+    setup)
+        _platform=$(detect_platform)
+        if [[ "$_platform" == "macos" ]]; then
+            bash "$TIAN_DIR/mac/setup.sh" "$TIAN_DIR"
+        else
+            bash "$TIAN_DIR/linux/setup.sh" "$TIAN_DIR"
+        fi ;;
+
     install)    cmd_install "$@" ;;
     repair)     cmd_repair ;;
     update)     cmd_update ;;

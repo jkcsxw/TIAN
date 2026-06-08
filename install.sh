@@ -81,7 +81,7 @@ download_repo() {
     rm -rf "$INSTALL_DIR"
     mv "$extracted_dir" "$INSTALL_DIR"
 
-    chmod +x "$INSTALL_DIR/setup.sh" "$INSTALL_DIR/tian-cli.sh" "$INSTALL_DIR/mac/setup.sh" "$INSTALL_DIR/mac/tian-cli-bash.sh"
+    chmod +x "$INSTALL_DIR/setup.sh" "$INSTALL_DIR/tian-cli.sh" "$INSTALL_DIR/mac/setup.sh" "$INSTALL_DIR/mac/tian-cli-bash.sh" "$INSTALL_DIR/linux/setup.sh"
     ok "Installed files to $INSTALL_DIR"
 }
 
@@ -97,12 +97,9 @@ run_platform_flow() {
         linux)
             ok "Linux CLI installed."
             echo ""
-            echo -e "${BOLD}Next steps${RESET}"
-            echo "  1. Open a new terminal, or run: export PATH=\"$HOME/.local/bin:\$PATH\""
-            echo "  2. Run: tian-cli help"
-            echo "  3. Optional: if you have PowerShell Core, run: tian-cli setup"
+            echo -e "${BOLD}Starting interactive setup...${RESET}"
             echo ""
-            bash "$INSTALL_DIR/tian-cli.sh" help
+            bash "$INSTALL_DIR/linux/setup.sh" "$INSTALL_DIR"
             ;;
     esac
 }
