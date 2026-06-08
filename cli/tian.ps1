@@ -207,6 +207,9 @@ function Cmd-Help {
     add mcp  <id>       添加MCP服务器到配置
     add skill <id>      安装技能包
     remove mcp  <id>    从配置中移除MCP服务器
+    key set [id]        设置或更新API密钥（带实时验证）
+    key show            显示所有已设置的API密钥（已掩码）
+    key remove <id>     从环境变量中删除API密钥
     repair              重新安装修复当前配置
     lang en|zh          切换界面语言
 
@@ -292,6 +295,9 @@ function Cmd-Help {
     add mcp  <id>       Add an MCP server to your config
     add skill <id>      Install a skill
     remove mcp  <id>    Remove an MCP server from your config
+    key set [id]        Set or update an API key (with live verification)
+    key show            Show all API keys that are currently set (masked)
+    key remove <id>     Remove an API key from environment variables
     repair              Re-run install to fix the current config
     lang en|zh          Switch interface language
 
@@ -633,10 +639,7 @@ function Cmd-List {
 function Cmd-Add {
     switch ($Subcommand) {
         "mcp" {
-            $id = $Command  # positional arg after 'add mcp'
-            # When called as: tian-cli add mcp <id>, $Subcommand="mcp", $id comes from args
-            # Re-read from raw args
-            $id = $args[0]
+            $id = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
             if (-not $id) {
                 Write-Fail "Usage: tian-cli add mcp <id>   (run 'tian-cli list mcp' for IDs)"
                 return
@@ -666,7 +669,7 @@ function Cmd-Add {
             Write-Ok "$($server.displayName) added to $($backend.displayName) config."
         }
         "skill" {
-            $id = $args[0]
+            $id = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
             if (-not $id) {
                 Write-Fail "Usage: tian-cli add skill <id>   (run 'tian-cli list skills' for IDs)"
                 return
@@ -685,7 +688,7 @@ function Cmd-Add {
 function Cmd-Remove {
     switch ($Subcommand) {
         "mcp" {
-            $id = $args[0]
+            $id = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
             if (-not $id) { Write-Fail "Usage: tian-cli remove mcp <id>"; return }
             $server = Get-McpById $id
             if (-not $server) { Write-Fail "Unknown MCP id '$id'"; return }
@@ -1586,6 +1589,174 @@ function Cmd-Config {
     }
 }
 
+function Cmd-Key {
+    # tian-cli key set [backend-id]
+    # tian-cli key show
+    # tian-cli key remove <backend-id>
+    $sub = $Subcommand.ToLower()
+
+    # Helper: collect all backends that have an API key, de-duplicated by env var
+    function Get-KeyBackends {
+        $seen = @{}
+        $catalog.backends | ForEach-Object {
+            $env = $_.apiKeyEnvVar
+            if ($env -and -not $seen.ContainsKey($env)) {
+                $seen[$env] = $true
+                [PSCustomObject]@{
+                    Id          = $_.id
+                    DisplayName = Get-DisplayName $_
+                    EnvVar      = $env
+                    KeyUrl      = $_.apiKeyUrl
+                    KeyHint     = $_.apiKeyHint
+                }
+            }
+        }
+    }
+
+    switch ($sub) {
+        "set" {
+            $backendId = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
+            $backends  = Get-KeyBackends
+
+            if ($backendId) {
+                $entry = $backends | Where-Object { $_.Id -eq $backendId } | Select-Object -First 1
+                if (-not $entry) {
+                    Write-Fail "Unknown backend '$backendId' or it has no API key. Run: tian-cli list backends"
+                    exit 1
+                }
+            } else {
+                if (-not $backends) {
+                    Write-Fail "No backends with API keys found in catalog."
+                    exit 1
+                }
+                Write-Header "Set API Key"
+                Write-Rule
+                $names = @($backends | ForEach-Object { "$($_.DisplayName)  ($($_.EnvVar))" })
+                $idx   = Prompt-Choice "Which backend do you want to set a key for?" $names 0
+                $entry = @($backends)[$idx]
+            }
+
+            Write-Header "Set API Key — $($entry.DisplayName)"
+            Write-Rule
+            if ($entry.KeyUrl)  { Write-Info "Get your key at: $($entry.KeyUrl)" }
+            if ($entry.KeyHint) { Write-Info $entry.KeyHint }
+            Write-Host ""
+
+            $existing = [System.Environment]::GetEnvironmentVariable($entry.EnvVar, "User")
+            if (-not $existing) { $existing = [System.Environment]::GetEnvironmentVariable($entry.EnvVar, "Process") }
+            if ($existing) {
+                Write-Info "Current value: $($existing.Substring(0, [Math]::Min(8, $existing.Length)))..."
+                Write-Host ""
+            }
+
+            $apiKey = Prompt-Secret "$($entry.EnvVar) (paste your key)"
+            Write-Host ""
+            if (-not $apiKey) { Write-Fail "No key entered — aborting."; exit 1 }
+
+            # Determine provider for live verification
+            $provider = ""
+            if ($entry.EnvVar -match "ANTHROPIC") { $provider = "anthropic" }
+            elseif ($entry.EnvVar -match "OPENAI") { $provider = "openai" }
+
+            # Persist: User scope on Windows, shell profile on macOS/Linux
+            if ($IsMacOS -or $IsLinux) {
+                $profilePath = if (Test-Path "$env:HOME/.zshrc") { "$env:HOME/.zshrc" } else { "$env:HOME/.bash_profile" }
+                $varName     = $entry.EnvVar
+                $filtered    = (Get-Content $profilePath -ErrorAction SilentlyContinue) | Where-Object { $_ -notmatch "^export $varName=" }
+                ($filtered + "export $varName=`"$($apiKey.Trim())`"") | Set-Content $profilePath -Encoding UTF8
+                [System.Environment]::SetEnvironmentVariable($varName, $apiKey.Trim(), "Process")
+                Write-Ok "$($entry.EnvVar) saved to $profilePath"
+                Write-Info "To activate in this session: . $profilePath"
+            } else {
+                [System.Environment]::SetEnvironmentVariable($entry.EnvVar, $apiKey.Trim(), "User")
+                [System.Environment]::SetEnvironmentVariable($entry.EnvVar, $apiKey.Trim(), "Process")
+                Write-Ok "$($entry.EnvVar) saved to User environment variables"
+                Write-Info "Open a new terminal for the change to take effect."
+            }
+            Write-Host ""
+
+            # Live verification (best-effort)
+            if ($provider) {
+                $b = $catalog.backends | Where-Object { $_.id -eq $entry.Id } | Select-Object -First 1
+                if ($b) { Test-ApiKey -Backend $b -ApiKey $apiKey | Out-Null }
+            }
+            Write-Host ""
+        }
+
+        "show" {
+            Write-Header "API Keys"
+            Write-Rule
+            $backends = Get-KeyBackends
+            if (-not $backends) { Write-Info "No backends with API keys found in catalog."; return }
+            $anySet = $false
+            foreach ($entry in $backends) {
+                $val = [System.Environment]::GetEnvironmentVariable($entry.EnvVar, "User")
+                if (-not $val) { $val = [System.Environment]::GetEnvironmentVariable($entry.EnvVar, "Process") }
+                $label = "{0,-38}" -f "$($entry.DisplayName) ($($entry.EnvVar))"
+                if ($val) {
+                    Write-Ok "$label  $($val.Substring(0, [Math]::Min(8, $val.Length)))..."
+                    $anySet = $true
+                } else {
+                    Write-Info "$label  not set"
+                }
+            }
+            if (-not $anySet) {
+                Write-Host ""
+                Write-Info "No API keys are currently set. Run: tian-cli key set"
+            }
+            Write-Host ""
+        }
+
+        "remove" {
+            $backendId = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
+            if (-not $backendId) {
+                Write-Fail "Usage: tian-cli key remove <backend-id>"
+                exit 1
+            }
+            $backends = Get-KeyBackends
+            $entry    = $backends | Where-Object { $_.Id -eq $backendId } | Select-Object -First 1
+            if (-not $entry) {
+                Write-Fail "Unknown backend '$backendId' or it has no API key. Run: tian-cli list backends"
+                exit 1
+            }
+
+            if ($IsMacOS -or $IsLinux) {
+                $profilePath = if (Test-Path "$env:HOME/.zshrc") { "$env:HOME/.zshrc" } else { "$env:HOME/.bash_profile" }
+                $varName     = $entry.EnvVar
+                if (Test-Path $profilePath) {
+                    $filtered = (Get-Content $profilePath) | Where-Object { $_ -notmatch "^export $varName=" }
+                    $filtered | Set-Content $profilePath -Encoding UTF8
+                    [System.Environment]::SetEnvironmentVariable($varName, $null, "Process")
+                    Write-Ok "$varName removed from $profilePath"
+                } else {
+                    Write-Info "$varName was not found in profile — nothing to remove"
+                }
+            } else {
+                $current = [System.Environment]::GetEnvironmentVariable($entry.EnvVar, "User")
+                if ($current) {
+                    [System.Environment]::SetEnvironmentVariable($entry.EnvVar, $null, "User")
+                    [System.Environment]::SetEnvironmentVariable($entry.EnvVar, $null, "Process")
+                    Write-Ok "$($entry.EnvVar) removed from User environment variables"
+                } else {
+                    Write-Info "$($entry.EnvVar) was not set — nothing to remove"
+                }
+            }
+            Write-Host ""
+        }
+
+        default {
+            Write-Host ""
+            Write-Color "  Usage:" White
+            Write-Info "  tian-cli key set [backend-id]    Set or update an API key (with live verification)"
+            Write-Info "  tian-cli key show                Show which API keys are set"
+            Write-Info "  tian-cli key remove <backend-id> Remove an API key from environment variables"
+            Write-Host ""
+            Write-Info "  Example: tian-cli key set claude-code"
+            Write-Host ""
+        }
+    }
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 switch ($Command.ToLower()) {
     "setup"   { Cmd-Setup }
@@ -1593,7 +1764,7 @@ switch ($Command.ToLower()) {
     "status"  { Cmd-Status }
     "list"    { Cmd-List }
     "add"     {
-        $id = $args[0]
+        $id = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
         switch ($Subcommand.ToLower()) {
             "mcp"   {
                 $server = Get-McpById $id
@@ -1626,7 +1797,7 @@ switch ($Command.ToLower()) {
         }
     }
     "remove"  {
-        $id = $args[0]
+        $id = if ($RemainingArgs.Count -gt 0) { $RemainingArgs[0] } else { "" }
         if ($Subcommand.ToLower() -eq "mcp") {
             $server = Get-McpById $id
             if (-not $server) { Write-Fail (TF "cli.unknown_mcp_id" $id); exit 1 }
@@ -1644,6 +1815,7 @@ switch ($Command.ToLower()) {
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
     "config"    { Cmd-Config }
+    "key"       { Cmd-Key }
     "doctor"    { Cmd-Doctor -Fix:$Fix }
     "quota"     { Cmd-Quota }
     "update"    { Cmd-Update }
