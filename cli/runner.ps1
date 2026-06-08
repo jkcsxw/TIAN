@@ -290,7 +290,8 @@ param(
     [string]$ScheduleName,
     [string]$TianDir,
     [string]$CliScript,
-    [string]$ShellCommand
+    [string]$ShellCommand,
+    [string]$BackendsFile = ""
 )
 
 function Test-QuotaExhaustedText {
@@ -299,22 +300,52 @@ function Test-QuotaExhaustedText {
     return $Text -match '(?is)(insufficient_quota|quota(?:\s+is)?\s+exhausted|quota_exhausted|rate.limit|rate limit|429|too many requests|overloaded)'
 }
 
-$argsList = @()
-if ($BackendFlag) { $argsList += $BackendFlag }
-$argsList += $Prompt
-$output = & $BackendCommand @argsList 2>&1
-$exitCode = if ($LASTEXITCODE -is [int]) { [int]$LASTEXITCODE } else { 0 }
+# Load all available backends from file; fall back to the primary backend passed as params
+$backends = @()
+if ($BackendsFile -and (Test-Path $BackendsFile)) {
+    try {
+        $parsed = Get-Content $BackendsFile -Raw | ConvertFrom-Json
+        if ($parsed -is [array]) { $backends = [array]$parsed } elseif ($parsed) { $backends = @($parsed) }
+    } catch {}
+    Remove-Item $BackendsFile -ErrorAction SilentlyContinue
+}
+if ($backends.Count -eq 0) {
+    $backends = @([PSCustomObject]@{ Command = $BackendCommand; Flag = $BackendFlag; DisplayName = "AI"; Id = "" })
+}
+
+$output      = @()
+$exitCode    = 0
+$outputText  = ""
+$usedBackend = $backends[0]
+$quotaExhausted = $false
+
+foreach ($b in $backends) {
+    $argsList = @()
+    if ($b.Flag) { $argsList += $b.Flag }
+    $argsList += $Prompt
+    $output   = & $b.Command @argsList 2>&1
+    $exitCode = if ($LASTEXITCODE -is [int]) { [int]$LASTEXITCODE } else { 0 }
+    $outputText     = if ($output) { ($output | Out-String) } else { "" }
+    $usedBackend    = $b
+    $quotaExhausted = Test-QuotaExhaustedText -Text $outputText
+    if (-not $quotaExhausted) { break }
+    $output += "[TIAN] Quota/rate-limit on $($b.DisplayName) — trying next backend..."
+}
+
 $output | Out-File -FilePath $OutputFile -Encoding UTF8
-$outputText = if ($output) { ($output | Out-String) } else { "" }
-$quotaExhausted = Test-QuotaExhaustedText -Text $outputText
 $finishedAt = [System.DateTime]::Now.ToString("o")
-$status = if ($quotaExhausted) { "stopped" } elseif ($exitCode -eq 0) { "done" } else { "error" }
+$status     = if ($quotaExhausted) { "stopped" } elseif ($exitCode -eq 0) { "done" } else { "error" }
 $stopReason = if ($quotaExhausted) { "quota_exhausted" } else { $null }
 
 if (Test-Path $MetaFile) {
     $meta = Get-Content $MetaFile -Raw | ConvertFrom-Json
     $meta.status = $status
     $meta.finishedAt = $finishedAt
+    if ($usedBackend.Id) {
+        if (-not ($meta.PSObject.Properties['backend'])) {
+            $meta | Add-Member -NotePropertyName 'backend' -NotePropertyValue $usedBackend.Id
+        } else { $meta.backend = $usedBackend.Id }
+    }
     if ($stopReason) {
         if (-not ($meta.PSObject.Properties['stopReason'])) {
             $meta | Add-Member -NotePropertyName 'stopReason' -NotePropertyValue $stopReason
@@ -332,6 +363,11 @@ if (Test-Path $JobsFile) {
         if (-not ($job.PSObject.Properties['finishedAt'])) {
             $job | Add-Member -NotePropertyName 'finishedAt' -NotePropertyValue $finishedAt
         } else { $job.finishedAt = $finishedAt }
+        if ($usedBackend.Id) {
+            if (-not ($job.PSObject.Properties['backend'])) {
+                $job | Add-Member -NotePropertyName 'backend' -NotePropertyValue $usedBackend.Id
+            } else { $job.backend = $usedBackend.Id }
+        }
         if ($stopReason) {
             if (-not ($job.PSObject.Properties['stopReason'])) {
                 $job | Add-Member -NotePropertyName 'stopReason' -NotePropertyValue $stopReason
@@ -346,7 +382,7 @@ if ($quotaExhausted -and $ScheduleName -and (Test-Path $CliScript)) {
 }
 
 # Desktop notification on job completion
-$notifMsg = if ($quotaExhausted) { "Job $JobId stopped — quota exhausted" } elseif ($exitCode -ne 0) { "Job $JobId failed" } else { "Job $JobId finished" }
+$notifMsg = if ($quotaExhausted) { "Job $JobId stopped — all backends quota-exhausted" } elseif ($exitCode -ne 0) { "Job $JobId failed" } else { "Job $JobId finished (via $($usedBackend.DisplayName))" }
 try {
     if ($env:OS -eq 'Windows_NT' -or $IsWindows) {
         Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
@@ -367,6 +403,16 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
 '@
         Set-Content -Path $workerFile -Value $workerScript -Encoding UTF8
 
+        # Collect all available backends and write them to a sidecar file so the
+        # worker can fall back to the next one if the primary hits quota/rate-limits.
+        $allBgs = @(Get-AllAvailableBackends -TianDir $TianDir)
+        if ($allBgs.Count -eq 0) { $allBgs = @($backend) }
+        $backendsForWorker = $allBgs | ForEach-Object {
+            [PSCustomObject]@{ Command = $_.cliCommand; Flag = $_.nonInteractiveFlag; DisplayName = $_.displayName; Id = $_.id }
+        }
+        $backendsFile = Join-Path $global:TIAN_TASKS_DIR "$jobId.backends.json"
+        ($backendsForWorker | ConvertTo-Json -Depth 3) | Set-Content $backendsFile -Encoding UTF8
+
         $shellCommand = Get-RunnerShellCommand
         $cliScript = Join-Path $TianDir "cli" "tian.ps1"
         $quotedArgs = @(
@@ -383,7 +429,8 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
             "-ScheduleName", "`"$ScheduleName`"",
             "-TianDir", "`"$TianDir`"",
             "-CliScript", "`"$cliScript`"",
-            "-ShellCommand", "`"$shellCommand`""
+            "-ShellCommand", "`"$shellCommand`"",
+            "-BackendsFile", "`"$backendsFile`""
         )
         $proc = Start-RunnerBackgroundProcess -ShellCommand $shellCommand -Arguments ($quotedArgs -join " ")
 
