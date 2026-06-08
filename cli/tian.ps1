@@ -18,6 +18,8 @@ param(
     [switch]$All,
     [switch]$List,
     [switch]$Fix,
+    [switch]$NoKeys,
+    [string]$Output     = "",
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$RemainingArgs
 )
 
@@ -220,6 +222,9 @@ function Cmd-Help {
     schedule run <名称>        立即运行某个定时任务
     schedule remove <名称>     删除定时任务
 
+    config export             将配置（API密钥、MCP、技能、定时任务）导出到文件
+    config import <文件>       在此机器上恢复之前导出的配置
+
     help                      显示此帮助
 
   安装参数
@@ -254,6 +259,10 @@ function Cmd-Help {
     tian-cli schedule list
     tian-cli schedule run morning-brief
     tian-cli schedule remove morning-brief
+
+    tian-cli config export --output 我的备份.json
+    tian-cli config export --no-keys
+    tian-cli config import 我的备份.json
 
 "@ White
     } else {
@@ -293,6 +302,9 @@ function Cmd-Help {
     schedule run <name>        Run a scheduled task immediately
     schedule remove <name>     Delete a scheduled task
 
+    config export              Export setup (API keys, MCP configs, skills, schedules) to a file
+    config import <file>       Restore a previously exported config on this machine
+
     help                       Show this help
 
   INSTALL FLAGS
@@ -327,6 +339,10 @@ function Cmd-Help {
     tian-cli schedule list
     tian-cli schedule run morning-brief
     tian-cli schedule remove morning-brief
+
+    tian-cli config export --output my-tian-backup.json
+    tian-cli config export --no-keys
+    tian-cli config import my-tian-backup.json
 
 "@ White
     }
@@ -1178,6 +1194,230 @@ function Cmd-Uninstall {
     Write-Host ""
 }
 
+function Cmd-Config-Export {
+    $outFile = if ($Output) { $Output } else { "tian-config.json" }
+
+    Write-Header "TIAN Config Export"
+    Write-Rule
+
+    if (-not $NoKeys) {
+        Write-Warn "This export file will contain your API keys in plaintext."
+        Write-Info "Keep it secure. Use --no-keys to omit keys."
+        Write-Host ""
+    }
+
+    $export = [ordered]@{
+        version    = 1
+        exportedAt = (Get-Date).ToString("o")
+        platform   = "windows"
+    }
+
+    # ── API Keys ──────────────────────────────────────────────────────────────
+    if (-not $NoKeys) {
+        $apiKeys  = @{}
+        $seenVars = @{}
+        foreach ($b in $catalog.backends) {
+            $varName = $b.apiKeyEnvVar
+            if (-not $varName -or $seenVars.ContainsKey($varName)) { continue }
+            $seenVars[$varName] = $true
+            $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
+            if (-not $val) { $val = [System.Environment]::GetEnvironmentVariable($varName, "Process") }
+            if ($val) { $apiKeys[$varName] = $val }
+        }
+        $export["apiKeys"] = $apiKeys
+        Write-Info "API keys collected: $($apiKeys.Count)"
+    }
+
+    # ── MCP Servers ───────────────────────────────────────────────────────────
+    $mcpConfigs = @{}
+    $seenPaths  = @{}
+    foreach ($backend in $catalog.backends) {
+        if (-not (Test-BackendSupportsMcp $backend)) { continue }
+        $target = $backend.mcpConfigTarget
+        if (-not $target) { continue }
+        $path = Get-McpConfigPath $backend
+        if ($seenPaths.ContainsKey($path) -or -not (Test-Path $path)) { continue }
+        $seenPaths[$path] = $true
+        try {
+            $cfg     = Get-Content $path -Raw | ConvertFrom-Json
+            $servers = $cfg.mcpServers
+            if ($servers) {
+                $ht = ConvertTo-Hashtable $servers
+                if ($ht.Count -gt 0) {
+                    $mcpConfigs[$target] = $ht
+                    Write-Info "MCP: $target — $($ht.Count) server(s) collected"
+                }
+            }
+        } catch {
+            Write-Warn "Could not read MCP config at $path — skipping"
+        }
+    }
+    $export["mcpServers"] = $mcpConfigs
+
+    # ── Schedules ─────────────────────────────────────────────────────────────
+    $schedules = @()
+    try { $schedules = Read-Schedules; if (-not $schedules) { $schedules = @() } } catch {}
+    $export["schedules"] = $schedules
+    Write-Info "Schedules collected: $(@($schedules).Count)"
+
+    # ── Installed Skills ──────────────────────────────────────────────────────
+    $skillsDir      = Join-Path $env:USERPROFILE ".tian\skills"
+    $installedSkills = @()
+    if (Test-Path $skillsDir) {
+        $installedSkills = @(Get-ChildItem $skillsDir -Filter "*.md" | ForEach-Object { $_.BaseName })
+    }
+    $export["installedSkills"] = $installedSkills
+    Write-Info "Skills collected: $($installedSkills.Count)"
+
+    # ── Write output file ─────────────────────────────────────────────────────
+    $json = $export | ConvertTo-Json -Depth 10
+    Set-Content -Path $outFile -Value $json -Encoding UTF8
+
+    Write-Host ""
+    Write-Ok "Config exported to: $outFile"
+    Write-Info "Copy this file to the new machine, then run:"
+    Write-Info "  tian-cli config import $outFile"
+    Write-Host ""
+}
+
+function Cmd-Config-Import {
+    $inFile = if ($RemainingArgs.Count -gt 0) { [string]$RemainingArgs[0] } else { "" }
+    if (-not $inFile) {
+        Write-Fail "Usage: tian-cli config import <file> [--yes]"
+        return
+    }
+    if (-not (Test-Path $inFile)) {
+        Write-Fail "File not found: $inFile"
+        return
+    }
+
+    Write-Header "TIAN Config Import"
+    Write-Rule
+
+    $imported = $null
+    try {
+        $imported = Get-Content $inFile -Raw | ConvertFrom-Json
+    } catch {
+        Write-Fail "Invalid JSON in $inFile"
+        return
+    }
+
+    Write-Info "Importing TIAN config from: $inFile"
+    Write-Host ""
+
+    if (-not (Confirm-Action "Proceed?")) {
+        Write-Info "Cancelled."
+        return
+    }
+    Write-Host ""
+
+    # ── API Keys ──────────────────────────────────────────────────────────────
+    Write-Color "  API Keys" DarkGray
+    $keyCount = 0
+    if ($imported.apiKeys) {
+        $keyProps = $imported.apiKeys | Get-Member -MemberType NoteProperty -ErrorAction SilentlyContinue
+        foreach ($prop in $keyProps) {
+            $name = $prop.Name
+            $val  = $imported.apiKeys.$name
+            if ($name -and $val) {
+                [System.Environment]::SetEnvironmentVariable($name, $val, "User")
+                [System.Environment]::SetEnvironmentVariable($name, $val, "Process")
+                Write-Ok "$name saved to user environment"
+                $keyCount++
+            }
+        }
+    }
+    if ($keyCount -eq 0) { Write-Info "No API keys in export file" }
+    Write-Host ""
+
+    # ── MCP Servers ───────────────────────────────────────────────────────────
+    Write-Color "  MCP Servers" DarkGray
+    $mcpCount = 0
+    if ($imported.mcpServers) {
+        $targetProps = $imported.mcpServers | Get-Member -MemberType NoteProperty -ErrorAction SilentlyContinue
+        foreach ($prop in $targetProps) {
+            $target     = $prop.Name
+            $newServers = $imported.mcpServers.$target
+            if (-not $newServers) { continue }
+
+            $known = $catalog.backends | Where-Object { $_.mcpConfigTarget -eq $target } | Select-Object -First 1
+            if (-not $known) { Write-Warn "Unknown backend target '$target' — skipping"; continue }
+
+            $fakeBackend = [PSCustomObject]@{ mcpConfigTarget = $target; mcpConfigPath = "" }
+            $cfgPath = Get-McpConfigPath $fakeBackend
+            $cfgDir  = Split-Path $cfgPath -Parent
+            if (-not (Test-Path $cfgDir)) { New-Item -ItemType Directory -Path $cfgDir -Force | Out-Null }
+
+            $cfg = @{}
+            if (Test-Path $cfgPath) {
+                try { $cfg = ConvertTo-Hashtable (Get-Content $cfgPath -Raw | ConvertFrom-Json) } catch {}
+            }
+            if (-not $cfg.ContainsKey("mcpServers")) { $cfg["mcpServers"] = @{} }
+
+            $newHt = ConvertTo-Hashtable $newServers
+            foreach ($k in $newHt.Keys) { $cfg["mcpServers"][$k] = $newHt[$k] }
+            $cfg | ConvertTo-Json -Depth 10 | Set-Content $cfgPath -Encoding UTF8
+            Write-Ok "$target`: $($newHt.Count) MCP server(s) merged into $cfgPath"
+            $mcpCount++
+        }
+    }
+    if ($mcpCount -eq 0) { Write-Info "No MCP servers in export file" }
+    Write-Host ""
+
+    # ── Skills ────────────────────────────────────────────────────────────────
+    Write-Color "  Skills" DarkGray
+    $skillCount = 0
+    if ($imported.installedSkills) {
+        foreach ($skillId in $imported.installedSkills) {
+            if (-not $skillId) { continue }
+            $skill = Get-SkillById $skillId
+            if ($skill) {
+                Install-Skills -SelectedSkills @($skill) -TianDir $TianDir -LogBox $null -ProgressBar $fakeProgress
+                Write-Ok "Skill '$skillId' installed"
+                $skillCount++
+            } else {
+                Write-Warn "Skill '$skillId' not in catalog — skipping"
+            }
+        }
+    }
+    if ($skillCount -eq 0) { Write-Info "No skills in export file" }
+    Write-Host ""
+
+    # ── Schedules ─────────────────────────────────────────────────────────────
+    Write-Color "  Schedules" DarkGray
+    $schedCount = 0
+    if ($imported.schedules) {
+        foreach ($sched in $imported.schedules) {
+            $sName   = $sched.name
+            $sPrompt = $sched.prompt
+            $sTime   = if ($sched.time)   { $sched.time }   else { "08:00" }
+            $sRepeat = if ($sched.repeat) { $sched.repeat } else { "daily" }
+            if ($sName -and $sPrompt) {
+                Add-Schedule -Name $sName -Prompt $sPrompt -Time $sTime -Repeat $sRepeat -TianDir $TianDir
+                $schedCount++
+            }
+        }
+    }
+    if ($schedCount -eq 0) { Write-Info "No schedules in export file" }
+    Write-Host ""
+
+    Write-Rule
+    Write-Ok "Import complete!"
+    Write-Info "Open a new terminal so the saved environment variables take effect."
+    Write-Host ""
+}
+
+function Cmd-Config {
+    switch ($Subcommand.ToLower()) {
+        "export" { Cmd-Config-Export }
+        "import" { Cmd-Config-Import }
+        default  {
+            Write-Fail "Usage: tian-cli config export [--output <file>] [--no-keys]"
+            Write-Fail "       tian-cli config import <file> [--yes]"
+        }
+    }
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 switch ($Command.ToLower()) {
     "setup"   { Cmd-Setup }
@@ -1235,6 +1475,7 @@ switch ($Command.ToLower()) {
             } else { Write-Warn (TF "cli.mcp_not_configured" (Get-DisplayName $server)) }
         } else { Write-Fail (T "cli.remove_mcp_usage") }
     }
+    "config"    { Cmd-Config }
     "doctor"    { Cmd-Doctor -Fix:$Fix }
     "update"    { Cmd-Update }
     "repair"    { Cmd-Repair }
