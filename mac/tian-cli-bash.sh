@@ -709,6 +709,10 @@ $(rule)
     schedule list       List scheduled tasks
     schedule run <n>    Run a scheduled task now
     schedule remove <n> Delete a scheduled task
+    key set [id]        Set or update an API key for a backend (interactive)
+    key show            Show which API keys are currently set
+    key remove <id>     Remove an API key from your shell profile
+    quota               Check live quota/rate-limit status for all API keys (colored output)
     config export       Export setup (API keys, MCP configs, skills, schedules) to a file
     config import       Restore a previously exported config on this machine
     help                Show this help
@@ -737,6 +741,7 @@ $(rule)
     bash tian-cli.sh config export --output my-tian-backup.json
     bash tian-cli.sh config export --no-keys
     bash tian-cli.sh config import my-tian-backup.json
+    bash tian-cli.sh quota
 
 EOF
 }
@@ -3082,6 +3087,316 @@ EOF
     esac
 }
 
+cmd_key() {
+    local sub="${1:-}"; shift || true
+
+    case "$sub" in
+        set)
+            # tian-cli key set [backend-id]
+            local backend_id="${1:-}"
+            local b_row=""
+
+            if [[ -n "$backend_id" ]]; then
+                b_row=$(python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+target = sys.argv[2]
+for b in c['backends']:
+    if b.get('id') == target and b.get('apiKeyEnvVar'):
+        print('|'.join([b.get('id',''), b.get('displayName',''), b.get('apiKeyEnvVar',''), b.get('apiKeyUrl',''), b.get('apiKeyHint','')]))
+        break
+PYEOF
+) || true
+                [[ -z "$b_row" ]] && fail "Unknown backend '$backend_id' or it has no API key. Run: tian-cli list backends"
+            else
+                # No backend given: list backends that require a key and let user pick
+                local b_names=() b_ids=() b_envs=() b_urls=() b_hints=()
+                while IFS='|' read -r bid bname benv burl bhint; do
+                    [[ -z "$bid" ]] && continue
+                    b_ids+=("$bid")
+                    b_names+=("$bname")
+                    b_envs+=("$benv")
+                    b_urls+=("$burl")
+                    b_hints+=("$bhint")
+                done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+seen = set()
+for b in c['backends']:
+    env = b.get('apiKeyEnvVar', '')
+    if not env or env in seen: continue
+    seen.add(env)
+    print('|'.join([b.get('id',''), b.get('displayName',''), env, b.get('apiKeyUrl',''), b.get('apiKeyHint','')]))
+PYEOF
+)
+                if [[ ${#b_ids[@]} -eq 0 ]]; then
+                    fail "No backends with API keys found in catalog."
+                fi
+
+                echo -e "${BOLD}  Which backend do you want to set a key for?${RESET}"
+                local i
+                for i in "${!b_names[@]}"; do
+                    echo "    [$((i+1))] ${b_names[$i]}"
+                done
+                echo ""
+                local choice
+                read -rp "  Enter number [1]: " choice
+                choice="${choice:-1}"
+                local idx=$(( choice - 1 ))
+                if [[ "$idx" -lt 0 || "$idx" -ge ${#b_ids[@]} ]]; then
+                    fail "Invalid choice."
+                fi
+                b_row="${b_ids[$idx]}|${b_names[$idx]}|${b_envs[$idx]}|${b_urls[$idx]}|${b_hints[$idx]}"
+            fi
+
+            local bid bname benv burl bhint
+            IFS='|' read -r bid bname benv burl bhint <<< "$b_row"
+
+            hdr "Set API Key — $bname"
+            [[ -n "$burl" ]]  && info "Get your key at: $burl"
+            [[ -n "$bhint" ]] && info "$bhint"
+            echo ""
+
+            local existing="${!benv:-}"
+            if [[ -n "$existing" ]]; then
+                info "Current value: ${existing:0:8}..."
+                echo ""
+            fi
+
+            local api_key
+            api_key=$(prompt_secret "$benv (paste your key, then Enter)")
+            echo ""
+            [[ -z "$api_key" ]] && fail "No key entered — aborting."
+
+            local provider=""
+            [[ "$benv" == *ANTHROPIC* ]] && provider="anthropic"
+            [[ "$benv" == *OPENAI* ]]    && provider="openai"
+
+            save_shell_env_var "$benv" "$api_key"
+            ok "$benv saved to $(profile_file)"
+            echo ""
+
+            if [[ -n "$provider" ]]; then
+                info "Verifying key with the API..."
+                _verify_api_key "$provider" "$api_key" "$burl"
+            fi
+
+            echo ""
+            info "To activate immediately in this session: source $(profile_file)"
+            ;;
+
+        show)
+            hdr "API Keys"
+            local any=false
+            while IFS='|' read -r bname benv burl; do
+                [[ -z "$benv" ]] && continue
+                local val="${!benv:-}"
+                if [[ -n "$val" ]]; then
+                    ok "$(printf '%-40s' "$bname ($benv)") ${val:0:8}..."
+                    any=true
+                else
+                    local profile; profile=$(profile_file)
+                    if [[ -f "$profile" ]] && grep -qE "export[[:space:]]+${benv}[[:space:]]*=" "$profile" 2>/dev/null; then
+                        warn "$(printf '%-40s' "$bname ($benv)") saved in profile but not active — open a new terminal"
+                    else
+                        info "$(printf '%-40s' "$bname ($benv)") not set"
+                    fi
+                fi
+            done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+seen = set()
+for b in c['backends']:
+    env = b.get('apiKeyEnvVar', '')
+    if not env or env in seen: continue
+    seen.add(env)
+    print('|'.join([b.get('displayName',''), env, b.get('apiKeyUrl','')]))
+PYEOF
+)
+            if ! $any; then
+                echo ""
+                info "No API keys are currently active. Run: tian-cli key set"
+            fi
+            ;;
+
+        remove)
+            local backend_id="${1:-}"
+            [[ -n "$backend_id" ]] || fail "Usage: tian-cli key remove <backend-id>"
+            local b_row
+            b_row=$(python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+for b in c['backends']:
+    if b.get('id') == sys.argv[2] and b.get('apiKeyEnvVar'):
+        print('|'.join([b.get('displayName',''), b.get('apiKeyEnvVar','')]))
+        break
+PYEOF
+) || true
+            [[ -z "$b_row" ]] && fail "Unknown backend '$backend_id' or it has no API key."
+            local bname benv
+            IFS='|' read -r bname benv <<< "$b_row"
+            local profile; profile=$(profile_file)
+            if [[ -f "$profile" ]] && grep -qE "export[[:space:]]+${benv}[[:space:]]*=" "$profile" 2>/dev/null; then
+                python3 - "$profile" "$benv" <<'PYEOF'
+import os, re, sys
+profile, name = sys.argv[1], sys.argv[2]
+pattern = re.compile(rf'^\s*export\s+{re.escape(name)}=')
+with open(profile, encoding='utf-8', errors='ignore') as fh:
+    lines = fh.readlines()
+kept = [l for l in lines if not pattern.search(l)]
+with open(profile, 'w', encoding='utf-8') as fh:
+    fh.writelines(kept)
+PYEOF
+                unset "$benv" 2>/dev/null || true
+                ok "$benv removed from $(basename "$profile") and unset from current session"
+            else
+                info "$benv was not found in $(profile_file) — nothing to remove"
+            fi
+            ;;
+
+        *)
+            echo -e "${BOLD}Usage:${RESET}"
+            echo "  tian-cli key set [backend-id]   Set or update an API key"
+            echo "  tian-cli key show               Show which API keys are set"
+            echo "  tian-cli key remove <backend-id> Remove an API key from your shell profile"
+            echo ""
+            echo "  Example: tian-cli key set claude-code"
+            ;;
+    esac
+}
+
+cmd_quota() {
+    hdr "API Quota / Rate-Limit Status"
+
+    if ! command -v curl &>/dev/null; then
+        fail "curl is required for quota checks. Install it and retry."
+    fi
+
+    # Collect all backends that have an API key configured
+    local checked=0
+    local issues=0
+
+    while IFS='|' read -r bid bname benv burl provider; do
+        [[ -z "$benv" ]] && continue
+        local key="${!benv:-}"
+        if [[ -z "$key" ]]; then
+            info "$bname ($benv): not set — skipping"
+            continue
+        fi
+
+        ((checked++)) || true
+        printf "  Checking %-30s" "$bname..."
+
+        local http_status retry_after body
+        case "$provider" in
+            anthropic)
+                # Use /v1/models — cheap, authenticated, reflects quota state
+                body=$(curl -s -w "\n%{http_code}" --max-time 8 \
+                    -H "x-api-key: $key" \
+                    -H "anthropic-version: 2023-06-01" \
+                    "https://api.anthropic.com/v1/models" 2>/dev/null) || body=""
+                http_status=$(echo "$body" | tail -1)
+                retry_after=$(curl -sI --max-time 8 \
+                    -H "x-api-key: $key" \
+                    -H "anthropic-version: 2023-06-01" \
+                    "https://api.anthropic.com/v1/models" 2>/dev/null \
+                    | grep -i "^retry-after:" | awk '{print $2}' | tr -d '\r') || retry_after=""
+                ;;
+            openai)
+                body=$(curl -s -w "\n%{http_code}" --max-time 8 \
+                    -H "Authorization: Bearer $key" \
+                    "https://api.openai.com/v1/models" 2>/dev/null) || body=""
+                http_status=$(echo "$body" | tail -1)
+                retry_after=$(curl -sI --max-time 8 \
+                    -H "Authorization: Bearer $key" \
+                    "https://api.openai.com/v1/models" 2>/dev/null \
+                    | grep -i "^retry-after:" | awk '{print $2}' | tr -d '\r') || retry_after=""
+                ;;
+            *)
+                echo -e "${DIM}(no quota check available for this provider)${RESET}"
+                continue
+                ;;
+        esac
+
+        case "$http_status" in
+            200)
+                echo -e "${GREEN}OK${RESET}  — key valid, not rate-limited"
+                ;;
+            401)
+                echo -e "${RED}INVALID${RESET}  — key rejected (HTTP 401)"
+                info "  Fix: tian-cli key set ${bid}  (get a new key at: $burl)"
+                ((issues++)) || true
+                ;;
+            403)
+                # Anthropic 403 can mean insufficient permissions or billing issue
+                local body_content; body_content=$(echo "$body" | head -1)
+                if echo "$body_content" | grep -qi "credit\|billing\|quota\|insufficient"; then
+                    echo -e "${RED}QUOTA EXHAUSTED${RESET}  — billing/credit issue (HTTP 403)"
+                    info "  Fix: add credits at $burl"
+                else
+                    echo -e "${YELLOW}FORBIDDEN${RESET}  — key lacks permissions (HTTP 403)"
+                    info "  Fix: check key permissions at $burl"
+                fi
+                ((issues++)) || true
+                ;;
+            429)
+                local rate_msg="RATE LIMITED  — quota exhausted or too many requests (HTTP 429)"
+                if [[ -n "$retry_after" ]]; then
+                    rate_msg="RATE LIMITED  — retry after ${retry_after}s (HTTP 429)"
+                fi
+                echo -e "${YELLOW}${rate_msg}${RESET}"
+                # Try to extract more detail from body
+                local err_type
+                err_type=$(echo "$body" | head -1 | python3 -c \
+                    "import json,sys
+try:
+    d=json.load(sys.stdin)
+    err=d.get('error',{})
+    t=err.get('type','') or ''
+    m=(err.get('message','') or '')[:80]
+    print(t + (': ' + m if m else ''))
+except Exception:
+    pass" 2>/dev/null) || err_type=""
+                [[ -n "$err_type" ]] && info "  Detail: $err_type"
+                [[ -n "$retry_after" ]] && info "  Retry after: ${retry_after}s"
+                if [[ -z "$retry_after" ]]; then
+                    info "  This may resolve automatically — try again in a few minutes"
+                fi
+                ((issues++)) || true
+                ;;
+            000)
+                echo -e "${YELLOW}UNREACHABLE${RESET}  — network error or DNS failure"
+                info "  Check internet connection or firewall rules"
+                ((issues++)) || true
+                ;;
+            *)
+                echo -e "${DIM}UNKNOWN${RESET}  — unexpected HTTP $http_status"
+                ;;
+        esac
+    done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, subprocess, sys
+c, seen = json.load(open(sys.argv[1])), set()
+for b in c['backends']:
+    env = b.get('apiKeyEnvVar', '')
+    if not env or env in seen: continue
+    seen.add(env)
+    provider = 'anthropic' if 'ANTHROPIC' in env else ('openai' if 'OPENAI' in env else '')
+    print(f"{b.get('id','')}|{b['displayName']}|{env}|{b.get('apiKeyUrl','')}|{provider}")
+PYEOF
+)
+
+    echo ""
+    if [[ $checked -eq 0 ]]; then
+        warn "No API keys are set. Run: tian-cli key set"
+    elif [[ $issues -eq 0 ]]; then
+        ok "All $checked API key(s) are active and within quota limits."
+    else
+        warn "$issues issue(s) found across $checked key(s)."
+        info "Run 'tian-cli doctor' for a full health check."
+    fi
+    echo ""
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
@@ -3100,6 +3415,8 @@ case "$CMD" in
     list)      cmd_list "$@" ;;
     skill)     cmd_skill "$@" ;;
     config)    cmd_config "$@" ;;
+    key)       cmd_key "$@" ;;
+    quota)     cmd_quota ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
 esac
