@@ -197,6 +197,7 @@ function Cmd-Help {
     setup               交互式引导安装（首次使用推荐）
     install             使用参数快速安装
     doctor [--fix]      诊断常见安装问题；--fix 自动修复可修复的问题
+    ping [--backend id] 向AI后端发送测试提示，验证其是否正常响应
     quota               检查所有API密钥的配额和速率限制状态（彩色输出）
     update              将已安装的AI后端更新到最新版本
     uninstall           移除TIAN安装的组件（后端、密钥、数据）
@@ -289,6 +290,7 @@ function Cmd-Help {
     setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
     doctor [--fix]      Check your setup and diagnose common problems; --fix auto-resolves fixable issues
+    ping [--backend id] Send a quick test prompt to the active AI backend and verify it responds
     quota               Check live quota/rate-limit status for all API keys (colored output)
     update              Upgrade installed AI backends to their latest versions
     uninstall           Remove TIAN's installed components (backends, keys, data)
@@ -1013,6 +1015,108 @@ function Cmd-Doctor {
             Write-Color "  Tip: run 'tian-cli doctor --fix' to auto-resolve fixable issues (npm backends, Ollama)" DarkGray
         }
     }
+    Write-Host ""
+}
+
+function Cmd-Ping {
+    param([string]$ForcedBackendId = "")
+
+    Write-Header "TIAN Ping — End-to-End AI Test"
+    Write-Rule
+
+    # Resolve which backend to test
+    $backendCmd  = ""
+    $backendFlag = ""
+    $backendName = ""
+
+    if ($ForcedBackendId) {
+        $b = Get-BackendById $ForcedBackendId
+        if (-not $b) {
+            Write-Fail "Unknown backend '$ForcedBackendId'. Run: tian-cli list backends"
+            exit 1
+        }
+        if (-not $b.cliCommand -or -not (Get-Command $b.cliCommand -ErrorAction SilentlyContinue)) {
+            Write-Fail "Backend '$ForcedBackendId' is not installed. Run: tian-cli install --backend $ForcedBackendId"
+            exit 1
+        }
+        $backendCmd  = $b.cliCommand
+        $backendFlag = ($b.nonInteractiveFlag -split ' ') | Where-Object { $_ }
+        $backendName = $b.displayName
+    } else {
+        foreach ($b in $catalog.backends) {
+            if ($b.cliCommand -and (Get-Command $b.cliCommand -ErrorAction SilentlyContinue)) {
+                $backendCmd  = $b.cliCommand
+                $backendFlag = ($b.nonInteractiveFlag -split ' ') | Where-Object { $_ }
+                $backendName = $b.displayName
+                break
+            }
+        }
+        if (-not $backendCmd) {
+            Write-Fail "No AI backend found. Run: tian-cli setup"
+            exit 1
+        }
+    }
+
+    Write-Info "Backend: $backendName  ($backendCmd)"
+    Write-Info "Sending test prompt..."
+    Write-Host ""
+
+    $testPrompt = "Reply with exactly and only the word: PONG"
+    $tmpFile    = [System.IO.Path]::GetTempFileName()
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $exitCode = 0
+    try {
+        $psi               = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName      = $backendCmd
+        foreach ($f in $backendFlag) { $psi.ArgumentList.Add($f) }
+        $psi.ArgumentList.Add($testPrompt)
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.UseShellExecute        = $false
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $stdout = $proc.StandardOutput.ReadToEnd()
+        $stderr = $proc.StandardError.ReadToEnd()
+        $proc.WaitForExit(30000) | Out-Null
+        $exitCode = $proc.ExitCode
+        Set-Content -Path $tmpFile -Value ($stdout + $stderr) -Encoding UTF8
+    } catch {
+        Set-Content -Path $tmpFile -Value "" -Encoding UTF8
+        $exitCode = 1
+    }
+    $sw.Stop()
+    $elapsedS = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+
+    $response = (Get-Content $tmpFile -Raw -ErrorAction SilentlyContinue) -replace '^\s+|\s+$'
+    Remove-Item $tmpFile -ErrorAction SilentlyContinue
+
+    if (-not $response) {
+        Write-Warn "No output received from backend (exit code: $exitCode, ${elapsedS}s)"
+        Write-Info "  Check: tian-cli doctor  — to diagnose configuration issues"
+        Write-Info "  Check: tian-cli quota   — to check API quota"
+        Write-Host ""
+        exit 1
+    }
+
+    $quotaPatterns = "insufficient_quota|quota_is_exhausted|quota is exhausted|rate[._]limit|rate limit|429|too many requests|overloaded"
+    if ($response -imatch $quotaPatterns) {
+        Write-Warn "Quota or rate-limit error detected in backend response (${elapsedS}s)"
+        Write-Info "  Check: tian-cli quota   — to see your API quota status"
+        Write-Host ""
+        Write-Rule
+        Write-Color "Response snippet:" DarkGray
+        Write-Host ($response -split "`n" | Select-Object -First 5 | Out-String).TrimEnd()
+        Write-Host ""
+        exit 1
+    }
+
+    Write-Rule
+    Write-Color "Response received in ${elapsedS}s:" DarkGray
+    Write-Host ""
+    Write-Host ($response -split "`n" | Select-Object -First 20 | Out-String).TrimEnd()
+    Write-Host ""
+    Write-Rule
+    Write-Ok "AI backend is responding correctly.  (${elapsedS}s)"
     Write-Host ""
 }
 
@@ -1825,6 +1929,7 @@ switch ($Command.ToLower()) {
     "config"    { Cmd-Config }
     "key"       { Cmd-Key }
     "doctor"    { Cmd-Doctor -Fix:$Fix }
+    "ping"      { Cmd-Ping -ForcedBackendId $Backend }
     "quota"     { Cmd-Quota }
     "update"    { Cmd-Update }
     "repair"    { Cmd-Repair }
