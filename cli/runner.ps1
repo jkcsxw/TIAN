@@ -237,11 +237,29 @@ function Invoke-Task {
         [switch]$Background,
         [switch]$Watch,
         [string]$JobName = "",
-        [string]$ScheduleName = ""
+        [string]$ScheduleName = "",
+        [string]$ForcedBackendId = "",
+        [string]$OutputPath = ""
     )
 
     Ensure-TaskDirs
-    $backend = Get-ActiveBackend -TianDir $TianDir
+
+    if ($ForcedBackendId) {
+        $catalog = Get-Catalog -TianDir $TianDir
+        $backend = $catalog.backends | Where-Object { $_.id -eq $ForcedBackendId } | Select-Object -First 1
+        if (-not $backend) {
+            Write-Fail "Unknown backend '$ForcedBackendId'. Run: tian-cli list backends"
+            return $null
+        }
+        if (-not $backend.cliCommand -or -not (Get-Command $backend.cliCommand -ErrorAction SilentlyContinue)) {
+            Write-Fail "Backend '$ForcedBackendId' is not installed. Run: tian-cli install --backend $ForcedBackendId"
+            return $null
+        }
+        Write-Info "Using backend: $($backend.displayName)"
+    } else {
+        $backend = Get-ActiveBackend -TianDir $TianDir
+    }
+
     if (-not $backend) {
         Write-Fail "未在系统中找到AI后端，请先运行 'tian-cli setup'。/ No AI backend found on PATH. Run 'tian-cli setup' first."
         return $null
@@ -403,10 +421,14 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
 '@
         Set-Content -Path $workerFile -Value $workerScript -Encoding UTF8
 
-        # Collect all available backends and write them to a sidecar file so the
-        # worker can fall back to the next one if the primary hits quota/rate-limits.
-        $allBgs = @(Get-AllAvailableBackends -TianDir $TianDir)
-        if ($allBgs.Count -eq 0) { $allBgs = @($backend) }
+        # Collect backends for the worker. When a specific backend is forced, use only
+        # that one; otherwise pass all available backends so the worker can fall back.
+        if ($ForcedBackendId) {
+            $allBgs = @($backend)
+        } else {
+            $allBgs = @(Get-AllAvailableBackends -TianDir $TianDir)
+            if ($allBgs.Count -eq 0) { $allBgs = @($backend) }
+        }
         $backendsForWorker = $allBgs | ForEach-Object {
             [PSCustomObject]@{ Command = $_.cliCommand; Flag = $_.nonInteractiveFlag; DisplayName = $_.displayName; Id = $_.id }
         }
@@ -449,17 +471,26 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
         Write-Ok "任务已在后台启动。/ Task started in background."
         Write-Info "任务ID / Job ID : $jobId"
         Write-Info "查看结果 / Check result with:  tian-cli jobs result $jobId"
+        if ($OutputPath) { Write-Info "Output will also be saved to: $OutputPath (when job completes)" }
 
         if ($Watch) {
             Write-Host ""
             Watch-Job -JobId $jobId
+            if ($OutputPath -and (Test-Path $outputFile)) {
+                Copy-Item -Path $outputFile -Destination $OutputPath -Force -ErrorAction SilentlyContinue
+                Write-Ok "Result saved to: $OutputPath"
+            }
         }
 
         return $jobId
     } else {
         # Foreground — try each installed backend in catalog order, falling back on quota/rate-limit
-        $allBackends = @(Get-AllAvailableBackends -TianDir $TianDir)
-        if ($allBackends.Count -eq 0) { $allBackends = @($backend) }
+        if ($ForcedBackendId) {
+            $allBackends = @($backend)
+        } else {
+            $allBackends = @(Get-AllAvailableBackends -TianDir $TianDir)
+            if ($allBackends.Count -eq 0) { $allBackends = @($backend) }
+        }
 
         $primaryCmd  = $backend.cliCommand
         $result      = $null
@@ -504,6 +535,16 @@ Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
             }
         }
         Save-Jobs $jobs
+
+        if ($OutputPath) {
+            try {
+                Copy-Item -Path $outputFile -Destination $OutputPath -Force
+                Write-Ok "Result saved to: $OutputPath"
+            } catch {
+                Write-Warn "Could not save result to '$OutputPath': $_"
+            }
+        }
+
         return $jobId
     }
 }

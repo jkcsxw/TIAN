@@ -213,11 +213,13 @@ function Cmd-Help {
     repair              重新安装修复当前配置
     lang en|zh          切换界面语言
 
-    run  "提示词"                    立即执行任务（前台）
-    run  "提示词" --background       在后台执行任务
-    run  "提示词" -w/--watch         后台执行并实时显示输出（auto-exits when done）
-    run  "提示词" --file <路径>       将文件内容附加到提示词（如：总结文档）
-    run  "提示词" --stdin            将管道输入内容附加到提示词
+    run  "提示词"                         立即执行任务（前台）
+    run  "提示词" --background            在后台执行任务
+    run  "提示词" -w/--watch             后台执行并实时显示输出（auto-exits when done）
+    run  "提示词" --backend <id>          指定后端（如：ollama-qwen-local 用于隐私任务）
+    run  "提示词" --file <路径>           将文件内容附加到提示词（如：总结文档）
+    run  "提示词" --stdin                将管道输入内容附加到提示词
+    run  "提示词" --output <路径>         将AI回复保存到文件
     jobs                            列出后台任务
     jobs result <id>                查看已完成任务的输出
     jobs tail <id>                  实时追踪任务输出（auto-exits when done; Ctrl+C 停止追踪）
@@ -262,6 +264,8 @@ function Cmd-Help {
 
     tian-cli run "总结今日AI领域最新动态"
     tian-cli run "帮我写今天的工作日报" --background
+    tian-cli run "总结这份文档" --file report.pdf --output summary.txt
+    tian-cli run "隐私任务" --backend ollama-qwen-local
     tian-cli jobs
     tian-cli jobs result 20240417-083012-ab12cd
 
@@ -301,11 +305,13 @@ function Cmd-Help {
     repair              Re-run install to fix the current config
     lang en|zh          Switch interface language
 
-    run  "prompt"                    Run a task now (foreground)
-    run  "prompt" --background       Run a task in the background
-    run  "prompt" -w/--watch         Background task with live output streaming (auto-exits when done)
-    run  "prompt" --file <path>      Append file content to the prompt (e.g. summarize a document)
-    run  "prompt" --stdin            Append piped stdin content to the prompt
+    run  "prompt"                         Run a task now (foreground)
+    run  "prompt" --background            Run a task in the background
+    run  "prompt" -w/--watch             Background task with live output streaming (auto-exits when done)
+    run  "prompt" --backend <id>          Force a specific backend (e.g. ollama-qwen-local for privacy)
+    run  "prompt" --file <path>           Append file content to the prompt (e.g. summarize a document)
+    run  "prompt" --stdin                 Append piped stdin content to the prompt
+    run  "prompt" --output <path>         Save the AI response to a file
     jobs                             List background jobs
     jobs result <id>                 Show output of a completed job
     jobs tail <id>                   Stream a running job's output live (auto-exits when done; Ctrl+C stops watching)
@@ -351,6 +357,8 @@ function Cmd-Help {
     tian-cli run "Summarise today's AI news"
     tian-cli run "Write my daily work report" --background
     tian-cli run "Summarise this document" --file report.pdf
+    tian-cli run "Summarise this document" --file report.pdf --output summary.txt
+    tian-cli run "Process this privately" --backend ollama-qwen-local
     tian-cli run "Review this code for bugs" --file src/main.py --background
     tian-cli jobs
     tian-cli jobs result 20240417-083012-ab12cd
@@ -1857,7 +1865,8 @@ switch ($Command.ToLower()) {
 
         # --watch implies --background (job must be backgrounded to be watched)
         $runBackground = $Background -or $Watch
-        Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$runBackground -Watch:$Watch
+        Invoke-Task -Prompt $prompt -TianDir $TianDir -Background:$runBackground -Watch:$Watch `
+            -ForcedBackendId $Backend -OutputPath $Output
     }
 
     "jobs" {
