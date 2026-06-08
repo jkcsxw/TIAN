@@ -752,6 +752,7 @@ $(rule)
     completion zsh      Print a zsh tab-completion script  (eval "\$(tian-cli completion zsh)")
     completion install  Auto-install tab completion into your shell profile
     lang en|zh          Switch interface language (切换界面语言)
+    version             Show TIAN version, installed backends, and runtime info
     help                Show this help
 
   INSTALL FLAGS (non-interactive)
@@ -850,6 +851,7 @@ cat <<'ZHEOF'
     completion zsh      打印zsh自动补全脚本
     completion install  自动将自动补全安装到Shell配置文件
     lang en|zh          切换界面语言
+    version             显示TIAN版本、已安装后端及运行时信息
     help                显示此帮助
 
   安装参数（非交互式）
@@ -4131,7 +4133,7 @@ _tian_complete() {
 
     # Top-level subcommands
     if [[ \$cword -eq 1 ]]; then
-        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key ping quota completion lang help" -- "\$cur") )
+        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key ping quota completion lang version help" -- "\$cur") )
         return
     fi
 
@@ -4289,6 +4291,83 @@ ENDZSH
     esac
 }
 
+cmd_version() {
+    hdr "TIAN — Version Information"
+
+    # ── TIAN version from package.json ────────────────────────────────────────
+    local tian_version=""
+    local pkg_json="$TIAN_DIR/package.json"
+    if [[ -f "$pkg_json" ]]; then
+        tian_version=$(python3 -c "import json; print(json.load(open('$pkg_json')).get('version','?'))" 2>/dev/null) || tian_version="?"
+    fi
+    info "TIAN:         ${tian_version:-unknown}"
+
+    # ── Git commit info ────────────────────────────────────────────────────────
+    if command -v git &>/dev/null && [[ -d "$TIAN_DIR/.git" ]]; then
+        local git_hash git_date
+        git_hash=$(git -C "$TIAN_DIR" log -1 --format="%h" 2>/dev/null) || git_hash=""
+        git_date=$(git -C "$TIAN_DIR" log -1 --format="%ci" 2>/dev/null) || git_date=""
+        if [[ -n "$git_hash" ]]; then
+            info "Commit:       $git_hash  (${git_date%% *})"
+        fi
+        local git_branch
+        git_branch=$(git -C "$TIAN_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null) || git_branch=""
+        [[ -n "$git_branch" ]] && info "Branch:       $git_branch"
+    fi
+    echo ""
+
+    # ── Installed AI backends ──────────────────────────────────────────────────
+    echo -e "${BOLD}  AI backends${RESET}"
+    local found_backend=false
+    while IFS='|' read -r bcmd bname; do
+        [[ -z "$bcmd" ]] && continue
+        if command -v "$bcmd" &>/dev/null; then
+            local bver
+            bver=$("$bcmd" --version 2>/dev/null | head -1) || bver="(version unknown)"
+            ok "$bname: $bver"
+            found_backend=true
+        fi
+    done < <(python3 - "$CATALOG" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+seen = set()
+for b in c['backends']:
+    cmd = b.get('cliCommand', '')
+    if cmd and cmd not in seen:
+        seen.add(cmd)
+        print(f"{cmd}|{b['displayName']}")
+PYEOF
+)
+    $found_backend || info "No AI backends installed yet — run: tian-cli setup"
+    echo ""
+
+    # ── Runtime versions ───────────────────────────────────────────────────────
+    echo -e "${BOLD}  Runtime${RESET}"
+    if command -v node &>/dev/null; then
+        ok "Node.js:  $(node --version 2>/dev/null || echo '?')"
+    else
+        warn "Node.js:  not found (required for MCP servers)"
+    fi
+    if command -v python3 &>/dev/null; then
+        ok "Python:   $(python3 --version 2>&1 | awk '{print $2}' || echo '?')"
+    else
+        warn "Python3:  not found"
+    fi
+    if command -v npx &>/dev/null; then
+        ok "npx:      $(npx --version 2>/dev/null || echo '?')"
+    else
+        info "npx:      not found"
+    fi
+    echo ""
+
+    # ── Platform ───────────────────────────────────────────────────────────────
+    local platform; platform=$(detect_platform)
+    local uname_info; uname_info="$(uname -s) $(uname -m)"
+    info "Platform: $platform ($uname_info)"
+    info "Install:  $TIAN_DIR"
+    echo ""
+}
+
 # ── Router ────────────────────────────────────────────────────────────────────
 CMD="${1:-help}"; shift || true
 case "$CMD" in
@@ -4312,6 +4391,7 @@ case "$CMD" in
     quota)      cmd_quota ;;
     completion) cmd_completion "$@" ;;
     lang)       cmd_lang "$@" ;;
+    version|--version|-V) cmd_version ;;
     help|--help|-h) cmd_help ;;
     *) fail "Unknown command '$CMD'. Run: bash tian-cli.sh help" ;;
 esac
