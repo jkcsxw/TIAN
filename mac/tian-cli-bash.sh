@@ -726,6 +726,7 @@ $(rule)
     run "prompt" --backend <id>   Force a specific backend (e.g. ollama-qwen-local for privacy)
     run "prompt" --file <path>    Append file content to the prompt (e.g. summarize a document)
     run "prompt" --stdin          Append piped stdin to the prompt (also triggered automatically when stdin is not a tty)
+    run "prompt" --output <path>  Save the AI response to a file (works with foreground and background)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
@@ -770,6 +771,8 @@ $(rule)
     bash tian-cli.sh run "Urgent task" --backend claude-code -b
     bash tian-cli.sh run "Summarise this document" --file report.pdf
     bash tian-cli.sh run "Review this code for bugs" --file src/main.py -b
+    bash tian-cli.sh run "Write a blog post about AI" --output blog-post.md
+    bash tian-cli.sh run "Summarise this document" --file report.pdf --output summary.md
     cat notes.txt | bash tian-cli.sh run "Organise these notes into bullet points"
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
@@ -1135,6 +1138,7 @@ cmd_run() {
     local forced_backend_id=""
     local input_file=""
     local read_stdin=false
+    local output_path=""
     while [[ $# -gt 0 ]]; do
         case "${1:-}" in
             -b|--background)
@@ -1165,6 +1169,10 @@ cmd_run() {
             --stdin)
                 read_stdin=true
                 shift
+                ;;
+            --output|-o)
+                output_path="${2:-}"
+                shift 2
                 ;;
             *)
                 shift
@@ -1205,7 +1213,7 @@ ${stdin_content}"
         fi
     fi
 
-    [[ -z "$prompt" ]] && fail "Usage: tian-cli run \"your prompt\" [--file path] [--stdin] [-b] [-w]"
+    [[ -z "$prompt" ]] && fail "Usage: tian-cli run \"your prompt\" [--file path] [--stdin] [--output path] [-b] [-w]"
 
     local backend_row cmd flag
     if [[ -n "$forced_backend_id" ]]; then
@@ -1310,7 +1318,10 @@ case "$(uname -s)" in
     Darwin) osascript -e "display notification \"$_notif_msg\" with title \"TIAN\"" 2>/dev/null || true ;;
     Linux)  command -v notify-send &>/dev/null && DISPLAY="${DISPLAY:-:0}" notify-send -t 8000 "TIAN" "$_notif_msg" 2>/dev/null || true ;;
 esac
-' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" "$forced_backend_id" &>/dev/null &
+# Copy output to user-specified file if requested
+_output_path="${10:-}"
+[[ -n "$_output_path" ]] && cp "$_out" "$_output_path" 2>/dev/null || true
+' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" "$forced_backend_id" "$output_path" &>/dev/null &
         local pid=$!
         python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" "$pid" "$job_name" "$schedule_name" "$forced_backend_id" <<'PYEOF'
 import json, sys
@@ -1329,6 +1340,7 @@ with open(jobs_file, 'w') as fh:
 PYEOF
         ok "Job started: $job_id"
         info "Check result with: bash tian-cli.sh jobs result $job_id"
+        [[ -n "$output_path" ]] && info "Output will also be saved to: $output_path (when job completes)"
         if $watch; then
             echo ""
             info "Watching live output (Ctrl+C to stop watching; job continues)..."
@@ -1354,6 +1366,10 @@ PYEOF
                 is_quota_error "$out_text" || break
                 warn "$r_name: quota or rate limit — trying next backend..."
             done < <(all_backends)
+        fi
+        if [[ -n "$output_path" ]]; then
+            cp "$out_file" "$output_path" && ok "Result saved to: $output_path" \
+                || warn "Could not save result to '$output_path'"
         fi
     fi
 }
@@ -4001,7 +4017,8 @@ _tian_complete() {
             case "\$prev" in
                 --backend) COMPREPLY=( \$(compgen -W "${_backend_ids}" -- "\$cur") ) ;;
                 --file|-f) COMPREPLY=( \$(compgen -f -- "\$cur") ) ;;
-                *)         COMPREPLY=( \$(compgen -W "--backend --file -f --stdin -b --background -w --watch --job-name" -- "\$cur") ) ;;
+                --output|-o) COMPREPLY=( \$(compgen -f -- "\$cur") ) ;;
+                *)         COMPREPLY=( \$(compgen -W "--backend --file -f --stdin --output -o -b --background -w --watch --job-name" -- "\$cur") ) ;;
             esac ;;
         install)
             case "\$prev" in
