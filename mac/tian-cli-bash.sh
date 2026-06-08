@@ -34,6 +34,32 @@ detect_platform() {
     esac
 }
 
+# Returns the Claude Desktop config file path for the current platform.
+# On WSL, Claude Desktop is a Windows app: its config lives in the Windows
+# AppData directory, which we resolve via cmd.exe + wslpath.
+# Falls back to ~/.config/Claude/... if the Windows path cannot be determined.
+_claude_desktop_cfg_path() {
+    local platform; platform=$(detect_platform)
+    case "$platform" in
+        macos)
+            echo "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+            return ;;
+        wsl)
+            if command -v cmd.exe &>/dev/null; then
+                local raw wsl_appdata
+                raw=$(cmd.exe /c "echo %APPDATA%" 2>/dev/null | tr -d '\r\n' || true)
+                if [[ -n "$raw" && "$raw" != "%APPDATA%" ]]; then
+                    wsl_appdata=$(wslpath "$raw" 2>/dev/null || true)
+                    if [[ -n "$wsl_appdata" ]]; then
+                        echo "$wsl_appdata/Claude/claude_desktop_config.json"
+                        return
+                    fi
+                fi
+            fi ;;
+    esac
+    echo "$HOME/.config/Claude/claude_desktop_config.json"
+}
+
 # Bug fix: check if command is actually installed, not just present in catalog
 active_backend() {
     python3 - "$CATALOG" <<'PYEOF'
@@ -246,10 +272,10 @@ PYEOF
 
 get_mcp_config_path_for_backend() {
     local backend_id="${1:-}"
-    python3 - "$CATALOG" "$backend_id" "$(detect_platform)" "$HOME" <<'PYEOF'
+    python3 - "$CATALOG" "$backend_id" "$(detect_platform)" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
 
-catalog_path, backend_id, platform, home = sys.argv[1:5]
+catalog_path, backend_id, platform, home, claude_desktop_cfg = sys.argv[1:6]
 catalog = json.load(open(catalog_path))
 backend = next((b for b in catalog["backends"] if b.get("id") == backend_id), None)
 if not backend:
@@ -266,12 +292,7 @@ def expand(path: str) -> str:
     return path.replace("\\", "/")
 
 if target == "claude_desktop":
-    if platform == "macos":
-        print(os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json"))
-    elif platform in ("linux", "wsl"):
-        print(os.path.join(home, ".config", "Claude", "claude_desktop_config.json"))
-    else:
-        print(expand(custom) if custom else os.path.join(home, ".tian", "mcp_config.json"))
+    print(claude_desktop_cfg)
 elif target == "claude_code":
     print(os.path.join(home, ".claude", "settings.json"))
 elif custom:
@@ -972,9 +993,9 @@ PYEOF
         else
             info "$label  not configured yet"
         fi
-    done < <(python3 - "$CATALOG" "$platform" "$HOME" <<'PYEOF'
+    done < <(python3 - "$CATALOG" "$platform" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
-catalog_path, platform, home = sys.argv[1:4]
+catalog_path, platform, home, claude_desktop_cfg = sys.argv[1:5]
 catalog = json.load(open(catalog_path))
 seen = set()
 for backend in catalog["backends"]:
@@ -985,7 +1006,7 @@ for backend in catalog["backends"]:
     target = backend.get("mcpConfigTarget") or ""
     custom = backend.get("mcpConfigPath") or ""
     if target == "claude_desktop":
-        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        path = claude_desktop_cfg
     elif target == "claude_code":
         path = os.path.join(home, ".claude", "settings.json")
     else:
@@ -2542,10 +2563,10 @@ PYEOF
         else
             info "$label config not found (optional): $path"
         fi
-    done < <(python3 - "$CATALOG" "$platform" "$HOME" <<'PYEOF'
+    done < <(python3 - "$CATALOG" "$platform" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
 
-catalog_path, platform, home = sys.argv[1:4]
+catalog_path, platform, home, claude_desktop_cfg = sys.argv[1:5]
 catalog = json.load(open(catalog_path))
 seen = set()
 for backend in catalog["backends"]:
@@ -2558,7 +2579,7 @@ for backend in catalog["backends"]:
     target = backend.get("mcpConfigTarget") or ""
     custom = backend.get("mcpConfigPath") or ""
     if target == "claude_desktop":
-        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        path = claude_desktop_cfg
     elif target == "claude_code":
         path = os.path.join(home, ".claude", "settings.json")
     else:
@@ -2573,10 +2594,10 @@ PYEOF
 
     echo -e "${BOLD}  Configured MCP servers${RESET}"
     local mcp_check_output
-    mcp_check_output=$(python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
+    mcp_check_output=$(python3 - "$CATALOG" "$(detect_platform)" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
 
-catalog_path, platform, home = sys.argv[1:4]
+catalog_path, platform, home, claude_desktop_cfg = sys.argv[1:5]
 catalog = json.load(open(catalog_path))
 
 # Build a map from configKey -> server (for env-var lookups)
@@ -2584,9 +2605,7 @@ server_by_key = {s.get("configKey", ""): s for s in catalog.get("mcpServers", []
 
 def expand_path(target, custom):
     if target == "claude_desktop":
-        if platform == "macos":
-            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        return claude_desktop_cfg
     if target == "claude_code":
         return os.path.join(home, ".claude", "settings.json")
     if custom:
@@ -3197,10 +3216,10 @@ PYEOF
         else
             info "$label config not found — skipping"
         fi
-    done < <(python3 - "$CATALOG" "$(detect_platform)" "$HOME" <<'PYEOF'
+    done < <(python3 - "$CATALOG" "$(detect_platform)" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
 
-catalog_path, platform, home = sys.argv[1:4]
+catalog_path, platform, home, claude_desktop_cfg = sys.argv[1:5]
 catalog = json.load(open(catalog_path))
 seen = set()
 for backend in catalog["backends"]:
@@ -3213,7 +3232,7 @@ for backend in catalog["backends"]:
     target = backend.get("mcpConfigTarget") or ""
     custom = backend.get("mcpConfigPath") or ""
     if target == "claude_desktop":
-        path = os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json") if platform == "macos" else os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        path = claude_desktop_cfg
     elif target == "claude_code":
         path = os.path.join(home, ".claude", "settings.json")
     else:
@@ -3274,13 +3293,14 @@ _cmd_config_export() {
     fi
 
     python3 - "$CATALOG" "$out_file" "$platform" "$HOME" \
-        "$include_keys" "$SCHEDULES_FILE" "$HOME/.tian/skills" <<'PYEOF'
+        "$include_keys" "$SCHEDULES_FILE" "$HOME/.tian/skills" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys, datetime
 
 catalog_path, out_file, platform, home = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-include_keys   = sys.argv[5] == "true"
-schedules_file = sys.argv[6]
-skills_dir     = sys.argv[7]
+include_keys      = sys.argv[5] == "true"
+schedules_file    = sys.argv[6]
+skills_dir        = sys.argv[7]
+claude_desktop_cfg = sys.argv[8]
 
 catalog = json.load(open(catalog_path))
 
@@ -3306,9 +3326,7 @@ if include_keys:
 # ── MCP server configs ─────────────────────────────────────────────────────
 def expand_path(target, custom):
     if target == "claude_desktop":
-        if platform == "macos":
-            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        return claude_desktop_cfg
     if target == "claude_code":
         return os.path.join(home, ".claude", "settings.json")
     if custom:
@@ -3401,18 +3419,16 @@ PYEOF
     # ── MCP server configs ─────────────────────────────────────────────────────
     echo -e "${BOLD}  MCP Servers${RESET}"
     local mcp_count
-    mcp_count=$(python3 - "$CATALOG" "$in_file" "$platform" "$HOME" <<'PYEOF'
+    mcp_count=$(python3 - "$CATALOG" "$in_file" "$platform" "$HOME" "$(_claude_desktop_cfg_path)" <<'PYEOF'
 import json, os, sys
 
-catalog_path, in_file, platform, home = sys.argv[1:]
+catalog_path, in_file, platform, home, claude_desktop_cfg = sys.argv[1:6]
 catalog  = json.load(open(catalog_path))
 imported = json.load(open(in_file))
 
 def expand_path(target):
     if target == "claude_desktop":
-        if platform == "macos":
-            return os.path.join(home, "Library", "Application Support", "Claude", "claude_desktop_config.json")
-        return os.path.join(home, ".config", "Claude", "claude_desktop_config.json")
+        return claude_desktop_cfg
     if target == "claude_code":
         return os.path.join(home, ".claude", "settings.json")
     return os.path.join(home, ".tian", "mcp_config.json")
