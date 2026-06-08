@@ -3283,89 +3283,46 @@ PYEOF
     esac
 }
 
-cmd_quota() {
-    hdr "API Quota / Rate-Limit Status"
+_quota_render_result() {
+    # Print the result for one backend from a pre-populated temp dir.
+    # Args: bid bname benv burl provider tmpdir
+    local bid="$1" bname="$2" benv="$3" burl="$4" provider="$5" tmpdir="$6"
+    local body_file="$tmpdir/${benv}.body"
+    local hdr_file="$tmpdir/${benv}.hdr"
 
-    if ! command -v curl &>/dev/null; then
-        fail "curl is required for quota checks. Install it and retry."
-    fi
+    local body="" http_status="" retry_after=""
+    [[ -f "$body_file" ]] && body=$(cat "$body_file")
+    http_status=$(echo "$body" | tail -1)
+    body=$(echo "$body" | head -n -1)   # strip the appended status line
+    [[ -f "$hdr_file" ]] && retry_after=$(grep -i "^retry-after:" "$hdr_file" \
+        | awk '{print $2}' | tr -d '\r' | head -1) || retry_after=""
 
-    # Collect all backends that have an API key configured
-    local checked=0
-    local issues=0
-
-    while IFS='|' read -r bid bname benv burl provider; do
-        [[ -z "$benv" ]] && continue
-        local key="${!benv:-}"
-        if [[ -z "$key" ]]; then
-            info "$bname ($benv): not set — skipping"
-            continue
-        fi
-
-        ((checked++)) || true
-        printf "  Checking %-30s" "$bname..."
-
-        local http_status retry_after body
-        case "$provider" in
-            anthropic)
-                # Use /v1/models — cheap, authenticated, reflects quota state
-                body=$(curl -s -w "\n%{http_code}" --max-time 8 \
-                    -H "x-api-key: $key" \
-                    -H "anthropic-version: 2023-06-01" \
-                    "https://api.anthropic.com/v1/models" 2>/dev/null) || body=""
-                http_status=$(echo "$body" | tail -1)
-                retry_after=$(curl -sI --max-time 8 \
-                    -H "x-api-key: $key" \
-                    -H "anthropic-version: 2023-06-01" \
-                    "https://api.anthropic.com/v1/models" 2>/dev/null \
-                    | grep -i "^retry-after:" | awk '{print $2}' | tr -d '\r') || retry_after=""
-                ;;
-            openai)
-                body=$(curl -s -w "\n%{http_code}" --max-time 8 \
-                    -H "Authorization: Bearer $key" \
-                    "https://api.openai.com/v1/models" 2>/dev/null) || body=""
-                http_status=$(echo "$body" | tail -1)
-                retry_after=$(curl -sI --max-time 8 \
-                    -H "Authorization: Bearer $key" \
-                    "https://api.openai.com/v1/models" 2>/dev/null \
-                    | grep -i "^retry-after:" | awk '{print $2}' | tr -d '\r') || retry_after=""
-                ;;
-            *)
-                echo -e "${DIM}(no quota check available for this provider)${RESET}"
-                continue
-                ;;
-        esac
-
-        case "$http_status" in
-            200)
-                echo -e "${GREEN}OK${RESET}  — key valid, not rate-limited"
-                ;;
-            401)
-                echo -e "${RED}INVALID${RESET}  — key rejected (HTTP 401)"
-                info "  Fix: tian-cli key set ${bid}  (get a new key at: $burl)"
-                ((issues++)) || true
-                ;;
-            403)
-                # Anthropic 403 can mean insufficient permissions or billing issue
-                local body_content; body_content=$(echo "$body" | head -1)
-                if echo "$body_content" | grep -qi "credit\|billing\|quota\|insufficient"; then
-                    echo -e "${RED}QUOTA EXHAUSTED${RESET}  — billing/credit issue (HTTP 403)"
-                    info "  Fix: add credits at $burl"
-                else
-                    echo -e "${YELLOW}FORBIDDEN${RESET}  — key lacks permissions (HTTP 403)"
-                    info "  Fix: check key permissions at $burl"
-                fi
-                ((issues++)) || true
-                ;;
-            429)
-                local rate_msg="RATE LIMITED  — quota exhausted or too many requests (HTTP 429)"
-                if [[ -n "$retry_after" ]]; then
-                    rate_msg="RATE LIMITED  — retry after ${retry_after}s (HTTP 429)"
-                fi
-                echo -e "${YELLOW}${rate_msg}${RESET}"
-                # Try to extract more detail from body
+    printf "  %-32s" "$bname"
+    case "$http_status" in
+        200)
+            echo -e "${GREEN}OK${RESET}  — key valid, not rate-limited"
+            ;;
+        401)
+            echo -e "${RED}INVALID${RESET}  — key rejected (HTTP 401)"
+            echo -e "             Fix: tian-cli key set ${bid}  (get a new key at: $burl)"
+            ;;
+        403)
+            if echo "$body" | grep -qi "credit\|billing\|quota\|insufficient"; then
+                echo -e "${RED}QUOTA EXHAUSTED${RESET}  — billing/credit issue (HTTP 403)"
+                echo -e "             Fix: add credits at $burl"
+            else
+                echo -e "${YELLOW}FORBIDDEN${RESET}  — key lacks permissions (HTTP 403)"
+                echo -e "             Fix: check key permissions at $burl"
+            fi
+            ;;
+        429)
+            if [[ -n "$retry_after" ]]; then
+                echo -e "${YELLOW}RATE LIMITED${RESET}  — retry after ${retry_after}s (HTTP 429)"
+                echo -e "             Retry after: ${retry_after}s"
+            else
+                echo -e "${YELLOW}RATE LIMITED${RESET}  — quota exhausted or too many requests (HTTP 429)"
                 local err_type
-                err_type=$(echo "$body" | head -1 | python3 -c \
+                err_type=$(echo "$body" | python3 -c \
                     "import json,sys
 try:
     d=json.load(sys.stdin)
@@ -3375,20 +3332,73 @@ try:
     print(t + (': ' + m if m else ''))
 except Exception:
     pass" 2>/dev/null) || err_type=""
-                [[ -n "$err_type" ]] && info "  Detail: $err_type"
-                [[ -n "$retry_after" ]] && info "  Retry after: ${retry_after}s"
-                if [[ -z "$retry_after" ]]; then
-                    info "  This may resolve automatically — try again in a few minutes"
-                fi
-                ((issues++)) || true
+                [[ -n "$err_type" ]] && echo -e "             Detail: $err_type"
+                echo -e "             This may resolve automatically — try again in a few minutes"
+            fi
+            ;;
+        000|"")
+            echo -e "${YELLOW}UNREACHABLE${RESET}  — network error or DNS failure"
+            echo -e "             Check internet connection or firewall rules"
+            ;;
+        *)
+            echo -e "${DIM}UNKNOWN${RESET}  — unexpected HTTP $http_status"
+            ;;
+    esac
+}
+
+cmd_quota() {
+    hdr "API Quota / Rate-Limit Status"
+
+    if ! command -v curl &>/dev/null; then
+        fail "curl is required for quota checks. Install it and retry."
+    fi
+
+    local tmpdir; tmpdir=$(mktemp -d)
+    trap 'rm -rf "$tmpdir"' RETURN
+
+    # ── Phase 1: fire all curl requests in parallel (one per provider) ─────────
+    # Each request uses -D to capture response headers alongside the body in a
+    # single round-trip, halving the previous two-request-per-provider approach.
+    declare -A pids=()
+    local skipped_names=()
+    local n_checked=0
+
+    while IFS='|' read -r bid bname benv burl provider; do
+        [[ -z "$benv" ]] && continue
+        local key="${!benv:-}"
+        if [[ -z "$key" ]]; then
+            skipped_names+=("$bname ($benv)")
+            continue
+        fi
+
+        local body_file="$tmpdir/${benv}.body"
+        local hdr_file="$tmpdir/${benv}.hdr"
+        local meta_file="$tmpdir/${benv}.meta"
+        printf '%s|%s|%s|%s|%s\n' "$bid" "$bname" "$benv" "$burl" "$provider" > "$meta_file"
+
+        case "$provider" in
+            anthropic)
+                ( curl -s -w "\n%{http_code}" --max-time 8 \
+                    -D "$hdr_file" \
+                    -H "x-api-key: $key" \
+                    -H "anthropic-version: 2023-06-01" \
+                    "https://api.anthropic.com/v1/models" > "$body_file" 2>/dev/null
+                ) &
+                pids["$benv"]=$!
+                ((n_checked++)) || true
                 ;;
-            000)
-                echo -e "${YELLOW}UNREACHABLE${RESET}  — network error or DNS failure"
-                info "  Check internet connection or firewall rules"
-                ((issues++)) || true
+            openai)
+                ( curl -s -w "\n%{http_code}" --max-time 8 \
+                    -D "$hdr_file" \
+                    -H "Authorization: Bearer $key" \
+                    "https://api.openai.com/v1/models" > "$body_file" 2>/dev/null
+                ) &
+                pids["$benv"]=$!
+                ((n_checked++)) || true
                 ;;
             *)
-                echo -e "${DIM}UNKNOWN${RESET}  — unexpected HTTP $http_status"
+                printf '%s|%s|%s|%s|__unsupported__\n' "$bid" "$bname" "$benv" "$burl" > "$meta_file"
+                pids["$benv"]=0
                 ;;
         esac
     done < <(python3 - "$CATALOG" <<'PYEOF'
@@ -3403,14 +3413,40 @@ for b in c['backends']:
 PYEOF
 )
 
+    # ── Phase 2: wait for all jobs, then render results in catalog order ───────
+    for meta_file in "$tmpdir"/*.meta; do
+        [[ -f "$meta_file" ]] || continue
+        IFS='|' read -r bid bname benv burl provider < "$meta_file"
+        local pid="${pids[$benv]:-}"
+        [[ -n "$pid" && "$pid" != "0" ]] && wait "$pid" 2>/dev/null || true
+        if [[ "$provider" == "__unsupported__" ]]; then
+            printf "  %-32s%s\n" "$bname" "(no quota check available for this provider)"
+            continue
+        fi
+        _quota_render_result "$bid" "$bname" "$benv" "$burl" "$provider" "$tmpdir"
+    done
+
+    # ── Phase 3: summary ───────────────────────────────────────────────────────
     echo ""
-    if [[ $checked -eq 0 ]]; then
+    for sname in "${skipped_names[@]}"; do
+        info "$sname: not set — skipping"
+    done
+
+    if [[ $n_checked -le 0 ]]; then
         warn "No API keys are set. Run: tian-cli key set"
-    elif [[ $issues -eq 0 ]]; then
-        ok "All $checked API key(s) are active and within quota limits."
     else
-        warn "$issues issue(s) found across $checked key(s)."
-        info "Run 'tian-cli doctor' for a full health check."
+        local issues=0
+        for body_file in "$tmpdir"/*.body; do
+            [[ -f "$body_file" ]] || continue
+            local st; st=$(tail -1 "$body_file")
+            [[ "$st" =~ ^(401|403|429|000)$ ]] && ((issues++)) || true
+        done
+        if [[ $issues -eq 0 ]]; then
+            ok "All $n_checked API key(s) are active and within quota limits."
+        else
+            warn "$issues issue(s) found across $n_checked key(s)."
+            info "Run 'tian-cli doctor' for a full health check."
+        fi
     fi
     echo ""
 }
