@@ -67,6 +67,19 @@ Describe "CLI jobs command" {
     }
 }
 
+Describe "CLI quota command" {
+    It "exits 0 for quota command (no keys set)" {
+        $env:ANTHROPIC_API_KEY = ""
+        $env:OPENAI_API_KEY    = ""
+        Invoke-Tian @("quota") | Out-Null
+        $LASTEXITCODE | Should -Be 0
+    }
+    It "quota output mentions API keys" {
+        $out = Invoke-Tian @("quota")
+        ($out -join " ") | Should -Match "key|Key|quota|Quota|API"
+    }
+}
+
 Describe "CLI schedule subcommands" {
     It "exits 0 for 'schedule list'" {
         Invoke-Tian @("schedule", "list") | Out-Null

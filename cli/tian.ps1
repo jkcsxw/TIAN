@@ -197,6 +197,7 @@ function Cmd-Help {
     setup               交互式引导安装（首次使用推荐）
     install             使用参数快速安装
     doctor [--fix]      诊断常见安装问题；--fix 自动修复可修复的问题
+    quota               检查所有API密钥的配额和速率限制状态（彩色输出）
     update              将已安装的AI后端更新到最新版本
     uninstall           移除TIAN安装的组件（后端、密钥、数据）
     status              查看当前安装状态
@@ -279,6 +280,7 @@ function Cmd-Help {
     setup               Interactive guided setup (recommended for first-time users)
     install             Non-interactive install with flags
     doctor [--fix]      Check your setup and diagnose common problems; --fix auto-resolves fixable issues
+    quota               Check live quota/rate-limit status for all API keys (colored output)
     update              Upgrade installed AI backends to their latest versions
     uninstall           Remove TIAN's installed components (backends, keys, data)
     status              Show what is currently installed
@@ -999,6 +1001,159 @@ function Cmd-Doctor {
     Write-Host ""
 }
 
+function Cmd-Quota {
+    Write-Header "API Quota / Rate-Limit Status"
+    Write-Rule
+
+    $seenVars  = @{}
+    $toCheck   = [System.Collections.Generic.List[hashtable]]::new()
+    $skipped   = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($b in $catalog.backends) {
+        $varName = $b.apiKeyEnvVar
+        if (-not $varName -or $seenVars.ContainsKey($varName)) { continue }
+        $seenVars[$varName] = $true
+
+        $provider = if ($varName -like "*ANTHROPIC*") { "anthropic" }
+                    elseif ($varName -like "*OPENAI*")   { "openai" }
+                    else                                  { "" }
+        if (-not $provider) { continue }
+
+        $val = [System.Environment]::GetEnvironmentVariable($varName, "User")
+        if (-not $val) { $val = [System.Environment]::GetEnvironmentVariable($varName, "Process") }
+        if (-not $val) { $val = [System.Environment]::GetEnvironmentVariable($varName) }
+
+        if (-not $val) {
+            $skipped.Add("$($b.displayName) ($varName)")
+            continue
+        }
+
+        $toCheck.Add(@{
+            Name     = $b.displayName
+            VarName  = $varName
+            Key      = $val
+            Provider = $provider
+            Url      = $b.apiKeyUrl
+            Id       = $b.id
+        })
+    }
+
+    if ($toCheck.Count -eq 0 -and $skipped.Count -gt 0) {
+        Write-Warn "No API keys are set. Run: tian-cli key set"
+        foreach ($s in $skipped) { Write-Info "$s — not set" }
+        Write-Host ""
+        return
+    }
+
+    $issueCount = 0
+
+    foreach ($entry in $toCheck) {
+        $name     = $entry.Name
+        $varName  = $entry.VarName
+        $key      = $entry.Key
+        $provider = $entry.Provider
+        $keyUrl   = $entry.Url
+        $id       = $entry.Id
+
+        $headers = @{}
+        $url     = ""
+        switch ($provider) {
+            "anthropic" {
+                $url     = "https://api.anthropic.com/v1/models"
+                $headers = @{ "x-api-key" = $key; "anthropic-version" = "2023-06-01" }
+            }
+            "openai" {
+                $url     = "https://api.openai.com/v1/models"
+                $headers = @{ "Authorization" = "Bearer $key" }
+            }
+        }
+
+        $label = $name.PadRight(32)
+        $httpCode  = 0
+        $retryAfter = ""
+        $bodyText   = ""
+
+        try {
+            $req = [System.Net.WebRequest]::Create($url)
+            $req.Timeout = 8000
+            $req.Method  = "GET"
+            foreach ($h in $headers.GetEnumerator()) { $req.Headers[$h.Key] = $h.Value }
+            $resp    = $req.GetResponse()
+            $httpCode = [int]$resp.StatusCode
+            $reader  = [System.IO.StreamReader]::new($resp.GetResponseStream())
+            $bodyText = $reader.ReadToEnd()
+            $reader.Close(); $resp.Close()
+        } catch [System.Net.WebException] {
+            if ($_.Exception.Response) {
+                $httpCode   = [int]$_.Exception.Response.StatusCode
+                $retryAfter = $_.Exception.Response.Headers["Retry-After"]
+                try {
+                    $errStream = $_.Exception.Response.GetResponseStream()
+                    $reader    = [System.IO.StreamReader]::new($errStream)
+                    $bodyText  = $reader.ReadToEnd()
+                    $reader.Close()
+                } catch {}
+            } else {
+                $httpCode = 0
+            }
+        } catch {
+            $httpCode = 0
+        }
+
+        switch ($httpCode) {
+            200 {
+                Write-Ok   "$label OK  — key valid, not rate-limited"
+            }
+            401 {
+                Write-Fail "$label INVALID  — key rejected (HTTP 401)"
+                Write-Info "             Fix: tian-cli key set $id  (get a new key at: $keyUrl)"
+                $issueCount++
+            }
+            403 {
+                $isBilling = $bodyText -imatch "credit|billing|quota|insufficient"
+                if ($isBilling) {
+                    Write-Fail "$label QUOTA EXHAUSTED  — billing/credit issue (HTTP 403)"
+                    Write-Info "             Fix: add credits at $keyUrl"
+                } else {
+                    Write-Warn "$label FORBIDDEN  — key lacks permissions (HTTP 403)"
+                    Write-Info "             Fix: check key permissions at $keyUrl"
+                }
+                $issueCount++
+            }
+            429 {
+                if ($retryAfter) {
+                    Write-Warn "$label RATE LIMITED  — retry after ${retryAfter}s (HTTP 429)"
+                } else {
+                    Write-Warn "$label RATE LIMITED  — quota exhausted or too many requests (HTTP 429)"
+                    Write-Info "             This may resolve automatically — try again in a few minutes"
+                }
+                $issueCount++
+            }
+            0 {
+                Write-Warn "$label UNREACHABLE  — network error or DNS failure"
+                Write-Info "             Check internet connection or firewall rules"
+                $issueCount++
+            }
+            default {
+                Write-Info "$label UNKNOWN  — unexpected HTTP $httpCode"
+            }
+        }
+    }
+
+    Write-Host ""
+    foreach ($s in $skipped) { Write-Info "$s — not set, skipping" }
+
+    if ($toCheck.Count -gt 0) {
+        Write-Host ""
+        if ($issueCount -eq 0) {
+            Write-Ok "All $($toCheck.Count) API key(s) are active and within quota limits."
+        } else {
+            Write-Warn "$issueCount issue(s) found across $($toCheck.Count) key(s). Run: tian-cli doctor"
+        }
+    }
+    Write-Host ""
+}
+
 function Cmd-Update {
     Write-Header "TIAN Update — Upgrade AI Backends"
     Write-Rule
@@ -1486,6 +1641,7 @@ switch ($Command.ToLower()) {
     }
     "config"    { Cmd-Config }
     "doctor"    { Cmd-Doctor -Fix:$Fix }
+    "quota"     { Cmd-Quota }
     "update"    { Cmd-Update }
     "repair"    { Cmd-Repair }
     "uninstall" { Cmd-Uninstall }
