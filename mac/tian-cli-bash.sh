@@ -744,6 +744,7 @@ $(rule)
     key set [id]        Set or update an API key for a backend (interactive)
     key show            Show which API keys are currently set
     key remove <id>     Remove an API key from your shell profile
+    ping [--backend id] Send a quick test prompt to the active AI backend and verify it responds
     quota               Check live quota/rate-limit status for all API keys (colored output)
     config export       Export setup (API keys, MCP configs, skills, schedules) to a file
     config import       Restore a previously exported config on this machine
@@ -841,6 +842,7 @@ cat <<'ZHEOF'
     key set [id]        设置或更新API密钥（交互式）
     key show            显示当前已设置的API密钥
     key remove <id>     从Shell配置文件中移除API密钥
+    ping [--backend id] 向AI后端发送测试提示词，验证其是否正常响应
     quota               检查所有API密钥的配额/速率限制状态（彩色输出）
     config export       将配置（API密钥、MCP、技能、定时任务）导出到文件
     config import       在此机器上恢复之前导出的配置
@@ -3838,6 +3840,127 @@ except Exception:
     esac
 }
 
+cmd_ping() {
+    local forced_backend_id=""
+    while [[ $# -gt 0 ]]; do
+        case "${1:-}" in
+            --backend) forced_backend_id="${2:-}"; shift 2 ;;
+            -h|--help)
+                echo ""
+                echo "Usage: tian-cli ping [--backend <id>]"
+                echo ""
+                echo "  Send a quick test prompt to the active AI backend and verify it responds."
+                echo "  Use --backend <id> to test a specific backend instead of the active one."
+                echo ""
+                echo "  Examples:"
+                echo "    tian-cli ping"
+                echo "    tian-cli ping --backend ollama"
+                echo ""
+                return 0 ;;
+            *) shift ;;
+        esac
+    done
+
+    hdr "TIAN Ping — End-to-End AI Test"
+
+    local cmd="" flag="" backend_id="" b_name=""
+    if [[ -n "$forced_backend_id" ]]; then
+        local _bcheck
+        _bcheck=$(python3 - "$CATALOG" "$forced_backend_id" <<'PYEOF'
+import json, subprocess, sys
+catalog = json.load(open(sys.argv[1]))
+bid = sys.argv[2]
+b = next((bb for bb in catalog['backends'] if bb.get('id') == bid), None)
+if not b:
+    print("error:notfound"); raise SystemExit(1)
+c = b.get('cliCommand', '')
+fl = (b.get('nonInteractiveFlag', '') or '').strip()
+if not c or subprocess.run(['which', c], capture_output=True).returncode != 0:
+    print("error:notinstalled"); raise SystemExit(2)
+print(f"{c}|{fl}|{bid}|{b['displayName']}")
+PYEOF
+) || true
+        case "$_bcheck" in
+            error:notfound)     fail "Unknown backend '$forced_backend_id'. Run: tian-cli list backends" ;;
+            error:notinstalled) fail "Backend '$forced_backend_id' is not installed. Run: tian-cli install --backend $forced_backend_id" ;;
+        esac
+        cmd=$(echo "$_bcheck"    | cut -d'|' -f1)
+        flag=$(echo "$_bcheck"   | cut -d'|' -f2)
+        backend_id=$(echo "$_bcheck" | cut -d'|' -f3)
+        b_name=$(echo "$_bcheck" | cut -d'|' -f4)
+    else
+        local backend_row; backend_row=$(active_backend) || true
+        if [[ -z "$backend_row" ]]; then
+            fail "No AI backend found. Run: bash setup.sh"
+        fi
+        cmd=$(echo "$backend_row"    | cut -d'|' -f1)
+        flag=$(echo "$backend_row"   | cut -d'|' -f2)
+        backend_id=$(echo "$backend_row" | cut -d'|' -f3)
+        b_name=$(python3 - "$CATALOG" "$backend_id" <<'PYEOF'
+import json, sys
+c = json.load(open(sys.argv[1]))
+bid = sys.argv[2]
+b = next((bb for bb in c['backends'] if bb.get('id') == bid), None)
+print(b['displayName'] if b else bid)
+PYEOF
+)
+    fi
+
+    info "Backend: $b_name  ($cmd)"
+    info "Sending test prompt..."
+    echo ""
+
+    local test_prompt="Reply with exactly and only the word: PONG"
+    local tmpfile; tmpfile=$(mktemp)
+    trap 'rm -f "$tmpfile"' RETURN
+
+    # Capture start time in milliseconds
+    local start_ms end_ms
+    start_ms=$(date +%s%3N 2>/dev/null || date +%s)
+
+    local exit_code=0
+    # flag may be empty; unquoted expansion is intentional so multi-word flags split correctly
+    timeout 30 "$cmd" $flag "$test_prompt" > "$tmpfile" 2>&1 || exit_code=$?
+
+    end_ms=$(date +%s%3N 2>/dev/null || date +%s)
+    local elapsed_ms=$(( end_ms - start_ms ))
+    local elapsed_s
+    elapsed_s=$(awk "BEGIN{printf \"%.1f\", $elapsed_ms/1000}")
+
+    local response; response=$(cat "$tmpfile")
+
+    # ── No output at all ────────────────────────────────────────────────────────
+    if [[ -z "$response" ]]; then
+        warn "No output received from backend (exit code: $exit_code, ${elapsed_s}s)"
+        info "  Check: tian-cli doctor  — to diagnose configuration issues"
+        info "  Check: tian-cli quota   — to check API quota"
+        echo ""
+        return 1
+    fi
+
+    # ── Quota / rate-limit error in response ────────────────────────────────────
+    if is_quota_error "$response"; then
+        warn "Quota or rate-limit error detected in backend response (${elapsed_s}s)"
+        info "  Check: tian-cli quota   — to see your API quota status"
+        echo ""
+        rule
+        echo -e "${DIM}Response snippet:${RESET}"
+        echo "$response" | head -5
+        echo ""
+        return 1
+    fi
+
+    # ── Success ─────────────────────────────────────────────────────────────────
+    rule
+    echo -e "${DIM}Response received in ${elapsed_s}s:${RESET}"
+    echo ""
+    echo "$response" | head -20
+    echo ""
+    rule
+    ok "AI backend is responding correctly.  (${elapsed_s}s)"
+    echo ""
+}
+
 cmd_quota() {
     hdr "API Quota / Rate-Limit Status"
 
@@ -4008,7 +4131,7 @@ _tian_complete() {
 
     # Top-level subcommands
     if [[ \$cword -eq 1 ]]; then
-        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key quota completion lang help" -- "\$cur") )
+        COMPREPLY=( \$(compgen -W "setup install repair update doctor status uninstall add remove run jobs schedule list skill config key ping quota completion lang help" -- "\$cur") )
         return
     fi
 
@@ -4097,6 +4220,11 @@ _tian_complete() {
                     import) COMPREPLY=( \$(compgen -f -- "\$cur") ) ;;
                 esac
             fi ;;
+        ping)
+            case "\$prev" in
+                --backend) COMPREPLY=( \$(compgen -W "${_backend_ids}" -- "\$cur") ) ;;
+                *)         COMPREPLY=( \$(compgen -W "--backend" -- "\$cur") ) ;;
+            esac ;;
         doctor)     COMPREPLY=( \$(compgen -W "--fix -f" -- "\$cur") ) ;;
         lang)       COMPREPLY=( \$(compgen -W "en zh" -- "\$cur") ) ;;
         completion) COMPREPLY=( \$(compgen -W "bash zsh install" -- "\$cur") ) ;;
@@ -4180,6 +4308,7 @@ case "$CMD" in
     skill)      cmd_skill "$@" ;;
     config)     cmd_config "$@" ;;
     key)        cmd_key "$@" ;;
+    ping)       cmd_ping "$@" ;;
     quota)      cmd_quota ;;
     completion) cmd_completion "$@" ;;
     lang)       cmd_lang "$@" ;;
