@@ -697,6 +697,7 @@ $(rule)
     run "prompt"        Run a task (foreground)
     run "prompt" -b     Run a task in the background
     run "prompt" -w     Run in background and stream live output (auto-exits when done)
+    run "prompt" --backend <id>   Force a specific backend (e.g. ollama-qwen-local for privacy)
     jobs                List background jobs
     jobs result <id>    Show output of a completed job
     jobs tail <id>      Stream live output (auto-exits when job ends; shows result if already done)
@@ -726,6 +727,8 @@ $(rule)
     bash tian-cli.sh run "Summarise today's AI news"
     bash tian-cli.sh run "Draft my weekly report" -b
     bash tian-cli.sh run "Research the latest LLM papers" -w
+    bash tian-cli.sh run "Summarise this privately" --backend ollama-qwen-local
+    bash tian-cli.sh run "Urgent task" --backend claude-code -b
     bash tian-cli.sh list backends
     bash tian-cli.sh jobs
     bash tian-cli.sh schedule add morning-brief "Morning briefing" 08:00 daily
@@ -946,6 +949,7 @@ cmd_run() {
     local watch=false
     local job_name=""
     local schedule_name=""
+    local forced_backend_id=""
     while [[ $# -gt 0 ]]; do
         case "${1:-}" in
             -b|--background)
@@ -965,17 +969,51 @@ cmd_run() {
                 schedule_name="${2:-}"
                 shift 2
                 ;;
+            --backend)
+                forced_backend_id="${2:-}"
+                shift 2
+                ;;
             *)
                 shift
                 ;;
         esac
     done
 
-    local backend_row; backend_row=$(active_backend)
-    local cmd; cmd=$(echo "$backend_row" | cut -d'|' -f1)
-    local flag; flag=$(echo "$backend_row" | cut -d'|' -f2)
-
-    [[ -z "$cmd" ]] && fail "No AI backend found. Run: bash setup.sh"
+    local backend_row cmd flag
+    if [[ -n "$forced_backend_id" ]]; then
+        local _bcheck
+        _bcheck=$(python3 - "$CATALOG" "$forced_backend_id" <<'PYEOF'
+import json, subprocess, sys
+catalog = json.load(open(sys.argv[1]))
+bid = sys.argv[2]
+b = next((bb for bb in catalog['backends'] if bb.get('id') == bid), None)
+if not b:
+    print("error:notfound")
+    raise SystemExit(1)
+c = b.get('cliCommand', '')
+fl = (b.get('nonInteractiveFlag', '') or '').strip()
+if not c or subprocess.run(['which', c], capture_output=True).returncode != 0:
+    print("error:notinstalled")
+    raise SystemExit(2)
+print(f"{c}|{fl}|{bid}")
+PYEOF
+) || true
+        case "$_bcheck" in
+            error:notfound)
+                fail "Unknown backend '$forced_backend_id'. Run: tian-cli list backends" ;;
+            error:notinstalled)
+                fail "Backend '$forced_backend_id' is not installed. Run: tian-cli install --backend $forced_backend_id" ;;
+        esac
+        cmd=$(echo "$_bcheck" | cut -d'|' -f1)
+        flag=$(echo "$_bcheck" | cut -d'|' -f2)
+        [[ -z "$cmd" ]] && fail "Could not resolve backend '$forced_backend_id'."
+        info "Using backend: $forced_backend_id"
+    else
+        backend_row=$(active_backend)
+        cmd=$(echo "$backend_row" | cut -d'|' -f1)
+        flag=$(echo "$backend_row" | cut -d'|' -f2)
+        [[ -z "$cmd" ]] && fail "No AI backend found. Run: bash setup.sh"
+    fi
 
     ensure_dirs
     local job_id; job_id=$(new_job_id)
@@ -993,7 +1031,11 @@ _primary="$1"
 _prompt="$3"
 _out="$4"
 _ec=1
-backends=$(python3 -c "
+_forced="${9:-}"
+if [[ -n "$_forced" ]]; then
+    backends="$1|$2"
+else
+    backends=$(python3 -c "
 import json, subprocess, sys
 c = json.load(open(sys.argv[1]))
 for b in c[\"backends\"]:
@@ -1002,6 +1044,7 @@ for b in c[\"backends\"]:
     if cmd and subprocess.run([\"which\", cmd], capture_output=True).returncode == 0:
         print(cmd + \"|\" + flag)
 " "$CATALOG" 2>/dev/null)
+fi
 while IFS="|" read -r r_cmd r_flag; do
     [[ -z "$r_cmd" ]] && continue
     $r_cmd $r_flag "$_prompt" >"$_out" 2>&1
@@ -1027,17 +1070,20 @@ with open(jf, \"w\") as _fh:
 if quota and schedule_name:
     subprocess.run([\"bash\", os.path.join(tian_dir, \"tian-cli.sh\"), \"schedule\", \"remove\", schedule_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 " "$5" "$6" "$_ec" "$4" "$7" "$8"
-' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" &>/dev/null &
+' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" "$forced_backend_id" &>/dev/null &
         local pid=$!
-        python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" "$pid" "$job_name" "$schedule_name" <<'PYEOF'
+        python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" "$pid" "$job_name" "$schedule_name" "$forced_backend_id" <<'PYEOF'
 import json, sys
 from datetime import datetime
-jobs_file, jid, prompt, cmd, pid, job_name, schedule_name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6], sys.argv[7]
+jobs_file, jid, prompt, cmd, pid, job_name, schedule_name, forced_backend = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6], sys.argv[7], sys.argv[8]
 with open(jobs_file) as fh:
     jobs = json.load(fh)
-jobs.append({"id": jid, "name": job_name or jid, "prompt": prompt, "backend": cmd,
-             "scheduleName": schedule_name or "", "status": "running",
-             "createdAt": datetime.now().isoformat(), "pid": pid})
+entry = {"id": jid, "name": job_name or jid, "prompt": prompt, "backend": cmd,
+         "scheduleName": schedule_name or "", "status": "running",
+         "createdAt": datetime.now().isoformat(), "pid": pid}
+if forced_backend:
+    entry["forcedBackend"] = forced_backend
+jobs.append(entry)
 with open(jobs_file, 'w') as fh:
     json.dump(jobs, fh, indent=2)
 PYEOF
@@ -1051,18 +1097,24 @@ PYEOF
             return $?
         fi
     else
-        local primary_cmd="$cmd"
-        while IFS='|' read -r r_cmd r_flag _bid r_name; do
-            [[ -z "$r_cmd" ]] && continue
-            [[ "$r_cmd" == "$primary_cmd" ]] || warn "Falling back to $r_name (quota/rate-limit on previous backend)..."
+        if [[ -n "$forced_backend_id" ]]; then
             rule
-            # r_flag may be empty or multi-word; unquoted expansion handles both correctly
-            "$r_cmd" $r_flag "$prompt" 2>&1 | tee "$out_file" || true
+            "$cmd" $flag "$prompt" 2>&1 | tee "$out_file" || true
             rule
-            local out_text; out_text=$(cat "$out_file" 2>/dev/null || true)
-            is_quota_error "$out_text" || break
-            warn "$r_name: quota or rate limit — trying next backend..."
-        done < <(all_backends)
+        else
+            local primary_cmd="$cmd"
+            while IFS='|' read -r r_cmd r_flag _bid r_name; do
+                [[ -z "$r_cmd" ]] && continue
+                [[ "$r_cmd" == "$primary_cmd" ]] || warn "Falling back to $r_name (quota/rate-limit on previous backend)..."
+                rule
+                # r_flag may be empty or multi-word; unquoted expansion handles both correctly
+                "$r_cmd" $r_flag "$prompt" 2>&1 | tee "$out_file" || true
+                rule
+                local out_text; out_text=$(cat "$out_file" 2>/dev/null || true)
+                is_quota_error "$out_text" || break
+                warn "$r_name: quota or rate limit — trying next backend..."
+            done < <(all_backends)
+        fi
     fi
 }
 
@@ -1110,7 +1162,7 @@ cmd_jobs() {
             ;;
         retry)
             local id="${1:-}"; [[ -z "$id" ]] && fail "Usage: jobs retry <job-id>"
-            local orig_prompt orig_name orig_schedule
+            local orig_prompt orig_name orig_schedule orig_backend
             orig_prompt=$(python3 - "$JOBS_FILE" "$id" <<'PYEOF'
 import json, sys
 jobs = json.load(open(sys.argv[1]))
@@ -1130,10 +1182,16 @@ import json,sys
 j=next((x for x in json.load(open(sys.argv[1])) if x.get('id')==sys.argv[2]),{})
 print(j.get('scheduleName','') or '')
 " "$JOBS_FILE" "$id")
+            orig_backend=$(python3 -c "
+import json,sys
+j=next((x for x in json.load(open(sys.argv[1])) if x.get('id')==sys.argv[2]),{})
+print(j.get('forcedBackend','') or '')
+" "$JOBS_FILE" "$id")
             info "Retrying prompt from job $id..."
             local retry_args=(-b)
-            [[ -n "$orig_name"     ]] && retry_args+=(--job-name     "$orig_name")
+            [[ -n "$orig_name"     ]] && retry_args+=(--job-name      "$orig_name")
             [[ -n "$orig_schedule" ]] && retry_args+=(--schedule-name "$orig_schedule")
+            [[ -n "$orig_backend"  ]] && retry_args+=(--backend       "$orig_backend")
             cmd_run "$orig_prompt" "${retry_args[@]}"
             ;;
         clear)
