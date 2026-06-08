@@ -345,6 +345,24 @@ if ($quotaExhausted -and $ScheduleName -and (Test-Path $CliScript)) {
     & $ShellCommand -NoProfile -ExecutionPolicy Bypass -File $CliScript -TianDir $TianDir schedule remove --name $ScheduleName *> $null
 }
 
+# Desktop notification on job completion
+$notifMsg = if ($quotaExhausted) { "Job $JobId stopped — quota exhausted" } elseif ($exitCode -ne 0) { "Job $JobId failed" } else { "Job $JobId finished" }
+try {
+    if ($env:OS -eq 'Windows_NT' -or $IsWindows) {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $notify = New-Object System.Windows.Forms.NotifyIcon
+        $notify.Icon = [System.Drawing.SystemIcons]::Information
+        $notify.BalloonTipTitle = "TIAN"
+        $notify.BalloonTipText = $notifMsg
+        $notify.Visible = $true
+        $notify.ShowBalloonTip(6000)
+        Start-Sleep -Milliseconds 300
+        $notify.Dispose()
+    } elseif ($IsMacOS) {
+        & osascript -e "display notification `"$notifMsg`" with title `"TIAN`"" 2>$null
+    }
+} catch {}
+
 Remove-Item $PSCommandPath -ErrorAction SilentlyContinue
 '@
         Set-Content -Path $workerFile -Value $workerScript -Encoding UTF8

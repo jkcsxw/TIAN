@@ -1143,6 +1143,18 @@ with open(jf, \"w\") as _fh:
 if quota and schedule_name:
     subprocess.run([\"bash\", os.path.join(tian_dir, \"tian-cli.sh\"), \"schedule\", \"remove\", schedule_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 " "$5" "$6" "$_ec" "$4" "$7" "$8"
+# Desktop notification on job completion
+if grep -qiE "insufficient_quota|quota|rate[._]limit|429|too many requests|overloaded" "$_out" 2>/dev/null; then
+    _notif_msg="Job $6 stopped — quota exhausted"
+elif [[ "$_ec" -ne 0 ]]; then
+    _notif_msg="Job $6 failed"
+else
+    _notif_msg="Job $6 finished"
+fi
+case "$(uname -s)" in
+    Darwin) osascript -e "display notification \"$_notif_msg\" with title \"TIAN\"" 2>/dev/null || true ;;
+    Linux)  command -v notify-send &>/dev/null && DISPLAY="${DISPLAY:-:0}" notify-send -t 8000 "TIAN" "$_notif_msg" 2>/dev/null || true ;;
+esac
 ' -- "$cmd" "$flag" "$prompt" "$out_file" "$JOBS_FILE" "$job_id" "$schedule_name" "$TIAN_DIR" "$forced_backend_id" &>/dev/null &
         local pid=$!
         python3 - "$JOBS_FILE" "$job_id" "$prompt" "$cmd" "$pid" "$job_name" "$schedule_name" "$forced_backend_id" <<'PYEOF'
