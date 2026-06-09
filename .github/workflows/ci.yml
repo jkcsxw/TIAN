@@ -12,7 +12,7 @@ jobs:
     name: Package security (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Make security test executable
         run: chmod +x tests/bash/test-package-security.sh
@@ -25,7 +25,7 @@ jobs:
     name: Pester tests (Windows)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Pester v5
         shell: pwsh
@@ -48,7 +48,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pester-results
           path: tests/results-windows.xml
@@ -58,7 +58,7 @@ jobs:
     name: Bash tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Make test scripts executable
         run: chmod +x tests/run-tests.sh tests/bash/*.sh
@@ -71,7 +71,7 @@ jobs:
     name: Bash + Pester tests (macOS)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Make test scripts executable
         run: chmod +x tests/run-tests.sh tests/bash/*.sh
@@ -81,7 +81,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pester-results-mac
           path: tests/results-mac.xml
@@ -99,7 +99,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 

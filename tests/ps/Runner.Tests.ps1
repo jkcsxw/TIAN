@@ -250,6 +250,14 @@ Describe "Invoke-Task" {
                 nonInteractiveFlag = "--prompt"
             }
         }
+        Mock Get-AllAvailableBackends {
+            @([PSCustomObject]@{
+                id = "fake-backend"
+                displayName = "Fake Backend"
+                cliCommand = "Invoke-TestBackend"
+                nonInteractiveFlag = "--prompt"
+            })
+        }
 
         $prompt = 'say "hello"; Write-Host hacked'
         Invoke-Task -Prompt $prompt -TianDir (Get-TianRoot) | Out-Null
